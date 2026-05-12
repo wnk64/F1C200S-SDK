@@ -132,14 +132,7 @@ static int connect2Server_with_af(aw_mms_inf_t* mmsStreamInf, char *host, int po
         CDX_LOGV(" select 0");
         if(count > 30 )
         {
-            if(count > 30)
-            {
-                CDX_LOGE("*****************ConnTimeout");
-            }
-            else
-            {
-                CDX_LOGE("***************Connection interrupted by user");
-            }
+            CDX_LOGE("*****************ConnTimeout");
             return -1;
         }
 

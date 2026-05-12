@@ -16,20 +16,37 @@ LOCAL_INCLUDE = -I../include \
 		-I../../base/include \
 		-I../base \
                 -I$(top_srcdir)/external/include/aencoder \
+		-I$(top_srcdir)/../mpp_libcedarc/include \
                 -I$(top_srcdir)/../libcedarc/include \
 		-I$(top_srcdir)/
 
 libcdx_muxer_la_CFLAGS += $(LOCAL_INCLUDE)
 
-
 libcdx_muxer_la_LDFLAGS = $(LDFLAGS_CDXG)
 
-libcdx_muxer_la_LIBADD = $(top_srcdir)/libcore/muxer/aac/libcdx_aac_muxer.la \
-			$(top_srcdir)/libcore/muxer/mp4/libcdx_mp4_muxer.la \
-			$(top_srcdir)/libcore/muxer/ts/libcdx_ts_muxer.la \
-			$(top_srcdir)/libcore/base/libcdx_base.la
+libcdx_muxer_la_LIBADD =
 
-#			$(top_srcdir)/libcore/muxer/mp4ex/libcdx_mp4ex_muxer.la
+if MP3_MUXER_ENABLE
+libcdx_muxer_la_LIBADD += $(top_srcdir)/libcore/muxer/mp3/libcdx_mp3_muxer.la
+libcdx_muxer_la_CFLAGS += -DMP3_MUXER_ENABLE
+endif
+
+if AAC_MUXER_ENABLE
+libcdx_muxer_la_LIBADD += $(top_srcdir)/libcore/muxer/aac/libcdx_aac_muxer.la
+libcdx_muxer_la_CFLAGS += -DAAC_MUXER_ENABLE
+endif
+
+if TS_MUXER_ENABLE
+libcdx_muxer_la_LIBADD += $(top_srcdir)/libcore/muxer/ts/libcdx_ts_muxer.la
+libcdx_muxer_la_CFLAGS += -DTS_MUXER_ENABLE
+endif
+
+if MP4_MUXER_ENABLE
+libcdx_muxer_la_LIBADD += $(top_srcdir)/libcore/muxer/mp4/libcdx_mp4_muxer.la
+libcdx_muxer_la_CFLAGS += -DMP4_MUXER_ENABLE
+endif
+
+libcdx_muxer_la_LIBADD += $(top_srcdir)/libcore/base/libcdx_base.la
 
 LOCAL_LIB = -lpthread -laencoder -lvencoder
 libcdx_muxer_la_LDFLAGS += $(LOCAL_LIB)

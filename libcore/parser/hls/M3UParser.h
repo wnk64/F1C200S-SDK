@@ -121,6 +121,7 @@ struct PlaylistItem {
             cdx_int32 seqNum;
             PlaylistItem *cipherReference;
             cdx_int64 baseTimeUs;
+	    bool isInitItem;
         }mediaItemAttribute;
         struct {
             cdx_int64 bandwidth;

@@ -39,6 +39,7 @@ struct CdxParserListS
 struct CdxParserListS parserList;
 static int parserInit = 0;
 
+#ifdef ASF_PARSER_ENABLE
 extern CdxParserCreatorT asfParserCtor;
 static struct ParserUriKeyInfoS asfKeyInfo =
 {
@@ -47,7 +48,9 @@ static struct ParserUriKeyInfoS asfKeyInfo =
     {".asf", ".wmv", ".wma"}, /*suffix*/
     {NULL} /*attribute*/
 };
+#endif
 
+#if REMUX_PARSER_ENABLE
 extern CdxParserCreatorT remuxParserCtor;
 static struct ParserUriKeyInfoS remuxKeyInfo =
 {
@@ -56,7 +59,9 @@ static struct ParserUriKeyInfoS remuxKeyInfo =
     {NULL}, /*suffix*/
     {NULL} /*attribute*/
 };
+#endif
 
+#ifdef AVI_PARSER_ENABLE
 extern CdxParserCreatorT aviParserCtor;
 static struct ParserUriKeyInfoS aviKeyInfo =
 {
@@ -65,7 +70,9 @@ static struct ParserUriKeyInfoS aviKeyInfo =
     {".avi"}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
+#ifdef FLV_PARSER_ENABLE
 extern CdxParserCreatorT flvParserCtor;
 static struct ParserUriKeyInfoS flvKeyInfo =
 {
@@ -74,7 +81,9 @@ static struct ParserUriKeyInfoS flvKeyInfo =
     {".flv"}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
+#ifdef TS_PARSER_ENABLE
 extern CdxParserCreatorT tsParserCtor;
 static struct ParserUriKeyInfoS tsKeyInfo =
 {
@@ -83,6 +92,7 @@ static struct ParserUriKeyInfoS tsKeyInfo =
     {".ts", ".tp", ".tr", ".m2ts", ".mts"}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
 #ifdef __ANDROID__
 extern CdxParserCreatorT dashParserCtor;
@@ -95,6 +105,7 @@ static struct ParserUriKeyInfoS dashKeyInfo =
 };
 #endif
 
+#ifdef MOV_PARSER_ENABLE
 extern CdxParserCreatorT movParserCtor;
 static struct ParserUriKeyInfoS movKeyInfo =
 {
@@ -103,6 +114,7 @@ static struct ParserUriKeyInfoS movKeyInfo =
     {".mp4", ".mov", ".3gp"}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
 #ifdef __ANDROID__
 extern CdxParserCreatorT mmsParserCtor;
@@ -115,7 +127,7 @@ static struct ParserUriKeyInfoS mmsKeyInfo =
 };
 #endif
 
-#ifdef HLS_ENABLE
+#ifdef HLS_PARSER_ENABLE
 extern CdxParserCreatorT hlsParserCtor;
 static struct ParserUriKeyInfoS hlsKeyInfo =
 {
@@ -126,6 +138,7 @@ static struct ParserUriKeyInfoS hlsKeyInfo =
 };
 #endif
 
+#ifdef MKV_PARSER_ENABLE
 extern CdxParserCreatorT mkvParserCtor;
 static struct ParserUriKeyInfoS mkvKeyInfo =
 {
@@ -134,7 +147,9 @@ static struct ParserUriKeyInfoS mkvKeyInfo =
     {".mkv", ".webm"}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
+#ifdef MPG_PARSER_ENABLE
 extern CdxParserCreatorT mpgParserCtor;
 static struct ParserUriKeyInfoS mpgKeyInfo =
 {
@@ -143,6 +158,7 @@ static struct ParserUriKeyInfoS mpgKeyInfo =
     {NULL}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
 #ifdef __ANDROID__
 extern CdxParserCreatorT bdParserCtor;
@@ -153,7 +169,9 @@ static struct ParserUriKeyInfoS bdKeyInfo =
     {NULL}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
+#ifdef PMP_PARSER_ENABLE
 extern CdxParserCreatorT pmpParserCtor;
 static struct ParserUriKeyInfoS pmpKeyInfo =
 {
@@ -164,6 +182,7 @@ static struct ParserUriKeyInfoS pmpKeyInfo =
 };
 #endif
 
+#ifdef OGG_PARSER_ENABLE
 extern CdxParserCreatorT oggParserCtor;
 static struct ParserUriKeyInfoS oggKeyInfo =
 {
@@ -172,6 +191,7 @@ static struct ParserUriKeyInfoS oggKeyInfo =
     {".ogm", ".ogg"}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
 #ifdef __ANDROID__
 extern CdxParserCreatorT m3u9ParserCtor;
@@ -193,6 +213,7 @@ static struct ParserUriKeyInfoS playlistKeyInfo =
 };
 #endif
 
+#ifdef APE_PARSER_ENABLE
 extern CdxParserCreatorT apeParserCtor;
 static struct ParserUriKeyInfoS apeKeyInfo =
 {
@@ -201,7 +222,9 @@ static struct ParserUriKeyInfoS apeKeyInfo =
     {".ape"}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
+#ifdef FLAC_PARSER_ENABLE
 extern CdxParserCreatorT flacParserCtor;
 static struct ParserUriKeyInfoS flacKeyInfo =
 {
@@ -210,7 +233,9 @@ static struct ParserUriKeyInfoS flacKeyInfo =
     {".flac"}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
+#ifdef AMR_PARSER_ENABLE
 extern CdxParserCreatorT amrParserCtor;
 static struct ParserUriKeyInfoS amrKeyInfo =
 {
@@ -219,7 +244,9 @@ static struct ParserUriKeyInfoS amrKeyInfo =
     {".amr", ".awb"}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
+#if 1
 extern CdxParserCreatorT atracParserCtor;
 static struct ParserUriKeyInfoS atracKeyInfo =
 {
@@ -228,7 +255,9 @@ static struct ParserUriKeyInfoS atracKeyInfo =
     {".omg", ".oma", ".aa3"}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
+#ifdef MP3_PARSER_ENABLE
 extern CdxParserCreatorT mp3ParserCtor;
 static struct ParserUriKeyInfoS mp3KeyInfo =
 {
@@ -237,16 +266,9 @@ static struct ParserUriKeyInfoS mp3KeyInfo =
     {".mp1", ".mp2", ".mp3"}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
-extern CdxParserCreatorT aacParserCtor;
-static struct ParserUriKeyInfoS aacKeyInfo =
-{
-    "aac",
-    {NULL},  /*scheme*/
-    {".aac"}, /*suffix*/
-    {NULL}   /*attribute*/
-};
-
+#ifdef WAV_PARSER_ENABLE
 extern CdxParserCreatorT wavParserCtor;
 static struct ParserUriKeyInfoS wavKeyInfo =
 {
@@ -255,6 +277,18 @@ static struct ParserUriKeyInfoS wavKeyInfo =
     {".wav"}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
+
+#ifdef AAC_PARSER_ENABLE
+extern CdxParserCreatorT aacParserCtor;
+static struct ParserUriKeyInfoS aacKeyInfo =
+{
+    "aac",
+    {NULL},  /*scheme*/
+    {".aac"}, /*suffix*/
+    {NULL}   /*attribute*/
+};
+#endif
 
 #ifdef __ANDROID__
 extern CdxParserCreatorT mmshttpParserCtor;
@@ -285,6 +319,7 @@ static struct ParserUriKeyInfoS sstrKeyInfo =
 };
 #endif
 
+#if 0
 extern CdxParserCreatorT cafParserCtor;
 static struct ParserUriKeyInfoS cafKeyInfo =
 {
@@ -301,7 +336,9 @@ static struct ParserUriKeyInfoS g729KeyInfo =
     {".g729"}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
+#ifdef ID3V2_PARSER_ENABLE
 extern CdxParserCreatorT id3v2ParserCtor;
 static struct ParserUriKeyInfoS id3v2KeyInfo =
 {
@@ -310,7 +347,9 @@ static struct ParserUriKeyInfoS id3v2KeyInfo =
     {NULL}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
+#ifdef PLS_PARSER_ENABLE
 extern CdxParserCreatorT plsParserCtor;
 static struct ParserUriKeyInfoS plsKeyInfo =
 {
@@ -319,7 +358,9 @@ static struct ParserUriKeyInfoS plsKeyInfo =
     {".pls"}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
+#if 0
 extern CdxParserCreatorT dsdParserCtor;
 static struct ParserUriKeyInfoS dsdKeyInfo =
 {
@@ -328,7 +369,9 @@ static struct ParserUriKeyInfoS dsdKeyInfo =
     {".dff"}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
+#if 0
 extern CdxParserCreatorT aiffParserCtor;
 static struct ParserUriKeyInfoS aiffKeyInfo =
 {
@@ -337,6 +380,7 @@ static struct ParserUriKeyInfoS aiffKeyInfo =
     {".aiff","aif"}, /*suffix*/
     {NULL}   /*attribute*/
 };
+#endif
 
 #ifdef __ANDROID__
 extern CdxParserCreatorT envParserCtor;
@@ -406,17 +450,37 @@ void AwParserInit(void)
      *
      * zhaozhili, 2016-11-21
      */
-#ifdef HLS_ENABLE
+#ifdef HLS_PARSER_ENABLE
     AwParserRegister(&hlsParserCtor, CDX_PARSER_HLS, &hlsKeyInfo);
 #endif
-    AwParserRegister(&asfParserCtor, CDX_PARSER_ASF, &asfKeyInfo);
-    AwParserRegister(&movParserCtor, CDX_PARSER_MOV, &movKeyInfo);
-    AwParserRegister(&remuxParserCtor, CDX_PARSER_REMUX, &remuxKeyInfo);
 
+#ifdef ASF_PARSER_ENABLE
+    AwParserRegister(&asfParserCtor, CDX_PARSER_ASF, &asfKeyInfo);
+#endif
+
+#ifdef MOV_PARSER_ENABLE
+    AwParserRegister(&movParserCtor, CDX_PARSER_MOV, &movKeyInfo);
+#endif
+
+#if REMUX_PARSER_ENABLE
+    AwParserRegister(&remuxParserCtor, CDX_PARSER_REMUX, &remuxKeyInfo);
+#endif
+
+#ifdef FLV_PARSER_ENABLE
     AwParserRegister(&flvParserCtor, CDX_PARSER_FLV, &flvKeyInfo);
+#endif
+
+#ifdef AVI_PARSER_ENABLE
     AwParserRegister(&aviParserCtor, CDX_PARSER_AVI, &aviKeyInfo);
+#endif
+
+#ifdef TS_PARSER_ENABLE
     AwParserRegister(&tsParserCtor, CDX_PARSER_TS, &tsKeyInfo);
+#endif
+
+#ifdef PLS_PARSER_ENABLE
     AwParserRegister(&plsParserCtor, CDX_PARSER_PLS, &plsKeyInfo);
+#endif
 
 #ifdef __ANDROID__
     AwParserRegister(&dashParserCtor, CDX_PARSER_DASH, &dashKeyInfo);
@@ -424,14 +488,21 @@ void AwParserInit(void)
     AwParserRegister(&mmshttpParserCtor, CDX_PARSER_MMSHTTP, &mmshttpKeyInfo);
 #endif
 
+#ifdef MKV_PARSER_ENABLE
     AwParserRegister(&mkvParserCtor, CDX_PARSER_MKV, &mkvKeyInfo);
+#endif
 
 #ifdef __ANDROID__
     AwParserRegister(&bdParserCtor, CDX_PARSER_BD, &bdKeyInfo);
+#endif
+
+#ifdef PMP_PARSER_ENABLE
     AwParserRegister(&pmpParserCtor, CDX_PARSER_PMP, &pmpKeyInfo);
 #endif
 
+#ifdef OGG_PARSER_ENABLE
     AwParserRegister(&oggParserCtor, CDX_PARSER_OGG, &oggKeyInfo);
+#endif
 
 #ifdef __ANDROID__
     AwParserRegister(&m3u9ParserCtor, CDX_PARSER_M3U9, &m3u9KeyInfo);
@@ -440,16 +511,37 @@ void AwParserInit(void)
     AwParserRegister(&envParserCtor, CDX_PARSER_ENV, &envKeyInfo);
 #endif
 
+#ifdef MPG_PARSER_ENABLE
     AwParserRegister(&mpgParserCtor, CDX_PARSER_MPG, &mpgKeyInfo);
+#endif
+
+#ifdef APE_PARSER_ENABLE
     AwParserRegister(&apeParserCtor, CDX_PARSER_APE, &apeKeyInfo);
+#endif
+
+#ifdef FLAC_PARSER_ENABLE
     AwParserRegister(&flacParserCtor, CDX_PARSER_FLAC, &flacKeyInfo);
+#endif
+
+#ifdef AMR_PARSER_ENABLE
     AwParserRegister(&amrParserCtor, CDX_PARSER_AMR, &amrKeyInfo);
-#ifdef __ANDROID__
+#endif
+
+#ifdef ATRAC_PARSER_ENABLE
     AwParserRegister(&atracParserCtor, CDX_PARSER_ATRAC, &atracKeyInfo);
 #endif
+
+#ifdef MP3_PARSER_ENABLE
     AwParserRegister(&mp3ParserCtor, CDX_PARSER_MP3, &mp3KeyInfo);
-    AwParserRegister(&aacParserCtor, CDX_PARSER_AAC, &aacKeyInfo);
+#endif
+
+#ifdef WAV_PARSER_ENABLE
     AwParserRegister(&wavParserCtor, CDX_PARSER_WAV, &wavKeyInfo);
+#endif
+
+#ifdef AAC_PARSER_ENABLE
+    AwParserRegister(&aacParserCtor, CDX_PARSER_AAC, &aacKeyInfo);
+#endif
 
 #ifdef __ANDROID__
     AwParserRegister(&awtsParserCtor, CDX_PARSER_AWTS, &awtsKeyInfo);
@@ -460,7 +552,10 @@ void AwParserInit(void)
     AwParserRegister(&aiffParserCtor, CDX_PARSER_AIFF, &aiffKeyInfo);
 #endif
 
+#ifdef ID3V2_PARSER_ENABLE
     AwParserRegister(&id3v2ParserCtor, CDX_PARSER_ID3V2, &id3v2KeyInfo);
+#endif
+
 #if ENABLE_RAW_STREAM_PARSER
     AwParserRegister(&rawStreamParserCtor, CDX_PARSER_AWRAWSTREAM, &rawStreamKeyInfo);
 #endif

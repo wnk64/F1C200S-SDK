@@ -79,6 +79,7 @@ typedef enum VIDEO_ENCODE_TYPE
 {
     VIDEO_ENCODE_H264,
     VIDEO_ENCODE_JPEG,
+    VIDEO_ENCODE_H265,
 }VIDEO_ENCODE_TYPE;
 
 typedef enum AUDIO_ENCODE_TYPE
@@ -116,7 +117,12 @@ typedef struct VideoEncodeConfig
     int             nSrcHeight;
     int             bUsePhyBuf;
 	VIDEO_ENCODER_PIXEL_FORMAT nInputYuvFormat;
+#if MPP_ENC_API
+	eVencEncppScalerRatio ratio;
+#else
 	E_ISP_SCALER_RATIO ratio;
+#endif
+
 }VideoEncodeConfig;
 
 typedef struct VideoInputBuffer

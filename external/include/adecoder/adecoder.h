@@ -12,6 +12,7 @@
 #ifndef ADECODER_H
 #define ADECODER_H
 
+#include <stdint.h>
 #include <unistd.h>
 //#include <stdlib.h>
 //typedef signed long long int64_t;

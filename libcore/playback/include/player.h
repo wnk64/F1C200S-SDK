@@ -12,13 +12,19 @@
 #define PLAYER_H
 
 #include "cdx_config.h"
+#ifndef ONLY_ENABLE_AUDIO
 #include "vdecoder.h"
-#include "adecoder.h"
 #include "sdecoder.h"
 #include "layerControl.h"
+#endif
+#ifndef ONLY_DISABLE_AUDIO
+#include "adecoder.h"
 #include "soundControl.h"
+#endif
+#ifndef ONLY_ENABLE_AUDIO
 #include "subtitleControl.h"
 #include "deinterlace.h"
+#endif
 #include <CdxEnumCommon.h>
 
 enum EPLAYERNOTIFY {
@@ -26,6 +32,7 @@ enum EPLAYERNOTIFY {
 
     //* param == NULL;
     PLAYBACK_NOTIFY_FIRST_PICTURE,
+    PLAYBACK_NOTIFY_FIRST_AUDIO,
 
     //* width = ((int*)param)[0]; height = ((int*)param)[1];
     PLAYBACK_NOTIFY_VIDEO_SIZE,
@@ -142,6 +149,7 @@ int PlayerReset(Player* pl, int64_t nSeekTimeUs);
 //* must be called under stopped status, all stream information cleared.
 int PlayerClear(Player* pl);
 
+#ifndef ONLY_ENABLE_AUDIO
 //* set player playback in fast mode.
 //* in fast mode, video is showed directly without any synchronization, and
 //* audio is should not send in.
@@ -149,6 +157,7 @@ int PlayerFast(Player* pl, int bDecodeKeyframeOnly);
 
 //* return from fast mode, the player is set to started status when return.
 int PlayerStopFast(Player* pl);
+#endif
 
 enum EPLAYERSTATUS PlayerGetStatus(Player* pl);
 
@@ -184,6 +193,7 @@ int PlayerSetEos(Player* pl);
 
 int PlayerSetFirstPts(Player* pl, int64_t nFirstPts);
 
+#ifndef ONLY_ENABLE_AUDIO
 //* estimated by pts and stream data size.
 int PlayerGetVideoBitrate(Player* pl);
 
@@ -204,7 +214,8 @@ int PlayerGetVideoStreamFrameNum(Player* pl);
 
 //* how many picture has been decoded and waiting to show.
 int PlayerGetValidPictureNum(Player* pl);
-
+#endif
+#ifndef ONLY_DISABLE_AUDIO
 //* estimated by pts and stream data size.
 int PlayerGetAudioBitrate(Player* pl);
 
@@ -222,13 +233,13 @@ int PlayerGetAudioPcmDataSize(Player* pl);
 
 //* how much audio pcm data cached in audio device.
 int PlayerGetAudioCacheTimeInSoundDevice(Player* pl);
-
+#endif
 //********************************  END  ***********************************//
 
 //*******************************  START  **********************************//
 //** Video APIs.
 //**
-
+#ifndef ONLY_ENABLE_AUDIO
 int PlayerSetVideoStreamInfo(Player* pl, VideoStreamInfo* pStreamInfo);
 
 int PlayerCanSupportVideoStream(Player* pl, VideoStreamInfo* pStreamInfo);
@@ -238,18 +249,20 @@ int PlayerHasVideo(Player* pl);
 int PlayerConfigVideoScaleDownRatio(Player* pl, int nHorizonRatio, int nVerticalRatio);
 
 int PlayerConfigVideoRotateDegree(Player* pl, int nDegree);
-
+int PlayerConfigVideoG2dRotateDegree(Player* pl, int nDegree);
 int PlayerConfigVideoDeinterlace(Player* pl, int bOpenDeinterlace);
 int PlayerConfigDispErrorFrame(Player* pl, int bDispErrorFrame);
 int PlayerConfigDropDelayFrame(Player* pl, int bDropDelayFrame);
 int PlayerConfigTvStreamFlag(Player* pl, int bFlag);
+int PlayerConfigVideoLbcLossyComMod(Player* pl, int nLbcMode);
+#endif
 
 //********************************  END  ***********************************//
 
 //*******************************  START  **********************************//
 //** Audio APIs.
 //**
-
+#ifndef ONLY_DISABLE_AUDIO
 int PlayerSetAudioStreamInfo(Player* pl, AudioStreamInfo* pStreamInfo,
         int nStreamNum, int nDefaultStream);
 
@@ -269,13 +282,42 @@ int PlayerSwitchAudio(Player* pl, int nStreamIndex);
 int PlayerStopAudio(Player* pl);
 
 int PlayerStartAudio(Player* pl);
+//*******************************  START  **********************************//
+//** Audio Output Control APIs.
+//**
+int PlayerSetAudioSink(Player* pl, SoundCtrl* pAudioSink);
+
+//* get audio balance, return 1 means left channel, 2 means right channel, 3 means stereo.
+int PlayerGetAudioBalance(Player* pl);
+
+//* set audio balance, 1 means left channel, 2 means right channel, 3 means stereo.
+int PlayerSetAudioBalance(Player* pl, int nAudioBalance);
+
+//* mute the audio, bMute = 1 means mute the audio, 0 means resume from muted.
+int PlayerSetAudioMute(Player* pl, int bMute);
+
+/* get the audio mute setting, 1 means audio muted, 0 means not muted, -1 means
+ * there is no audio stream.
+ */
+int PlayerGetAudioMuteFlag(Player* pl);
+
+int PlayerSetAudioForceWriteToDeviceFlag(Player* pl, int bForceFlag);
+
+int PlayerConfigExtraScaleInfo(Player* pl, int nWidthTh, int nHeightTh,
+        int nHorizontalScaleRatio, int nVerticalScaleRatio);
+
+int PlayerSetPlayBackSettings(Player* pl,const struct XAudioPlaybackRate* rate);
+
+int PlayerGetPlayBackSettings(Player* pl,XAudioPlaybackRate* rate);
+
+#endif
 
 //********************************  END  ***********************************//
 
 //*******************************  START  **********************************//
 //** Subtitle APIs.
 //**
-
+#ifndef ONLY_ENABLE_AUDIO
 int PlayerSetSubtitleStreamInfo(Player* pl, SubtitleStreamInfo* pStreamInfo,
         int nStreamNum, int nDefaultStream);
 
@@ -355,40 +397,15 @@ int PlayerSetDisplayRatio(Player* pl, enum EDISPLAYRATIO eDisplayRatio);
 int PlayerSetDeinterlace(Player* pl, Deinterlace* pDi);
 
 //********************************  END  ***********************************//
+#endif
 
-//*******************************  START  **********************************//
-//** Audio Output Control APIs.
-//**
-int PlayerSetAudioSink(Player* pl, SoundCtrl* pAudioSink);
-
-//* get audio balance, return 1 means left channel, 2 means right channel, 3 means stereo.
-int PlayerGetAudioBalance(Player* pl);
-
-//* set audio balance, 1 means left channel, 2 means right channel, 3 means stereo.
-int PlayerSetAudioBalance(Player* pl, int nAudioBalance);
-
-//* mute the audio, bMute = 1 means mute the audio, 0 means resume from muted.
-int PlayerSetAudioMute(Player* pl, int bMute);
-
-/* get the audio mute setting, 1 means audio muted, 0 means not muted, -1 means
- * there is no audio stream.
- */
-int PlayerGetAudioMuteFlag(Player* pl);
-
-int PlayerSetAudioForceWriteToDeviceFlag(Player* pl, int bForceFlag);
-
-int PlayerConfigExtraScaleInfo(Player* pl, int nWidthTh, int nHeightTh,
-        int nHorizontalScaleRatio, int nVerticalScaleRatio);
-
-int PlayerSetPlayBackSettings(Player* pl,const struct XAudioPlaybackRate* rate);
-
-int PlayerGetPlayBackSettings(Player* pl,XAudioPlaybackRate* rate);
+#ifndef ONLY_ENABLE_AUDIO
 
 void PlayerSetVideoAvgByteRate(Player* pl, int br);
 
 int PlayerGetVideoDispFramerate(Player* pl,float* dispFrameRate);
-
-
+#endif
+int PlayerGetAudioTrack(Player* pl);
 //********************************  END  ***********************************//
 
 #ifdef __cplusplus

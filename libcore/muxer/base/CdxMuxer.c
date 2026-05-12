@@ -29,10 +29,21 @@ typedef struct CdxMuxerListS CdxMuxerListT;
 
 CdxMuxerListT muxerList;
 
+#ifdef MP3_MUXER_ENABLE
+extern CdxMuxerCreatorT mp3MuxerCtor;
+#endif
+
+#ifdef AAC_MUXER_ENABLE
 extern CdxMuxerCreatorT aacMuxerCtor;  // raw audio
+#endif
+
+#ifdef MP4_MUXER_ENABLE
 extern CdxMuxerCreatorT mp4MuxerCtor;
-//extern CdxMuxerCreatorT mp4exMuxerCtor;
+#endif
+
+#ifdef TS_MUXER_ENABLE
 extern CdxMuxerCreatorT tsMuxerCtor;
+#endif
 
 int AwMuxerRegister(CdxMuxerCreatorT *creator, CdxMuxerTypeT type)
 {
@@ -53,12 +64,20 @@ void AwMuxerInit()
     CDX_LOGD("aw muxer init ..");
     CdxListInit(&muxerList.list);
     muxerList.size = 0;
-
+#ifdef MP3_MUXER_ENABLE
+    AwMuxerRegister(&mp3MuxerCtor, CDX_MUXER_MP3);
+#endif
+#ifdef AAC_MUXER_ENABLE
     AwMuxerRegister(&aacMuxerCtor, CDX_MUXER_AAC);
+#endif
+
+#ifdef MP4_MUXER_ENABLE
     AwMuxerRegister(&mp4MuxerCtor, CDX_MUXER_MOV);
-//    AwMuxerRegister(&mp4exMuxerCtor, CDX_MUXER_MOV_EX);
+#endif
+
+#ifdef TS_MUXER_ENABLE
     AwMuxerRegister(&tsMuxerCtor, CDX_MUXER_TS);
-    AwMuxerRegister(&aacMuxerCtor, CDX_MUXER_MP3);
+#endif
     CDX_LOGD("aw muxer size:%d",muxerList.size);
     return;
 }

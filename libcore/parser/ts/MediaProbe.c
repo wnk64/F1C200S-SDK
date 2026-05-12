@@ -8,6 +8,7 @@
  *
  */
 
+#include <stdlib.h>
 #include <CdxTsParser.h>
 #include <cdx_log.h>
 
@@ -813,6 +814,7 @@ static cdx_int32 prob_h265(Stream *st)
     return 0;
 }
 
+#ifndef ONLY_ENABLE_AUDIO
 cdx_int32 ProbeVideo(Stream *stream)
 {
     if (stream->codec_id == VIDEO_CODEC_FORMAT_MPEG1
@@ -846,7 +848,7 @@ cdx_int32 ProbeVideo(Stream *stream)
         return -1;
     }
 }
-
+#endif
 cdx_int32 ProbeAudio(Stream *stream)
 {
     (void)stream;
@@ -855,11 +857,14 @@ cdx_int32 ProbeAudio(Stream *stream)
 
 cdx_int32 ProbeStream(Stream *stream)
 {
+#ifndef ONLY_ENABLE_AUDIO
     if(stream->mMediaType == TYPE_VIDEO)
     {
         return ProbeVideo(stream);
     }
-    else if(stream->mMediaType == TYPE_AUDIO)
+    else
+#endif
+    if(stream->mMediaType == TYPE_AUDIO)
     {
         return ProbeAudio(stream);
     }

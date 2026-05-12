@@ -97,10 +97,10 @@ cdx_uint8 MpgReadParserReadData(CdxMpgParserT *MpgParser)
     {
         nSize = CdxStreamRead(mMpgParserCxt->pStreamT,
                 mMpgParserCxt->mDataChunkT.pStartAddr,MAX_CHUNK_BUF_SIZE);
-        if(nSize <=4)
+        if(nSize <= 4)
         {
 
-            CDX_LOGV("here1:file pEndPtr flag is true.nSize=%x\n", nSize);
+            CDX_LOGE("here1:file pEndPtr flag is true.nSize=%x\n", nSize);
             return 0;
         }
 
@@ -115,7 +115,7 @@ cdx_uint8 MpgReadParserReadData(CdxMpgParserT *MpgParser)
         mMpgParserCxt->mDataChunkT.pReadPtr = mMpgParserCxt->mDataChunkT.pStartAddr;
         want = mMpgParserCxt->mDataChunkT.pEndAddr - mMpgParserCxt->mDataChunkT.pEndPtr;
         size1 = CdxStreamRead(mMpgParserCxt->pStreamT,mMpgParserCxt->mDataChunkT.pEndPtr,want);
-        if((size1 + nSize)<=4)
+        if(size1 < 0 || (size1 + nSize) <= 4)
         {
             CDX_LOGV("here2:file pEndPtr flag is true.\n");
             return 0;
@@ -303,7 +303,7 @@ cdx_uint8 *MpgReadFindStartCode(CdxMpgParserT *MpgParser, cdx_int16 *result)
 
     mMpgParserCxt = (MpgParserContextT *)MpgParser->pMpgParserContext;
 
-    curBuf = MpgOpenFindNextStartCode(MpgParser,mMpgParserCxt->mDataChunkT.pReadPtr,
+    curBuf = MpgOpenFindNextStartCode(MpgParser, mMpgParserCxt->mDataChunkT.pReadPtr,
             mMpgParserCxt->mDataChunkT.pEndPtr);
     if(!curBuf || (curBuf && curBuf[3]==0xba))
     {

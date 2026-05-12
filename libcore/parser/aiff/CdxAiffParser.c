@@ -679,12 +679,15 @@ static cdx_int32 __AiffParserGetMediaInfo(CdxParserT *parser, CdxMediaInfoT *med
     memset(cdxProgram, 0, sizeof(struct CdxProgramS));
     cdxProgram->id = 0;
     cdxProgram->audioNum = 1;
+#ifndef ONLY_ENABLE_AUDIO
     cdxProgram->videoNum = 0;//
     cdxProgram->subtitleNum = 0;
+#endif
     cdxProgram->audioIndex = 0;
+#ifndef ONLY_ENABLE_AUDIO
     cdxProgram->videoIndex = 0;
     cdxProgram->subtitleIndex = 0;
-
+#endif
     mediaInfo->bSeekable = CdxStreamSeekAble(impl->stream);
     mediaInfo->fileSize = impl->dFileSize;
 

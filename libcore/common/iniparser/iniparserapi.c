@@ -22,10 +22,16 @@ static dictionary* g_ini = NULL;
 int  IniParserInit()
 {
     logd("IniParserInit");
+#if MPP_ENC_API
+    char ini_name[265] = "/etc/tplayer_cedarx.conf";
+    char vendor_init_name[] =
+            "/vendor/etc/tplayer_cedarx.conf";
+
+#else
     char ini_name[265] = "/etc/cedarx.conf";
     char vendor_init_name[] =
             "/vendor/etc/cedarx.conf";
-
+#endif
     g_ini = iniparser_load(ini_name);
     if (g_ini == NULL)
     {
@@ -42,7 +48,7 @@ int  IniParserInit()
         logd("load conf file %s ok!\n", ini_name);
     }
 
-    log_set_level(GetConfigParamterInt("log_level", (int)LOG_LEVEL_WARNING));
+    cdx_log_set_level(GetConfigParamterInt("log_level", (int)LOG_LEVEL_WARNING));
 
     return 0;
 }

@@ -367,7 +367,7 @@ static cdx_int32 CdxHttpSendRequest(DownloadCtxT *d, cdx_int64 pos)
     }
     else if(d->oneThread == 1)
     {
-        if(pos == 0)
+        if(pos == 0 || pos < d->startPos)
         {
             snprintf(str, sizeof(str), "Range: bytes=%lld-", d->startPos);
             CdxHttpSetField(httpHdr, str);
@@ -486,6 +486,9 @@ static cdx_int32 CdxHttpSendRequest(DownloadCtxT *d, cdx_int64 pos)
 #endif
 
     ret = CdxStreamWrite(d->pStream, httpHdr->buffer, httpHdr->bufferSize);
+    CDX_LOGV("send request info*******************************************************begin");
+    CDX_LOGV("%s", httpHdr->buffer);
+    CDX_LOGV("send request info*******************************************************finish");
     if (ret < 0)
     {
         loge("send error.");
@@ -2860,7 +2863,14 @@ static cdx_int32 __CdxHttpStreamGetMetaData(CdxStreamT *stream, const cdx_char *
             *pVal = (void*)&httpHdr->statusCode;
             logd("++++++ *pVal = %p", *pVal);
         }
+		return 0;
     }
+    else if(strcmp(key, "httpHeader") == 0){
+		impl->pHttpHeaders.num = impl->nHttpHeaderSize;
+		impl->pHttpHeaders.pHttpHeader = impl->pHttpHeader;
+		*pVal = &impl->pHttpHeaders;
+		return 0;
+	}
     else
     {
         *pVal = CdxHttpGetField(httpHdr, key);
@@ -3107,6 +3117,12 @@ static cdx_int32 __CdxHttpStreamConnect(CdxStreamT *stream)
     logd("has %d download thread",parts);
 
     impl->dlCtx = (DownloadCtxT *)calloc(parts, sizeof(DownloadCtxT));
+    if(impl->dlCtx == NULL)
+    {
+	loge("create DownloadCtxT failed.");
+        impl->ioState = CDX_IO_STATE_ERROR;
+        goto __exit;
+    }
     impl->threadNum = parts;
     for(i = 0; i < parts; i++)
     {

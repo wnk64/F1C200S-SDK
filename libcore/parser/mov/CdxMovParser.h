@@ -117,9 +117,10 @@ struct CdxMovParser
     CDX_S32     nVideoExtraDataLen;      //vop header left size
     CDX_S32       keyItl;
     CDX_S32       bDiscardAud;
-
+#ifndef ONLY_ENABLE_AUDIO
     VideoStreamInfo             vFormat;
     SubtitleStreamInfo          tFormat;    //subtitle format
+#endif
     VirCacheContext                 *vc;
 
     #if SAVE_VIDEO

@@ -19,4 +19,3 @@ libcdx_aes_stream_la_LDFLAGS = $(LDFLAGS_CDXG)
 libcdx_aes_stream_la_LIBADD = $(top_srcdir)/libcore/base/libcdx_base.la
 
 libcdx_aes_stream_la_LDFLAGS += $(LOCAL_LIB)
-

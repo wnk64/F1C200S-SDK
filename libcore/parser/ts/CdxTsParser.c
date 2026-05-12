@@ -895,6 +895,7 @@ CDX_INTERFACE status_t StreamAppend(Stream *mStream,
 {
     CDX_CHECK(mStream);
     CdxBufferT *mBuffer = mStream->pes[mStream->pesIndex].mBuffer;
+#ifndef ONLY_ENABLE_AUDIO
     if(mStream->mMediaType == TYPE_VIDEO
         && (mStream->codec_id == VIDEO_CODEC_FORMAT_H264
         || mStream->codec_id == VIDEO_CODEC_FORMAT_H265
@@ -908,6 +909,7 @@ CDX_INTERFACE status_t StreamAppend(Stream *mStream,
         mStream->tmpDataSize = size;
     }
     else
+#endif
     {
         if(mStream->tmpDataSize)
         {
@@ -1049,6 +1051,7 @@ static cdx_int32 VerifyStream(Stream *mStream, unsigned stream_id)
         codec_type = TYPE_AUDIO;
         codec_id   = AUDIO_CODEC_FORMAT_MP3;
         break;
+#ifndef ONLY_ENABLE_AUDIO
     case CDX_STREAM_TYPE_VIDEO_MPEG1:
     case CDX_STREAM_TYPE_VIDEO_MPEG2:
         codec_type = TYPE_VIDEO;
@@ -1078,6 +1081,7 @@ static cdx_int32 VerifyStream(Stream *mStream, unsigned stream_id)
         codec_type = TYPE_VIDEO;
         codec_id   = VIDEO_CODEC_FORMAT_WMV3;
         break;
+#endif
     case CDX_STREAM_TYPE_AUDIO_AAC:
     case CDX_STREAM_TYPE_AUDIO_MPEG4:
         codec_type = TYPE_AUDIO;
@@ -1112,17 +1116,21 @@ static cdx_int32 VerifyStream(Stream *mStream, unsigned stream_id)
         codec_id   = AUDIO_CODEC_FORMAT_DTS;
         break;
 
+#ifndef ONLY_ENABLE_AUDIO
 #if SUPPORT_SUBTITLE_DVB
     case CDX_STREAM_TYPE_SUBTITLE_DVB:
         codec_type = TYPE_SUBS;
         codec_id   = SUBTITLE_CODEC_DVBSUB;
         break;
 #endif
+#endif
 
     case CDX_STREAM_TYPE_PCM_BLURAY:
         codec_type = TYPE_AUDIO;
         codec_id   = AUDIO_CODEC_FORMAT_PCM;
         break;
+
+#ifndef ONLY_ENABLE_AUDIO
     case CDX_STREAM_TYPE_HDMV_PGS_SUBTITLE:
         CDX_LOGV("PGS subtitle");
         codec_type = TYPE_SUBS;
@@ -1139,6 +1147,8 @@ static cdx_int32 VerifyStream(Stream *mStream, unsigned stream_id)
             codec_id   = VIDEO_CODEC_FORMAT_H265;
         }
         break;
+#endif
+
     case CDX_STREAM_TYPE_METADATA:
         codec_type = TYPE_META;
         codec_id   = METADATA_STREAM_ID;
@@ -1175,12 +1185,15 @@ static cdx_int32 VerifyStream(Stream *mStream, unsigned stream_id)
                 codec_type = TYPE_AUDIO;
                 codec_id = AUDIO_CODEC_FORMAT_AC3;
             }
+#ifndef ONLY_ENABLE_AUDIO
             else
             {
                 codec_type = TYPE_VIDEO;
                 codec_id   = VIDEO_CODEC_FORMAT_WMV3;
             }
+#endif
         }
+#ifndef ONLY_ENABLE_AUDIO
         else if(stream_id >= 0xe0
             && stream_id <= 0xef
             && !mStream->mProgram->videoCount)
@@ -1196,6 +1209,7 @@ static cdx_int32 VerifyStream(Stream *mStream, unsigned stream_id)
                 codec_id   = VIDEO_CODEC_FORMAT_MPEG2;
             }
         }
+#endif
         else
         {
             DestroyStream(mStream);
@@ -1753,6 +1767,7 @@ cdx_int32 onPayloadData(Stream *mStream,
         data - CdxBufferGetBase(mStream->pes[mStream->pesIndex].mBuffer), size);
     //mStream->pes[mStream->pesIndex].ESdata = data;
     //mStream->pes[mStream->pesIndex].size = size;
+#ifndef ONLY_ENABLE_AUDIO
     if(mStream->mMediaType == TYPE_VIDEO
         && (mStream->codec_id == VIDEO_CODEC_FORMAT_H264
         || mStream->codec_id == VIDEO_CODEC_FORMAT_H265
@@ -1811,6 +1826,7 @@ cdx_int32 onPayloadData(Stream *mStream,
         }
     }
     else
+#endif
     {
         mStream->accessUnit.data = data;
         mStream->accessUnit.size = size;
@@ -2570,13 +2586,14 @@ status_t parseProgramMap(Program *program, CdxBitReaderT *br)
             {
                 posStream->existInNewPmt = 0;
             }
-
+#ifndef ONLY_ENABLE_AUDIO
             if(posStream->mStreamType == CDX_STREAM_TYPE_PRIVATE_DATA
                 && posStream->codec_id == VIDEO_CODEC_FORMAT_H265
                 && program->videoCount >= 2)
             {
                 DestroyStream(posStream);
             }
+#endif
         }
 
 #endif
@@ -4450,10 +4467,12 @@ cdx_int32 TSClose(CdxParserT *parser)
     {
         mTSParser->hdcpOps->deinit(mTSParser->hdcpHandle);
     }
+#ifndef ONLY_ENABLE_AUDIO
     if(mTSParser->tempVideoInfo.pCodecSpecificData)
     {
         free(mTSParser->tempVideoInfo.pCodecSpecificData);
     }
+#endif
     pthread_mutex_destroy(&mTSParser->statusLock);
     pthread_cond_destroy(&mTSParser->cond);
     pthread_rwlock_destroy(&mTSParser->controlLock);
@@ -4533,6 +4552,7 @@ cdx_int32 SubmitLastData(TSParser *mTSParser)
     return -1;
 }
 
+#ifndef ONLY_ENABLE_AUDIO
 static cdx_int32 VerifyStreamMediaInfo(TSParser *mTSParser, CdxMediaInfoT *pmediainfo)
 {
     VideoStreamInfo *video = &pmediainfo->program[0].video[0];
@@ -4550,6 +4570,8 @@ static cdx_int32 VerifyStreamMediaInfo(TSParser *mTSParser, CdxMediaInfoT *pmedi
     }
     return 0;
 }
+#endif
+
 static cdx_int32 SetMediaInfo(TSParser *mTSParser, CdxMediaInfoT *pmediainfo)
 {
     memset(pmediainfo, 0, sizeof(CdxMediaInfoT));
@@ -4563,15 +4585,19 @@ static cdx_int32 SetMediaInfo(TSParser *mTSParser, CdxMediaInfoT *pmediainfo)
     cdxProgram->duration = mTSParser->durationMs;
     CDX_LOGV("cdxProgram->duration = %u", cdxProgram->duration);
     cdxProgram->audioNum = program->audioCount;
+#ifndef ONLY_ENABLE_AUDIO
     cdxProgram->videoNum = program->videoCount;//
     cdxProgram->subtitleNum = program->subsCount;
+#endif
     cdxProgram->metadataNum = program->metaCount;
     cdxProgram->audioIndex = 0;
+#ifndef ONLY_ENABLE_AUDIO
     cdxProgram->videoIndex = 0;
     cdxProgram->subtitleIndex = 0;
+#endif
     cdxProgram->firstPts = mTSParser->firstPts;
+#ifndef ONLY_ENABLE_AUDIO
     VideoStreamInfo *video = &cdxProgram->video[0];
-
     if(mTSParser->bdFlag < 2 && mTSParser->curVideo)
     {
         Stream *streamVideo = mTSParser->curVideo;
@@ -4603,6 +4629,7 @@ static cdx_int32 SetMediaInfo(TSParser *mTSParser, CdxMediaInfoT *pmediainfo)
         video->bIs3DStream = SeemToBeMvc(program);
         video->eCodecFormat = mTSParser->curVideo->codec_id;
     }
+#endif
     Stream *stream, *nextStream = NULL;
     cdx_int32 i = 0, j = 0;
     CdxListForEachEntrySafe(stream, nextStream, &program->mStreams, node)
@@ -4655,6 +4682,7 @@ static cdx_int32 SetMediaInfo(TSParser *mTSParser, CdxMediaInfoT *pmediainfo)
             stream->streamIndex = i;
             i++;
         }
+#ifndef ONLY_ENABLE_AUDIO
         else if(stream->mMediaType == TYPE_SUBS && j < SUBTITLE_STREAM_LIMIT)
         {
 
@@ -4668,8 +4696,10 @@ static cdx_int32 SetMediaInfo(TSParser *mTSParser, CdxMediaInfoT *pmediainfo)
         {
             CDX_LOGV("stream->mMediaType == TYPE_VIDEO");
             //TODO: some ts stream contains none video stream but not-zero video num.
+
             VerifyStreamMediaInfo(mTSParser, pmediainfo);
         }
+#endif
         else if(stream->mMediaType == TYPE_META)
         {
             CDX_LOGV("stream->mMediaType == TYPE_META");
@@ -4930,11 +4960,13 @@ _GetES:
                         cdxProgram1 = &tmp->program[0];
                         if(mTSParser->status >= CDX_PSR_IDLE && mTSParser->callback)
                         {
+#ifndef ONLY_ENABLE_AUDIO
                             cdx_int32 v_change = memcmp(cdxProgram->video,
                                 cdxProgram1->video, sizeof(cdxProgram->video));
+#endif
                             cdx_int32 a_change = memcmp(cdxProgram->audio,
                                 cdxProgram1->audio, sizeof(cdxProgram->audio));
-
+#ifndef ONLY_ENABLE_AUDIO
                             if(v_change)
                             {
                                 CDX_LOGD("video stream has changed.");
@@ -4950,7 +4982,9 @@ _GetES:
                                 mTSParser->callback(mTSParser->pUserData,
                                    PARSER_NOTIFY_VIDEO_STREAM_CHANGE, (void*)param);
                             }
-                            else if(a_change)
+                            else
+#endif
+                            if(a_change)
                             {
                                 CDX_LOGD("audio streams has changed.");
                                 while(!mTSParser->b_steam_change)
@@ -5024,6 +5058,7 @@ _GetES:
                     cdxProgram1 = &tmp->program[0];
                     if(mTSParser->status >= CDX_PSR_IDLE &&mTSParser->callback)
                     {
+#ifndef ONLY_ENABLE_AUDIO
                         if(memcmp(cdxProgram->video,
                             cdxProgram1->video, sizeof(cdxProgram->video)))
                         {
@@ -5031,6 +5066,7 @@ _GetES:
                             mTSParser->callback(mTSParser->pUserData,
                                 PARSER_NOTIFY_VIDEO_STREAM_CHANGE, NULL);
                         }
+#endif
                         if(memcmp(cdxProgram->audio,
                             cdxProgram1->audio, sizeof(cdxProgram->audio)))
                         {
@@ -5136,7 +5172,7 @@ cdx_int32 ResetCacheBuffer(CacheBuffer *cacheBuffer)
     return 0;
 }
 
-#define PROBE_PACKET_NUM (42*1024)
+#define PROBE_PACKET_NUM (5*1024)
 cdx_int32 TSInit(CdxParserT *parser)
 {
     CDX_LOGI("TSOpenThread start");
@@ -5594,6 +5630,7 @@ _ProbeProgram:
                 }
 
 #else
+#ifndef ONLY_ENABLE_AUDIO
                 cdx_int32 ret = ProbeVideoSpecificData(&mTSParser->tempVideoInfo,
                     stream->probeBuf, stream->probeDataSize, stream->codec_id,
                     CDX_PARSER_TS);
@@ -5620,6 +5657,7 @@ _ProbeProgram:
                 {
                     CDX_LOGE("probeVideoSpecificData (%d), it is unknown.", ret);
                 }
+#endif
 #endif
 
             }

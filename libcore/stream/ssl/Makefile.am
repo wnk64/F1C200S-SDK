@@ -20,5 +20,5 @@ libcdx_ssl_stream_la_LDFLAGS = $(LDFLAGS_CDXG)
 libcdx_ssl_stream_la_LIBADD = $(top_srcdir)/libcore/base/libcdx_base.la
 
 #LOCAL_LIB = -lpthread
-LOCAL_LIB = -lssl
+LOCAL_LIB = -lssl -lcrypto
 libcdx_ssl_stream_la_LDFLAGS += $(LOCAL_LIB)

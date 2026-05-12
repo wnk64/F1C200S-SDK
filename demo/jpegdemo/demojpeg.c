@@ -621,6 +621,7 @@ int main(int argc, char** argv)
     DataInfo.nLength = dataLen;
     DataInfo.bIsFirstPart = 1;
     DataInfo.bIsLastPart = 1;
+    DataInfo.bValid = 1;
 
     if (SubmitVideoStreamData(pVideo, &DataInfo, 0))
     {

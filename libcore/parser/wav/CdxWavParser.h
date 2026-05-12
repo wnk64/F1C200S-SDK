@@ -18,7 +18,7 @@
 typedef struct WavObjectStruct
 {
     cdx_int32    UID;
-    cdx_int32    Dsize;
+    cdx_uint32    Dsize;
 }WAVObjectT;
 
 typedef struct WaveFormatStruct
@@ -31,7 +31,7 @@ typedef struct WaveFormatStruct
     cdx_int16 wBitsPerSample;//WAVE文件的采样大小；
     cdx_int16 sbSize;        //PCM中忽略此值
     cdx_int16 nSamplesPerBlock;
-    cdx_int32    nDataCKSzie;            //length of data chunk
+    cdx_uint32    nDataCKSzie;            //length of data chunk
 }WavFormatT;
 
 typedef struct WavParserImplS

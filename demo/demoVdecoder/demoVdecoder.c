@@ -925,12 +925,13 @@ void *parserThreadFunc(void* param)
             goto parser_exit;
         }
         memset(&dataInfo, 0, sizeof(VideoStreamDataInfo));
-        dataInfo.pData          = packet.buf;
-        dataInfo.nLength      = packet.length;
+        dataInfo.pData         = packet.buf;
+        dataInfo.nLength       = packet.length;
         dataInfo.nPts          = packet.pts;
         dataInfo.nPcr          = packet.pcr;
-        dataInfo.bIsFirstPart = (!!(packet.flags & FIRST_PART));
-        dataInfo.bIsLastPart = (!!(packet.flags & LAST_PART));
+        dataInfo.bIsFirstPart  = (!!(packet.flags & FIRST_PART));
+        dataInfo.bIsLastPart   = (!!(packet.flags & LAST_PART));
+        dataInfo.bValid        = 1;
         nRet = SubmitVideoStreamData(pVideoDec , &dataInfo, 0);
         if(nRet != 0)
         {

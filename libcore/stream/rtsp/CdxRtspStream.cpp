@@ -1325,7 +1325,7 @@ static cdx_uint8 *RtspParseVorbisConfigStr( char const* configStr,
     {
         configSize -= headerSkip;
         p_extra = (cdx_uint8 *)malloc( configSize );
-        assert(!p_extra);
+        assert(p_extra);
         memcpy( p_extra, p_cfg+headerSkip, configSize );
     }
     delete [] p_cfg;
@@ -1917,7 +1917,7 @@ static int __CdxRtspStreamClose(CdxStreamT *stream)
     impl->pSys->eventData = 0xff;
     impl->pSys->eventRtsp = 0xff;
 
-    if (pthread_join(impl->threadId, NULL) == 0)
+    if (impl->threadId && pthread_join(impl->threadId, NULL) == 0)
     {
         pthread_mutex_destroy(&impl->bufferMutex);
         pthread_mutex_destroy(&impl->lock);
@@ -2650,20 +2650,20 @@ err_out:
 
 static struct CdxStreamOpsS rtspStreamOps =
 {
-connect:  __CdxRtspStreamConnect,
-getProbeData:  __CdxRtspStreamGetProbeData,
-read:  __CdxRtspStreamRead,
-close: __CdxRtspStreamClose,
-getIOState: __CdxRtspStreamGetIOState,
-attribute:  __CdxRtspStreamAttribute,
-control:    __CdxRtspStreamControl,
-write:     NULL,
-getMetaData: __CdxRtspStreamGetMetaData,
-seek:       NULL,
-seekToTime:    __CdxRtspStreamSeekToTime,
-eos:         __CdxRtspStreamEos,
-tell:      __CdxRtspStreamTell,
-size:      __CdxRtspStreamSize,
+    connect:  __CdxRtspStreamConnect,
+    getProbeData:  __CdxRtspStreamGetProbeData,
+    read:  __CdxRtspStreamRead,
+    close: __CdxRtspStreamClose,
+    getIOState: __CdxRtspStreamGetIOState,
+    attribute:  __CdxRtspStreamAttribute,
+    control:    __CdxRtspStreamControl,
+    write:     NULL,
+    getMetaData: __CdxRtspStreamGetMetaData,
+    seek:       NULL,
+    seekToTime:    __CdxRtspStreamSeekToTime,
+    eos:         __CdxRtspStreamEos,
+    tell:      __CdxRtspStreamTell,
+    size:      __CdxRtspStreamSize,
 };
 
 #if 0

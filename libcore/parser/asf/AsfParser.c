@@ -1510,7 +1510,7 @@ AsfContextT *AsfPsrCoreInit(void)
     return ctx;
 }
 
-int AsfPsrCoreIoctrl(AsfContextT *ctx, cdx_uint32 uCmd, cdx_uint32 uParam)
+int AsfPsrCoreIoctrl(AsfContextT *ctx, cdx_uint32 uCmd, cdx_uint64 uParam)
 {
     switch(uCmd)
     {

@@ -1140,6 +1140,7 @@ static int PlayerBufferOverflow(Player* p)
         //    nPictureNum, nFrameDuration, nStreamDataSize, nBitrate, bVideoOverflow);
     }
 
+#ifndef ONLY_DISABLE_AUDIO
     if(PlayerHasAudio(p))
     {
         nPcmDataSize    = PlayerGetAudioPcmDataSize(p);
@@ -1165,7 +1166,7 @@ static int PlayerBufferOverflow(Player* p)
         //        nBitrate = %d, nAudioCacheTime = %lld, bAudioOverflow = %d",
         //    nPcmDataSize, nStreamDataSize, nBitrate, nAudioCacheTime, bAudioOverflow);
     }
-
+#endif
     return bVideoOverflow && bAudioOverflow;
 }
 
@@ -1191,6 +1192,7 @@ static int PlayerBufferUnderflow(Player* p)
             nPictureNum, nStreamFrameNum, bVideoUnderflow);
     }
 
+#ifndef ONLY_DISABLE_AUDIO
     if(PlayerHasAudio(p))
     {
         int nStreamDataSize;
@@ -1206,7 +1208,7 @@ static int PlayerBufferUnderflow(Player* p)
         logd("nStreamDataSize = %d, nPcmDataSize = %d, nCacheTime = %d, bAudioUnderFlow = %d",
             nStreamDataSize, nPcmDataSize, nCacheTime, bAudioUnderFlow);
     }
-
+#endif
     return bVideoUnderflow | bAudioUnderFlow;
 }
 

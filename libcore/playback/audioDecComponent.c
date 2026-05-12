@@ -23,6 +23,7 @@
 #include "streamManager.h"
 #include "baseComponent.h"
 #include <dlfcn.h>
+#include <iniparserapi.h>
 
 #define MAX_AUDIO_STREAM_BUFFER_SIZE (2*1024*1024)
 #define MAX_AUDIO_STREAM_FRAME_COUNT (4096)
@@ -403,7 +404,7 @@ int AudioDecCompSetAudioStreamInfo(AudioDecComp*    p,
                                    int              nDefaultStreamIndex)
 {
     int i;
-
+    int nStreamFrameNum;
     if(p->pStreamInfoArr != NULL && p->nStreamCount > 0)
     {
         for(i=0; i<p->nStreamCount; i++)
@@ -500,10 +501,11 @@ int AudioDecCompSetAudioStreamInfo(AudioDecComp*    p,
         return -1;
     }
 
+    nStreamFrameNum = GetConfigParamterInt("max_audio_stream_frame_num", MAX_AUDIO_STREAM_FRAME_COUNT);
     for(i=0; i<nStreamCount; i++)
     {
         p->pStreamManagerArr[i] = StreamManagerCreate(MAX_AUDIO_STREAM_BUFFER_SIZE,
-                                                      MAX_AUDIO_STREAM_FRAME_COUNT,
+                                                      nStreamFrameNum,
                                                       i);
         if(p->pStreamManagerArr[i] == NULL)
         {
@@ -1314,46 +1316,51 @@ static void doDecode(AwMessage *msg, void *arg)
                             pOutputBuf,
                             &nPcmDataLen);
     logv("DecodeAudioStream, ret = %d",ret);
-    if(ret == ERR_AUDIO_DEC_NONE)
-    {
-        if(p->pStreamInfoArr[p->nStreamSelected].nSampleRate != p->bsInfo.out_samplerate ||
-            p->pStreamInfoArr[p->nStreamSelected].nChannelNum != p->bsInfo.out_channels)
-        {
-            p->pStreamInfoArr[p->nStreamSelected].nSampleRate = p->bsInfo.out_samplerate;
-            p->pStreamInfoArr[p->nStreamSelected].nChannelNum = p->bsInfo.out_channels;
-        }
-        p->AlibItf.DecUpdatePcmBuffer(p->AlibItf.libadecoder, nPcmDataLen);
-        BaseCompContinue(&p->base);
-        return;
-    }
-    else if(ret == ERR_AUDIO_DEC_NO_BITSTREAM || ret == ERR_AUDIO_DEC_ABSEND)
-    {
-        if(p->bEosFlag &&
-           StreamManagerStreamFrameNum(p->pStreamManagerArr[p->nStreamSelected]) == 0)
-        {
-            logv("audio decoder notify eos.");
-            p->callback(p->pUserData, PLAYER_AUDIO_DECODER_NOTIFY_EOS, NULL);
-            return;
-        }
-        else
-        {
-            if(StreamManagerStreamFrameNum(p->pStreamManagerArr[p->nStreamSelected]) == 0)
-                SemTimedWait(&p->streamDataSem, 50);
-            BaseCompContinue(&p->base);
-            return;
-        }
-    }
-    else if(ret == ERR_AUDIO_DEC_EXIT || ret == ERR_AUDIO_DEC_ENDINGCHKFAIL)
-    {
-        p->bCrashFlag = 1;
-        p->callback(p->pUserData, PLAYER_AUDIO_DECODER_NOTIFY_CRASH, NULL);
-        return;
-    }
-    else
-    {
-        logw("DecodeAudioStream() return %d, continue to decode", ret);
-        BaseCompContinue(&p->base);
-    }
+	switch (ret)
+	{
+		case ERR_AUDIO_DEC_NONE:
+		{
+			if (p->pStreamInfoArr[p->nStreamSelected].nSampleRate != p->bsInfo.out_samplerate ||
+				p->pStreamInfoArr[p->nStreamSelected].nChannelNum != p->bsInfo.out_channels)
+			{
+				p->pStreamInfoArr[p->nStreamSelected].nSampleRate = p->bsInfo.out_samplerate;
+				p->pStreamInfoArr[p->nStreamSelected].nChannelNum = p->bsInfo.out_channels;
+			}
+			p->AlibItf.DecUpdatePcmBuffer(p->AlibItf.libadecoder, nPcmDataLen);
+			BaseCompContinue(&p->base);
+			return;
+		}
+		case ERR_AUDIO_DEC_NO_BITSTREAM:
+		case ERR_AUDIO_DEC_ABSEND:
+		{
+			if (p->bEosFlag &&
+				StreamManagerStreamFrameNum(p->pStreamManagerArr[p->nStreamSelected]) == 0)
+			{
+				logv("audio decoder notify eos.");
+				p->callback(p->pUserData, PLAYER_AUDIO_DECODER_NOTIFY_EOS, NULL);
+				return;
+			}
+			else
+			{
+				if (StreamManagerStreamFrameNum(p->pStreamManagerArr[p->nStreamSelected]) == 0)
+					SemTimedWait(&p->streamDataSem, 50);
+				BaseCompContinue(&p->base);
+				return;
+			}
+		}
+		case ERR_AUDIO_DEC_EXIT:
+		case ERR_AUDIO_DEC_ENDINGCHKFAIL:
+		{
+			p->bCrashFlag = 1;
+			p->callback(p->pUserData, PLAYER_AUDIO_DECODER_NOTIFY_CRASH, NULL);
+			return;
+		}
+		default:
+		{
+			logw("DecodeAudioStream() return %d, continue to decode", ret);
+			BaseCompContinue(&p->base);
+		}
+	}
 }
 
 #if 0

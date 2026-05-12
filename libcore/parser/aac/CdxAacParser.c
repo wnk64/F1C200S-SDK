@@ -889,7 +889,7 @@ static int UnpackADIFHeader(AacParserImplS *impl,unsigned char *ptr,int len)
     return SUCCESS;
 }
 
-static cdx_int32 AacProbe(cdx_uint8 *ptr)
+static cdx_int32 AacProbe(cdx_uint8 *ptr, cdx_int32 size)
 {
     cdx_int32 offset = 0;
     /*We give up the judgement of id3 tag, instead of moving it to id3 parser*/
@@ -907,23 +907,23 @@ static cdx_int32 AacProbe(cdx_uint8 *ptr)
             int state = ((ptr[offset]&0xff) << 16) | ((ptr[offset+1]&0xff) << 8) |
                     ((ptr[offset+2]&0xff));
             latm_size = state & LATM_SIZE_MASK;
-            CDX_LOGD("latm_size : %d", latm_size);
+            CDX_LOGV("latm_size : %d, offset %d, size %d.", latm_size, offset, size);
             /*
                 For our aac parser at least have 4096 buffer size to avoid out of range
                 The most important, a aac frame has only 1024 samples, that is the size
                 cannot exceed 1024*2*2 = 4096bytes if lossless, though it's very impossiable
              */
-            if(latm_size > 4090)
+            if(latm_size > 4090 || (offset + latm_size + 1 > size))
             {
                 return CDX_FALSE;
             }
             if(((ptr[offset + latm_size]&0xff)==0x56)&&((ptr[offset + latm_size + 1]&0xe0)==0xe0))
             {
-                CDX_LOGD("This is realy latm...");
+                CDX_LOGV("This is realy latm...");
             }
             else
             {
-                CDX_LOGE("This is not latm...");
+                CDX_LOGV("This is not latm...");
                 return CDX_FALSE;
             }
         }
@@ -959,12 +959,12 @@ static int AacInit(CdxParserT* parameter)
     }
     while(needOffset + 7 < READLEN)
     {
-        if(AacProbe(impl->readBuf + needOffset))
+        if(AacProbe(impl->readBuf + needOffset, READLEN - needOffset))
             break;
         needOffset++;
     }
 
-    CDX_LOGD("First frame needOffset : %d", needOffset);
+    CDX_LOGV("First frame needOffset : %d", needOffset);
 
     if(needOffset + 7 >= READLEN)
     {
@@ -1410,7 +1410,7 @@ static int AacInit(CdxParserT* parameter)
     impl->bytesLeft = 0;
     impl->mErrno = PSR_OK;
     pthread_cond_signal(&impl->cond);
-    CDX_LOGW("AAC ulDuration:%lld",impl->ulDuration);
+    CDX_LOGV("AAC ulDuration:%lld",impl->ulDuration);
     return 0;
 AAC_error:
     CDX_LOGE("AacOpenThread fail!!!");
@@ -1439,7 +1439,7 @@ static cdx_int32 __AacParserControl(CdxParserT *parser, cdx_int32 cmd, void *par
         CdxStreamClrForceStop(impl->stream);
         break;
     case CDX_PSR_CMD_REPLACE_STREAM:
-        CDX_LOGD("replace stream!!!");
+        CDX_LOGW("replace stream!!!");
         if(impl->stream)
         {
             CdxStreamClose(impl->stream);
@@ -1508,13 +1508,13 @@ static cdx_int32 __AacParserPrefetch(CdxParserT *parser, CdxPacketT *pkt)
         }
         else if(ret == 0)
         {
-           CDX_LOGD("CdxStream EOS");
+           CDX_LOGV("CdxStream EOS");
            impl->mErrno = PSR_EOS;
            return CDX_FAILURE;
         }
         if(ret != AAC_MAINBUF_SIZE)
         {
-           CDX_LOGD("CdxStream EOS");
+           CDX_LOGV("CdxStream EOS");
            impl->mErrno = PSR_EOS;
         }
 
@@ -1529,7 +1529,7 @@ static cdx_int32 __AacParserPrefetch(CdxParserT *parser, CdxPacketT *pkt)
         {
             if(impl->eofReached)
             {
-                CDX_LOGD("CdxStream EOS");
+                CDX_LOGV("CdxStream EOS");
                 impl->mErrno = PSR_EOS;
             }
             pkt->length = impl->bytesLeft;
@@ -1546,7 +1546,7 @@ static cdx_int32 __AacParserPrefetch(CdxParserT *parser, CdxPacketT *pkt)
     CDX_LOGV("****len:%d,",pkt->length);
     if(pkt->length == 0)
     {
-       CDX_LOGD("CdxStream EOS");
+       CDX_LOGV("CdxStream EOS");
        impl->mErrno = PSR_EOS;
        return CDX_FAILURE;
     }
@@ -1585,7 +1585,7 @@ static cdx_int32 __AacParserRead(CdxParserT *parser, CdxPacketT *pkt)
     }
     if(pkt->length == 0)
     {
-       CDX_LOGD("CdxStream EOS");
+       CDX_LOGV("CdxStream EOS");
        impl->mErrno = PSR_EOS;
        return CDX_FAILURE;
     }
@@ -1614,12 +1614,15 @@ static cdx_int32 __AacParserGetMediaInfo(CdxParserT *parser, CdxMediaInfoT *medi
     memset(cdxProgram, 0, sizeof(struct CdxProgramS));
     cdxProgram->id = 0;
     cdxProgram->audioNum = 1;
+#ifndef ONLY_ENABLE_AUDIO
     cdxProgram->videoNum = 0;//
     cdxProgram->subtitleNum = 0;
+#endif
     cdxProgram->audioIndex = 0;
+#ifndef ONLY_ENABLE_AUDIO
     cdxProgram->videoIndex = 0;
     cdxProgram->subtitleIndex = 0;
-
+#endif
     if(impl->bSeekable)
     {
         if((impl->ulformat != AAC_FF_ADTS)&&(impl->ulformat != AAC_FF_LATM))
@@ -1658,8 +1661,9 @@ static cdx_int32 __AacParserSeekTo(CdxParserT *parser, cdx_int64 timeUs, SeekMod
 
     if(!impl->bSeekable)
     {
-        CDX_LOGD("bSeekable = 0");
-        return CDX_FAILURE;
+        impl->nFrames = (timeUs/1000000) * impl->ulSampleRate /1024;//fix aac not seek in airplay
+        CDX_LOGD("bSeekable = 0,timeUs %lld,impl->nFrames %d !",timeUs,impl->nFrames);
+        return CDX_SUCCESS;
     }
     nFrames = (timeUs/1000000) * impl->ulSampleRate /1024;
     if(nFrames > impl->nFrames)//ff
@@ -1774,7 +1778,7 @@ static cdx_uint32 __AacParserProbe(CdxStreamProbeDataT *probeData)
 
         for (frames = 0; buf1 < end; frames++)
         {
-            if (!AacProbe(buf1))
+            if (!AacProbe(buf1, end - buf1))
             {
                 if (buf != buf0)
                 {
@@ -1807,7 +1811,7 @@ static cdx_uint32 __AacParserProbe(CdxStreamProbeDataT *probeData)
     else if (max_frames >= 1)
         score = 1;
 
-    CDX_LOGD("aac probe score %d", score);
+    CDX_LOGV("aac probe score %d", score);
 
     if(score < 25)//unreliable... kill it
     {

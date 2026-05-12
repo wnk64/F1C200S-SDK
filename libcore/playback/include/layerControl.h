@@ -69,6 +69,8 @@ typedef struct LayerControlOpsS
     void (*destroy)(LayerCtrl*);
 
     int (*control)(LayerCtrl*, cdx_int32 , void *);
+
+    int (*returnBuffer)(LayerCtrl* , VideoPicture**);
 }LayerControlOpsT;
 
 struct LayerCtrl
@@ -83,6 +85,7 @@ enum CdxLayerCommandE
     CDX_LAYER_CMD_SET_HDR_INFO      = 0x101,
     CDX_LAYER_CMD_SET_NATIVE_WINDOW = 0x102,
     CDX_LAYER_CMD_SET_VIDEOCODEC_FORMAT = 0x103,
+    CDX_LAYER_CMD_SET_VIDEOCODEC_LBC_MODE = 0x104,
 };
 
 static void LayerRelease(LayerCtrl* l)
@@ -269,6 +272,15 @@ static int LayerControl(LayerCtrl* l, int cmd, void *para)
     CDX_CHECK(l->ops->control);
     return l->ops->control(l, cmd, para);
 }
+
+static int LayerReturnBuffer(LayerCtrl* l, VideoPicture** p)
+{
+    CDX_CHECK(l);
+    CDX_CHECK(l->ops);
+    CDX_CHECK(l->ops->returnBuffer);
+    return l->ops->returnBuffer(l, p);
+}
+
 
 #ifdef __cplusplus
 }

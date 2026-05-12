@@ -1,11 +1,31 @@
-SUBDIRS = customer file http udp tcp
+SUBDIRS = 
 
-if HTTPS_ENABLE
+if UDP_STREAM_ENABLE
+SUBDIRS += udp
+endif
+
+if TCP_STREAM_ENABLE
+SUBDIRS += tcp
+endif
+
+if FILE_STREAM_ENABLE
+SUBDIRS += file
+endif
+
+if HTTP_STREAM_ENABLE
+SUBDIRS += http
+endif
+
+if HTTPS_STREAM_ENABLE
 SUBDIRS += ssl aes
 endif
 
-if RTSP_CLIENT_ENABLE
+if RTSP_STREAM_ENABLE
 SUBDIRS += rtsp
+endif
+
+if RTMP_STREAM_ENABLE
+SUBDIRS += rtmp
 endif
 
 SUBDIRS += base

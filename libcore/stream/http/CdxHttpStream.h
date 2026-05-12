@@ -208,6 +208,7 @@ typedef struct CdxHttpStreamImpl
     const cdx_char *ua;                         // UA
     int nHttpHeaderSize;                        //header number to be added
     CdxHttpHeaderFieldT *pHttpHeader;           //http header
+    CdxHttpHeaderFieldsT pHttpHeaders;           //http header
     ExtraDataContainerT hfsContainer;
     int chunkedFlag;                            //set when "Transfer-Encoding: chunked"
 

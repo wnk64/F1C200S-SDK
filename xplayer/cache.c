@@ -31,10 +31,12 @@ static int64_t StreamCacheSeekByPcr(StreamCache* c, int64_t nSeekTimeUs);
 static int StreamCacheSeekByOffset(StreamCache* c, int64_t nOffset);
 static int StreamCachePlayerCacheTime(Player* p);
 
+#ifndef ONLY_ENABLE_AUDIO
 static int StreamCacheIsMpeg12KeyFrame(CacheNode* pNode);
 static int StreamCacheIsWMV3KeyFrame(CacheNode* pNode);
 static int StreamCacheIsH264KeyFrame(CacheNode* pNode);
 static int StreamCacheIsH265KeyFrame(CacheNode* pNode);
+#endif
 
 StreamCache* StreamCacheCreate(void)
 {
@@ -45,7 +47,9 @@ StreamCache* StreamCacheCreate(void)
     memset(c, 0, sizeof(StreamCache));
 
     c->eContainerFormat  = CDX_PARSER_UNKNOW;
+#ifndef ONLY_ENABLE_AUDIO
     c->eVideoCodecFormat = VIDEO_CODEC_FORMAT_UNKNOWN;
+#endif
     c->nLastValidPts     = -1;
     c->nLastValidPcr     = -1;
     c->nFirstPts         = -1;
@@ -61,7 +65,7 @@ static void NodeInfoDestroy(CacheNode *node)
 {
     if (node->info == NULL)
         return;
-
+#ifndef ONLY_ENABLE_AUDIO
     if(node->eMediaType == CDX_MEDIA_VIDEO)
     {
         struct VideoInfo *pVideoInfo = (struct VideoInfo *)node->info;
@@ -75,7 +79,9 @@ static void NodeInfoDestroy(CacheNode *node)
             }
         }
     }
-    else if(node->eMediaType == CDX_MEDIA_AUDIO)
+    else
+#endif
+    if(node->eMediaType == CDX_MEDIA_AUDIO)
     {
         struct AudioInfo *pAudioInfo = (struct AudioInfo *)node->info;
         int i;
@@ -298,6 +304,7 @@ int StreamBufferingPrepared(StreamCache* c)
     {
         int bPrepared = 0;
         pthread_mutex_lock(&c->mutex);
+#ifndef ONLY_ENABLE_AUDIO
         if(c->eVideoCodecFormat != VIDEO_CODEC_FORMAT_UNKNOWN &&
             c->pBuffering->mInitialBufferingMode == AW_BUFFERING_MODE_SIZE_ONLY){
             bPrepared = (c->nDataSize > c->pBuffering->mInitialWatermarkKB * 1024);
@@ -321,6 +328,10 @@ int StreamBufferingPrepared(StreamCache* c)
             c->pBuffering->mInitialBufferingMode == AW_BUFFERING_MODE_NONE){
             bPrepared = (c->nDataSize > c->pBuffering->mInitialWatermarkKB * 1024);
         }
+#else
+        if(c->pBuffering->mInitialBufferingMode == AW_BUFFERING_MODE_NONE)
+            bPrepared = (c->nDataSize > c->pBuffering->mInitialWatermarkKB * 1024);
+#endif
         pthread_mutex_unlock(&c->mutex);
         if(bPrepared){
             logv("Prepared. Data size is %fMB. Duration is %fS.",
@@ -341,6 +352,7 @@ int StreamCacheDataEnough(StreamCache* c)
     if(!c->pBuffering)
     {
         pthread_mutex_lock(&c->mutex);
+#ifndef ONLY_ENABLE_AUDIO
         if(c->eVideoCodecFormat != VIDEO_CODEC_FORMAT_UNKNOWN)
         {
             bDataEnough = (c->nDataSize >= c->nStartPlaySize) &&
@@ -349,6 +361,7 @@ int StreamCacheDataEnough(StreamCache* c)
                 c->nDataSize, c->nStartPlaySize, c->nVideoFrameNum, bDataEnough);
         }
         else
+#endif
         {
             bDataEnough = (c->nDataSize >= c->nStartPlaySize) &&
                           (c->nFrameNum > 0);
@@ -358,6 +371,7 @@ int StreamCacheDataEnough(StreamCache* c)
     else
     {
         pthread_mutex_lock(&c->mutex);
+#ifndef ONLY_ENABLE_AUDIO
         if(c->eVideoCodecFormat != VIDEO_CODEC_FORMAT_UNKNOWN &&
             c->pBuffering->mRebufferingMode == AW_BUFFERING_MODE_SIZE_ONLY){
             bDataEnough = (c->nDataSize > c->nCacheEnoughSize);
@@ -379,6 +393,10 @@ int StreamCacheDataEnough(StreamCache* c)
             c->pBuffering->mRebufferingMode == AW_BUFFERING_MODE_NONE){
             bDataEnough = (c->nDataSize > c->nCacheEnoughSize);
         }
+#else
+        if(c->pBuffering->mRebufferingMode == AW_BUFFERING_MODE_NONE)
+            bDataEnough = (c->nDataSize > c->nCacheEnoughSize);
+#endif
         pthread_mutex_unlock(&c->mutex);
         if(bDataEnough)
         {
@@ -425,12 +443,12 @@ void StreamCacheFlushOneFrame(StreamCache* c)
 
     c->nPassedDataSize += node->nLength;
     c->nPassedFrameNum++;
-
+#ifndef ONLY_ENABLE_AUDIO
     if (node->eMediaType == CDX_MEDIA_VIDEO) {
         c->nVideoFrameNum--;
         c->nPassedVideoFrameNum++;
     }
-
+#endif
     pthread_mutex_unlock(&c->mutex);
     return;
 }
@@ -546,9 +564,10 @@ int StreamCacheAddOneFrame(StreamCache* c, CacheNode* node)
 
     c->nDataSize += newNode->nLength;
     c->nFrameNum++;
+#ifndef ONLY_ENABLE_AUDIO
     if (node->eMediaType == CDX_MEDIA_VIDEO)
         c->nVideoFrameNum++;
-
+#endif
     pthread_mutex_unlock(&c->mutex);
 
     return 0;
@@ -573,11 +592,15 @@ void StreamCacheFlushAll(StreamCache* c)
 
     c->nDataSize = 0;
     c->nFrameNum = 0;
+#ifndef ONLY_ENABLE_AUDIO
     c->nVideoFrameNum = 0;
+#endif
     c->pHead = c->pTail = NULL;
     c->nPassedDataSize = 0;
     c->nPassedFrameNum = 0;
+#ifndef ONLY_ENABLE_AUDIO
     c->nPassedVideoFrameNum = 0;
+#endif
     c->nLastValidPts         = -1;
     c->pNodeWithLastValidPts = NULL;
     c->nLastValidPcr         = -1;
@@ -616,11 +639,17 @@ int StreamCacheGetLoadingProgress(StreamCache* c)
 
 int StreamCacheSetMediaFormat(StreamCache*           c,
                               CdxParserTypeT         eContainerFormat,
+#ifndef ONLY_ENABLE_AUDIO
                               enum EVIDEOCODECFORMAT eVideoCodecFormat,
+#else
+                              int eVideoCodecFormat,
+#endif
                               int                    nBitrate)
 {
     c->eContainerFormat  = eContainerFormat;
+#ifndef ONLY_ENABLE_AUDIO
     c->eVideoCodecFormat = eVideoCodecFormat;
+#endif
     c->nBitrate          = nBitrate;
     return 0;
 }
@@ -670,11 +699,15 @@ static int getSeekOffset(StreamCache* c, int64_t nSeekTimeUs, int64_t *pOffSet)
     if (nBitrate <= 0)
     {
         nBitrate = 0;
+#ifndef ONLY_ENABLE_AUDIO
         if(PlayerHasVideo(c->pPlayer))
             nBitrate += PlayerGetVideoBitrate(c->pPlayer);
+#endif
+#ifndef ONLY_DISABLE_AUDIO
         if(PlayerHasAudio(c->pPlayer))
             nBitrate += PlayerGetAudioBitrate(c->pPlayer);
-    }
+#endif
+	}
 
     if (nBitrate <= 0)
         return -1;
@@ -709,22 +742,30 @@ static void adjustList(StreamCache *c, CacheNode *pNodeFound)
 {
     int nPassedDataSize = 0;
     int nPassedFrameNum = 0;
+#ifndef ONLY_ENABLE_AUDIO
     int nPassedVideoFrameNum = 0;
+#endif
     CacheNode *pNode;
     for (pNode = c->pPassedHead; pNode != pNodeFound; pNode = pNode->pNext)
     {
         nPassedDataSize += pNode->nLength;
         nPassedFrameNum++;
+#ifndef ONLY_ENABLE_AUDIO
         if (pNode->eMediaType == CDX_MEDIA_VIDEO)
             nPassedVideoFrameNum++;
+#endif
     }
     c->pHead = pNodeFound;
     c->nDataSize = c->nPassedDataSize + c->nDataSize - nPassedDataSize;
     c->nFrameNum = c->nPassedFrameNum + c->nFrameNum - nPassedFrameNum;
+#ifndef ONLY_ENABLE_AUDIO
     c->nVideoFrameNum = c->nPassedVideoFrameNum + c->nVideoFrameNum - nPassedVideoFrameNum;
+#endif
     c->nPassedDataSize = nPassedDataSize;
     c->nPassedFrameNum = nPassedFrameNum;
+#ifndef ONLY_ENABLE_AUDIO
     c->nPassedVideoFrameNum = nPassedVideoFrameNum;
+#endif
 }
 
 int64_t StreamCacheSeekTo(StreamCache* c, int64_t nSeekTimeUs)
@@ -953,9 +994,11 @@ static int StreamCacheSeekByOffset(StreamCache* c, int64_t nSeekOffset)
 
 static int StreamCacheIsKeyFrame(StreamCache* c, CacheNode* pNode)
 {
+#ifndef ONLY_ENABLE_AUDIO
     if(c->eVideoCodecFormat == VIDEO_CODEC_FORMAT_UNKNOWN)
+#endif
         return pNode->eMediaType == CDX_MEDIA_AUDIO;
-
+#ifndef ONLY_ENABLE_AUDIO
     if(c->eContainerFormat == CDX_PARSER_TS ||
        c->eContainerFormat == CDX_PARSER_BD ||
        c->eContainerFormat == CDX_PARSER_HLS)
@@ -977,32 +1020,50 @@ static int StreamCacheIsKeyFrame(StreamCache* c, CacheNode* pNode)
     }
 
     return pNode->nFlags & KEY_FRAME && pNode->eMediaType == CDX_MEDIA_VIDEO;
+#endif
 }
 
 static int StreamCachePlayerCacheTime(Player* p)
 {
-    int     bHasVideo;
-    int     bHasAudio;
+#ifndef ONLY_ENABLE_AUDIO
+    int     bHasVideo = 0;
+#endif
+    int     bHasAudio = 0;
+#ifndef ONLY_ENABLE_AUDIO
     int     nPictureNum;
     int     nFrameDuration;
+#endif
     int     nPcmDataSize;
     int     nSampleRate;
     int     nChannelCount;
     int     nBitsPerSample;
     int     nStreamDataSize;
     int     nBitrate;
+#ifndef ONLY_ENABLE_AUDIO
     int64_t nVideoCacheTime;
+#endif
     int64_t nAudioCacheTime;
 
+#ifndef ONLY_ENABLE_AUDIO
     nVideoCacheTime = 0;
+#endif
     nAudioCacheTime = 0;
+#ifndef ONLY_ENABLE_AUDIO
     bHasVideo = PlayerHasVideo(p);
+#endif
+#ifndef ONLY_DISABLE_AUDIO
     bHasAudio = PlayerHasAudio(p);
-
+#endif
+#ifndef ONLY_ENABLE_AUDIO
     if(bHasVideo == 0 && bHasAudio == 0)
         return 0;
-
+#else
+    if(bHasAudio == 0)
+        return 0;
+#endif
     const int64_t unit = 8 * 1000 * 1000;
+
+#ifndef ONLY_ENABLE_AUDIO
     if(bHasVideo)
     {
         nPictureNum     = PlayerGetValidPictureNum(p);
@@ -1015,7 +1076,9 @@ static int StreamCachePlayerCacheTime(Player* p)
         if(nBitrate > 0)
             nVideoCacheTime += nStreamDataSize * unit / nBitrate;
     }
+#endif
 
+#ifndef ONLY_DISABLE_AUDIO
     if(bHasAudio)
     {
         nPcmDataSize    = PlayerGetAudioPcmDataSize(p);
@@ -1034,11 +1097,15 @@ static int StreamCachePlayerCacheTime(Player* p)
         if(nBitrate > 0)
             nAudioCacheTime += nStreamDataSize * unit/nBitrate;
     }
-
+#endif
+#ifndef ONLY_ENABLE_AUDIO
     return (int)(nVideoCacheTime + nAudioCacheTime)/(bHasVideo + bHasAudio);
+#else
+    return (int)(nAudioCacheTime)/(bHasAudio);
+#endif
 }
 
-
+#ifndef ONLY_ENABLE_AUDIO
 static int StreamCacheIsMpeg12KeyFrame(CacheNode* pNode)
 {
     unsigned int   code;
@@ -1150,3 +1217,4 @@ static int StreamCacheIsH265KeyFrame(CacheNode* pNode)
 
     return 0;
 }
+#endif

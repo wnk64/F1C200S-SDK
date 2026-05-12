@@ -13,6 +13,7 @@ LOCAL_INCLUDE = -I$(top_srcdir) \
 		-I$(top_srcdir)/libcore/parser/include \
 		-I$(top_srcdir)/libcore/common/iniparser \
 		-I$(top_srcdir)/external/include/adecoder \
+		-I$(top_srcdir)/../mpp_libcedarc/include \
 		-I$(top_srcdir)/../libcedarc/include \
 		-I./include
 

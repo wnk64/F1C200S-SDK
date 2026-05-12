@@ -537,9 +537,9 @@ int CdxHttpResponseParse(CdxHttpHeaderT *httpHdr)
             return -1;
         }
         memcpy(tmpBuf, httpHdr->buffer, posHdrSep);
-        CDX_LOGV("===================================================");
+        CDX_LOGV("get response info===================================================begin");
         CDX_LOGV("%s", tmpBuf);
-        CDX_LOGV("===================================================");
+        CDX_LOGV("get response info===================================================finish");
         free(tmpBuf);
     }
     ProcessCookies(httpHdr);

@@ -10,6 +10,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "OggParseAuxiliary"
+#include <stdlib.h>
 #include "CdxOggParser.h"
 #include <cdx_log.h>
 #include <string.h>

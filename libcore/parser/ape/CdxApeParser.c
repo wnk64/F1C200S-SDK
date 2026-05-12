@@ -24,6 +24,7 @@
 #include <CdxBinary.h>
 #include "CdxApeParser.h"
 #include <string.h>
+#include <stdlib.h>
 
 #include <limits.h>
 #include <fcntl.h>

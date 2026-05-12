@@ -15,7 +15,7 @@
  */
 
 #include "CdxMp4Muxer.h"
-
+#include "awbswap.h"
 int initMov(Mp4MuxContext *impl)
 {
     MuxMOVContext *mov = NULL;
@@ -196,6 +196,10 @@ int setVideoInfo(MuxMOVContext *mov, MuxerVideoStreamInfoT *p_v_info)
     if (p_v_info->eCodeType == VENC_CODEC_H264)
     {
         p_video->codec_id = MUX_CODEC_ID_H264;
+    }
+    else if (p_v_info->eCodeType == VENC_CODEC_H265)
+    {
+        p_video->codec_id = MUX_CODEC_ID_H265;
     }
     else if (p_v_info->eCodeType == VENC_CODEC_JPEG)
     {

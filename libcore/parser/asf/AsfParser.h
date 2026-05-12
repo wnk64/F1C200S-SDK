@@ -362,7 +362,7 @@ int AsfPsrCoreClose(AsfContextT *p);
 
 int AsfPsrCoreRead(AsfContextT *p);
 
-int AsfPsrCoreIoctrl(AsfContextT *p, cdx_uint32 uCmd, cdx_uint32 uParam);
+int AsfPsrCoreIoctrl(AsfContextT *p, cdx_uint32 uCmd, cdx_uint64 uParam);
 
 #ifdef __cplusplus
 }

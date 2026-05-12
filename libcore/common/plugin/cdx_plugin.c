@@ -38,7 +38,9 @@ typedef struct CdxPluginNodeS
 } CdxPluginNodeS;
 
 struct CdxPluginListS g_pluging_list;
+#ifndef ONLY_DISABLE_AUDIO
 struct CdxPluginListS g_adecoder_list;
+#endif
 struct CdxPluginListS g_vdecoder_list;
 typedef void PluginInitFunc(void);
 
@@ -239,8 +241,10 @@ void CdxPluginInit(void)
     logd("Plugin init!");
     static int has_init = 0;
 
+#ifndef ONLY_DISABLE_AUDIO
     CdxListInit(&g_adecoder_list.list);
     g_adecoder_list.size = 0;
+#endif
     CdxListInit(&g_vdecoder_list.list);
     g_vdecoder_list.size = 0;
     CdxListInit(&g_pluging_list.list);
@@ -248,7 +252,9 @@ void CdxPluginInit(void)
 
     if (!has_init)
     {
+#ifndef ONLY_DISABLE_AUDIO
         CdxPluginLoadList(&g_adecoder_list,"adecoder");
+#endif
         CdxPluginLoadList(&g_vdecoder_list,"vdecoder");
         CdxPluginLoadList(&g_pluging_list,"plugin");
         has_init = 1;

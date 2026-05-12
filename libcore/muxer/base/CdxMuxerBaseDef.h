@@ -22,6 +22,7 @@ typedef enum {
 typedef enum {
     MUX_CODEC_ID_MPEG4   = 32,
     MUX_CODEC_ID_H264    = 33,
+    MUX_CODEC_ID_H265    = 34,
     MUX_CODEC_ID_MJPEG   = 108,
     MUX_CODEC_ID_AAC     = 64,
     MUX_CODEC_ID_MP3     = 105,

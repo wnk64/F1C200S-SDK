@@ -22,7 +22,9 @@ extern "C" {
 #include <stdlib.h>
 #include <pthread.h>
 #include "CdxParser.h"
+#ifndef ONLY_ENABLE_AUDIO
 #include "vdecoder.h"
+#endif
 #include "player.h"
 #include "xplayerUtil.h"
 
@@ -55,13 +57,17 @@ typedef struct StreamCache_t
 
     int                     nDataSize;
     int                     nFrameNum;
+#ifndef ONLY_ENABLE_AUDIO
     int                     nVideoFrameNum;
+#endif
     CacheNode*              pHead;
     CacheNode*              pTail;
 
     int                     nPassedDataSize;
     int                     nPassedFrameNum;
+#ifndef ONLY_ENABLE_AUDIO
     int                     nPassedVideoFrameNum;
+#endif
     CacheNode*              pPassedHead;
 
     int64_t                 nLastValidPts;
@@ -73,7 +79,9 @@ typedef struct StreamCache_t
     int                     nBitrate;           //* for ts/m2ts stream seek processing.
     Player*                 pPlayer;            //* for ts/m2ts stream seek processing.
     CdxParserTypeT          eContainerFormat;   //* for seek processing.
+#ifndef ONLY_ENABLE_AUDIO
     enum EVIDEOCODECFORMAT  eVideoCodecFormat;  //* for finding key frame in cache when seek.
+#endif
     AwBufferingSettings*    pBuffering;
     int64_t                 nCacheEnoughSize;
     int64_t                 nCacheEnoughDurationUs;
@@ -110,7 +118,11 @@ int StreamCacheGetLoadingProgress(StreamCache* c);
 
 int StreamCacheSetMediaFormat(StreamCache*           c,
                               CdxParserTypeT         eContainerFormat,
+#ifndef ONLY_ENABLE_AUDIO
                               enum EVIDEOCODECFORMAT eVideoCodecFormat,
+#else
+                              int   eVideoCodecFormat,
+#endif
                               int                    nBitrate);
 
 int StreamCacheSetPlayer(StreamCache* c, Player* pPlayer);

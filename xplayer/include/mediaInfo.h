@@ -69,14 +69,21 @@ typedef struct MEDIAINFO
 
     enum ECONTAINER     eContainerType;
     int                 bSeekable;
+#ifndef ONLY_ENABLE_AUDIO
     int                 nVideoStreamNum;
+#endif
     int                 nAudioStreamNum;
+#ifndef ONLY_ENABLE_AUDIO
     int                 nSubtitleStreamNum;
-
+#endif
+#ifndef ONLY_ENABLE_AUDIO
     VideoStreamInfo*    pVideoStreamInfo;
+#endif
     AudioStreamInfo*    pAudioStreamInfo;
+	CdxMediaInfoT		*Id3Info;
+#ifndef ONLY_ENABLE_AUDIO
     SubtitleStreamInfo* pSubtitleStreamInfo;
-
+#endif
 }MediaInfo;
 
 #endif

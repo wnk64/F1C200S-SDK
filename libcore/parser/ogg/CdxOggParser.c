@@ -14,6 +14,7 @@
 #include <cdx_log.h>
 #include <CdxMemory.h>
 #include <errno.h>
+#include "CdxMetaData.h"
 
 extern const struct ogg_codec cdx_ff_vorbis_codec;
 extern const struct ogg_codec cdx_ff_ogm_video_codec;
@@ -1072,6 +1073,7 @@ static int ogg_seek(CdxOggParser *ogg, cdx_int64 timeUs)
     cdx_int64 dst_frame;
     struct ogg_stream *os;
     int i;
+#ifndef ONLY_ENABLE_AUDIO
     if(ogg->hasVideo)
     {
         for (i = 0; i < ogg->nstreams; i++)
@@ -1093,7 +1095,7 @@ static int ogg_seek(CdxOggParser *ogg, cdx_int64 timeUs)
             goto _start;
         }
     }
-
+#endif
     if(ogg->hasAudio)
     {
         CDX_LOGW("please check this code, when error happen");
@@ -1431,6 +1433,7 @@ static cdx_int32 OggParserPrefetch(CdxParserT *parser, CdxPacketT *cdxPkt)
     pthread_cond_signal(&oggParser->cond);
     return ret;
 }
+#ifndef ONLY_ENABLE_AUDIO
 static int VideoCodecMap(int codec_id)
 {
     int vCodecFormat = VIDEO_CODEC_FORMAT_UNKNOWN;
@@ -1473,6 +1476,7 @@ static int VideoCodecMap(int codec_id)
     }
     return vCodecFormat;
 }
+#endif
 static int SetMediaInfo(CdxOggParser *oggParser)
 {
     CdxMediaInfoT *mediaInfo = &oggParser->mediaInfo;
@@ -1483,7 +1487,9 @@ static int SetMediaInfo(CdxOggParser *oggParser)
     CDX_LOGD("*********oggParser->durationUs=%llu", oggParser->durationUs);
     int i, j=0;
     struct ogg_stream *os;
+#ifndef ONLY_ENABLE_AUDIO
     VideoStreamInfo *video = NULL;
+#endif
     for (i = 0; i < oggParser->nstreams; i++)
     {
         os = oggParser->streams + i;
@@ -1491,6 +1497,7 @@ static int SetMediaInfo(CdxOggParser *oggParser)
         {
             continue;
         }
+#ifndef ONLY_ENABLE_AUDIO
         if(os->stream->codec->codec_type == AVMEDIA_TYPE_VIDEO &&
            VIDEO_STREAM_LIMIT > program->videoNum++)
         {
@@ -1523,7 +1530,9 @@ static int SetMediaInfo(CdxOggParser *oggParser)
             video->pCodecSpecificData = oggParser->tempVideoInfo.pCodecSpecificData;
             os->streamIndex = 0;
         }
-        else if(os->stream->codec->codec_type == AVMEDIA_TYPE_AUDIO && AUDIO_STREAM_LIMIT > j)
+        else
+#endif
+        if(os->stream->codec->codec_type == AVMEDIA_TYPE_AUDIO && AUDIO_STREAM_LIMIT > j)
         {
             int codec_id = os->stream->codec->codec_id;
             switch(codec_id)
@@ -1605,12 +1614,14 @@ static int SetMediaInfo(CdxOggParser *oggParser)
 
             os->streamIndex = j++;
         }
+#ifndef ONLY_ENABLE_AUDIO
         else if(os->stream->codec->codec_type == AVMEDIA_TYPE_SUBTITLE &&
                 SUBTITLE_STREAM_LIMIT > program->subtitleNum++)
         {
             CDX_LOGW("subtitle is not support yet.");
             os->invalid = 1;
         }
+#endif
         else
         {
             os->invalid = 1;
@@ -1618,7 +1629,7 @@ static int SetMediaInfo(CdxOggParser *oggParser)
         }
     }
     program->audioNum = j;
-    PrintMediaInfo(mediaInfo);
+    //PrintMediaInfo(mediaInfo);
 
 #if OGG_SAVE_VIDEO_STREAM
     oggParser->fpVideoStream[0] = fopen("/data/camera/ogg_videostream.es", "wb+");
@@ -1721,7 +1732,9 @@ static int MakeSpecificData(CdxOggParser *oggParser)
     int ret = 0;
     //ProbeSpecificDataBuf *vProbeBuf = &oggParser->vProbeBuf;
     CdxPacketT *pkt;
+#ifndef ONLY_ENABLE_AUDIO
     unsigned int vCodecFormat = VIDEO_CODEC_FORMAT_UNKNOWN;
+#endif
     int i;
     int haveVideo = 0;
     struct ogg_stream *os;
@@ -1732,6 +1745,7 @@ static int MakeSpecificData(CdxOggParser *oggParser)
         {
             continue;
         }
+#ifndef ONLY_ENABLE_AUDIO
         if(os->stream->codec->codec_type == AVMEDIA_TYPE_VIDEO)
         {
             int codec_id = os->stream->codec->codec_id;
@@ -1759,8 +1773,11 @@ static int MakeSpecificData(CdxOggParser *oggParser)
             haveVideo = 1;
             break;
         }
+#endif
     }
+#ifndef ONLY_ENABLE_AUDIO
     if(!haveVideo)
+#endif
     {
         return PROBE_SPECIFIC_DATA_SUCCESS;
     }
@@ -1804,6 +1821,7 @@ static int MakeSpecificData(CdxOggParser *oggParser)
             goto _exit;
         }
         oggParser->packets[oggParser->packetNum++] = pkt;
+#ifndef ONLY_ENABLE_AUDIO
         if(pkt->type == CDX_MEDIA_VIDEO)
         {
             if(pkt->length + oggParser->vProbeBuf.probeDataSize >
@@ -1846,6 +1864,7 @@ static int MakeSpecificData(CdxOggParser *oggParser)
                 CDX_LOGE("probeVideoSpecificData (%d), it is unknown.", ret);
             }
         }
+#endif
     }
 
 _exit:
@@ -1859,6 +1878,81 @@ _exit:
     }
 _exit1:
     return ret;
+}
+
+static char *findString(char *content, const char *str, unsigned int len, int mode)
+{
+	int i;
+	int str_i = 0;
+	char *pos = NULL;
+	int contion;
+	char str_c;
+
+	for(i=0; i < len; i++){
+		if((len - i) < (strlen(str)-str_i)){
+			//CDX_LOGD("%d %d %d %d",len,i,strlen(str),str_i);
+			goto NOTFOUND;
+		}
+		// 是否区分大小写: mode = 0 不区分大小
+		str_c = str[str_i] >= 0x61 ? str[str_i] - 0x20 : str[str_i] + 0x20;
+		contion = mode ? (content[i] == str[str_i]) : (content[i] == str[str_i] || content[i] == str_c);
+		//CDX_LOGD("%c %c, %c %d",str[str_i], str_c, content[i], contion);
+		if(contion){
+			if(str_i == 0){
+				pos = &content[i];
+			}
+			str_i++;
+		}else{
+			str_i = 0;
+			pos = NULL;
+			continue;
+		}
+		if(str_i == strlen(str)){
+			break;
+		}
+	}
+	return pos;
+NOTFOUND:
+	return NULL;
+}
+
+static cdx_int8 OggGetId3v2(CdxOggParser *parser, CdxMediaInfoT *mediaInfo)
+{
+	char string[10][16]={"Title=", "Artist=", "Album=", "ALBUMARTIST="};
+	META_IDX IDX[] = {TITLE, ARTIST, ALBUM, ALBUM_ARTIST} ;
+	char content[128];
+	int i;
+	char *p;
+
+	for(i=0; i < 4; i++){
+		memset(content, '\0', sizeof(content));
+		p = findString((char *)parser->comment, (const char *)string[i], parser->comment_size, 0);
+		if(p == NULL){
+			CDX_LOGW("don't found %s",string[i]);
+			continue;
+		}
+	//	memcpy(content, p, strlen(p));
+		memcpy(content, p + strlen(string[i]), strlen(p) - strlen(string[i]));
+		SetMetaData(mediaInfo, IDX[i], content, ENCODE_UTF_8);
+	}
+
+	return 0;
+}
+
+static cdx_int64 Ogg_GetInfo_GetBsInByte(cdx_int32    ByteLen, CdxStreamT *cdxStream)
+{
+    cdx_int64 RetVal = 0;
+    cdx_int32 ret = 0;
+    cdx_int32 i;
+    cdx_uint8 data;
+
+    for (i = 0; i < ByteLen; i++){
+        ret = CdxStreamRead(cdxStream, &data, 1);
+        if(ret != 1)
+            return -1;
+        RetVal = (RetVal << 8) | (data & 0xff);
+    }
+    return RetVal;
 }
 
 int OggParserInit(CdxParserT *parser)
@@ -1882,7 +1976,21 @@ int OggParserInit(CdxParserT *parser)
         CDX_LOGE("MakeSpecificData fail");
         goto _exit;
     }
+
+
     SetMediaInfo(oggParser);
+    int64_t pos = CdxStreamTell(oggParser->file);
+
+	CdxStreamSeek(oggParser->file, 0, SEEK_SET);
+	oggParser->comment_size = 4096;
+	oggParser->comment = malloc(oggParser->comment_size);
+	ret = CdxStreamRead(oggParser->file, oggParser->comment, oggParser->comment_size);
+    if(ret < 0){
+        CDX_LOGE("ogg read comment fail");
+        goto _exit;
+    }
+
+	CdxStreamSeek(oggParser->file, pos, SEEK_SET);
 
     oggParser->seekTimeUs = -1;
 
@@ -2225,11 +2333,16 @@ static cdx_int32 OggParserClose(CdxParserT *parser)
     {
         free(oggParser->vProbeBuf.probeBuf);
     }
+#ifndef ONLY_ENABLE_AUDIO
     if(oggParser->tempVideoInfo.pCodecSpecificData)
     {
         free(oggParser->tempVideoInfo.pCodecSpecificData);
     }
-
+#endif
+	if(oggParser->comment){
+		free(oggParser->comment);
+		oggParser->comment = NULL;
+	}
     free(oggParser->buf);
     pthread_mutex_destroy(&oggParser->statusLock);
     pthread_cond_destroy(&oggParser->cond);
@@ -2249,7 +2362,9 @@ static cdx_int32 OggParserGetMediaInfo(CdxParserT *parser, CdxMediaInfoT *pMedia
     /*for the request from ericwang, for */
     pMediaInfo->programNum = 1;
     pMediaInfo->programIndex = 0;
-    /**/
+
+	OggGetId3v2(oggParser, pMediaInfo);
+
     return 0;
 }
 

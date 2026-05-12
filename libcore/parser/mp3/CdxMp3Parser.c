@@ -7,7 +7,7 @@
 * History :
 *   Author  : Khan <chengkan@allwinnertech.com>
 *   Date    : 2014/08/08
-*   Comment : ´´½¨³õÊ¼°æ±¾£¬ÊµÏÖ MP3 µÄ½â¸´ÓÃ¹¦ÄÜ
+*   Comment : åˆ›å»ºåˆå§‹ç‰ˆæœ¬ï¼Œå®žçŽ° MP3 çš„è§£å¤ç”¨åŠŸèƒ½
 */
 
 #define LOG_TAG "_mp3psr"
@@ -666,7 +666,7 @@ static XINGSeeker *CreateXINGSeeker(CdxParserT *parser,  cdx_int64 firstFramePos
     seeker->mFirstFramePos = firstFramePos;
 
     uint8_t ucBuffer[4];
-    int offset = firstFramePos;
+    int64_t offset = firstFramePos;
     if (Mp3Seek(mp3, offset, SEEK_SET)) {
          noSeeker = 1;
          goto EXIT;
@@ -689,6 +689,9 @@ static XINGSeeker *CreateXINGSeeker(CdxParserT *parser,  cdx_int64 firstFramePos
     }
     seeker->mFirstFramePos += xingFramesize;
 
+    if(mSamplePerFrame) {
+        seeker->mSamplePerFrame = mSamplePerFrame;
+    }
     uint8_t nVersion = (ucBuffer[1] >> 3) & 3;
 
     // determine offset of XING header
@@ -720,7 +723,24 @@ static XINGSeeker *CreateXINGSeeker(CdxParserT *parser,  cdx_int64 firstFramePos
             goto EXIT;
         }
     }
-    if (Mp3Seek(mp3, offset, SEEK_SET)) {
+
+    seeker->isCBR = CDX_FALSE;
+    if((ucBuffer[0] == 'I')) {
+        //Try to read encoded library, because LAME use "Info" to indicate CBR
+        if(!CdxStreamSeek(mp3->stream, xingbase + 0x9C - 0x24, SEEK_SET)) {
+            if(CdxStreamRead(mp3->stream, &ucBuffer, 4) == 4) {
+                if((ucBuffer[0] == 'L') && (ucBuffer[1] == 'A')
+                    && (ucBuffer[2] == 'M')  && (ucBuffer[3] == 'E')) {
+                        CDX_LOGD("Get encodeed library is LAME, so it is a cbr format!");
+                        seeker->isCBR = CDX_TRUE;
+                    } else {
+                        CDX_LOGD("Not lame! Assume it is a vbr format!");
+                    }
+            }
+        }
+    }
+
+    if (CdxStreamSeek(mp3->stream, offset, SEEK_SET)) {
          noSeeker = 1;
          goto EXIT;
     }
@@ -741,6 +761,8 @@ static XINGSeeker *CreateXINGSeeker(CdxParserT *parser,  cdx_int64 firstFramePos
             goto EXIT;
         }
         int32_t nFrames = MP3_U32_AT(ucBuffer);
+        seeker->mFrameNum = nFrames;
+        seeker->mSlots = (frameSlot_t*) malloc(sizeof(frameSlot_t) * nFrames);
         // only update mDurationUs if the calculated duration is valid (non zero)
         // otherwise, leave duration at -1 so that getDuration() and getOffsetForTime()
         // return false when called, to indicate that this xing tag does not have the
@@ -767,7 +789,7 @@ static XINGSeeker *CreateXINGSeeker(CdxParserT *parser,  cdx_int64 firstFramePos
             noSeeker = 1;
             goto EXIT;
         }
-        if (Mp3Read(mp3, seeker->mTOC, 99) < 99) {
+        if (Mp3Read(mp3, seeker->mTOC, 100) < 100) {
             noSeeker = 1;
             goto EXIT;
         }
@@ -785,8 +807,38 @@ static XINGSeeker *CreateXINGSeeker(CdxParserT *parser,  cdx_int64 firstFramePos
         seeker->mEncoderPadding = ((ucBuffer[1] & 0xf) << 8) + ucBuffer[2];
     }
 
+    seeker->mFrameSlotValid = CDX_FALSE;
+    //try to fill frame slots for a precised seeking (VBR)
+    if(!seeker->isCBR) {
+        int64_t curFrameSize = 0;
+        int32_t i = 0;
+        offset = seeker->mFirstFramePos;
+        for( i = 0; i < seeker->mFrameNum; i++) {
+            if (CdxStreamSeek(mp3->stream, offset, SEEK_SET)) {
+                break;
+            }
+            if (CdxStreamRead(mp3->stream, &ucBuffer, 4) < 4) { // XING header ID
+                break;
+            }
+            header = MP3_U32_AT(ucBuffer);
+            if (!GetMPEGAudioFrameSize(header, &curFrameSize, &samplingRate, &mNumChannels,
+                                NULL, &mSamplePerFrame)) {
+                break;
+            }
+            seeker->mSlots[i].frameIndex = i;
+            seeker->mSlots[i].offset = offset;
+            offset += curFrameSize;
+        }
+
+        if(i == seeker->mFrameNum) {
+            CDX_LOGD("Successfully init frame slots!");
+            seeker->mFrameSlotValid = CDX_TRUE;
+        }
+    }
 EXIT:
     if (noSeeker) {
+        if(seeker->mSlots)
+            free(seeker->mSlots);
         free(seeker);
         seeker = NULL;
     }
@@ -811,10 +863,10 @@ cdx_bool GetXINGOffsetForTime(XINGSeeker *seeker, int64_t *timeUs, int64_t *pos)
         if ( a == 0 ) {
             fa = 0.0f;
         } else {
-            fa = (float)seeker->mTOC[a-1];
+            fa = (float)seeker->mTOC[a];
         }
         if ( a < 99 ) {
-            fb = (float)seeker->mTOC[a];
+            fb = (float)seeker->mTOC[a+1];
         } else {
             fb = 256.0f;
         }
@@ -1451,7 +1503,7 @@ static int CdxMp3ParserSeekTo(CdxParserT *parser, cdx_int64 timeUs, SeekModeType
 
     mp3->mStatus = MP3_STA_SEEKING;
     int64_t actualSeekTimeUs = timeUs;
-    if ((mp3->mXINGSeeker == NULL ||
+    if ((mp3->mXINGSeeker == NULL || mp3->mXINGSeeker->isCBR ||
        !GetXINGOffsetForTime(mp3->mXINGSeeker, &actualSeekTimeUs, &mp3->mCurrentPos))
         && (mp3->mVBRISeeker == NULL ||
            !GetVBRIOffsetForTime(mp3, mp3->mVBRISeeker, &actualSeekTimeUs,&mp3->mCurrentPos))) {
@@ -1465,6 +1517,21 @@ static int CdxMp3ParserSeekTo(CdxParserT *parser, cdx_int64 timeUs, SeekModeType
         mp3->mCurrentPos = mp3->mFirstFramePos + timeUs * mp3->mBitRate / 8000000;
     } else {
         mCurrentTimeUs = actualSeekTimeUs;
+    }
+
+    //If is vbr file, we try to use frame slot talbe to find current position.
+    if(mp3->mXINGSeeker!=NULL && !mp3->mXINGSeeker->isCBR && mp3->mXINGSeeker->mFrameSlotValid) {
+        int64_t samples = actualSeekTimeUs * mp3->mSampleRate / 1000000;
+        int64_t framenums = (int64_t) samples/mp3->mXINGSeeker->mSamplePerFrame + 1;
+        if(framenums >= mp3->mXINGSeeker->mFrameNum) {
+            framenums = mp3->mXINGSeeker->mFrameNum;
+        }
+        if(framenums > 0) {
+            mp3->mCurrentPos = mp3->mXINGSeeker->mSlots[framenums-1].offset;
+        } else {
+            mp3->mCurrentPos = mp3->mXINGSeeker->mFirstFramePos;
+        }
+        CDX_LOGD("Get new pos using frame slot table : %lld,", mp3->mCurrentPos);
     }
 
     mBasisTimeUs = mCurrentTimeUs;
@@ -1602,6 +1669,8 @@ static int CdxMp3ParserClose(CdxParserT *parser)
     }
 
     if (mp3->mXINGSeeker) {
+        if(mp3->mXINGSeeker->mSlots)
+            free(mp3->mXINGSeeker->mSlots);
         free(mp3->mXINGSeeker);
         mp3->mXINGSeeker = NULL;
     }

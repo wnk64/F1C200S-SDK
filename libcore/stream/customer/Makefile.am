@@ -21,4 +21,3 @@ libcdx_customer_stream_la_LIBADD = $(top_srcdir)/libcore/base/libcdx_base.la
 
 #LOCAL_LIB = -lpthread
 libcdx_customer_stream_la_LDFLAGS += $(LOCAL_LIB)
-

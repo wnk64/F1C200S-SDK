@@ -17,6 +17,7 @@
 #include "CdxMp4Muxer.h"
 #include <errno.h>
 #include <sys/stat.h>
+#include "awbswap.h"
 
 #define WRITE_FREE_TAG (0)
 
@@ -86,10 +87,14 @@ static cdx_int32 writeLe32Stream(ByteIOContext *s, cdx_uint32 val)
 /***************************** Write Data to Stream File *****************************/
 
 /********************************** Write Video Tag **********************************/
-#define MOV_AV_RB32(x)  ((((const cdx_uint8*)(x))[0] << 24) | \
+#define MOV_AW_RB32(x)  ((((const cdx_uint8*)(x))[0] << 24) | \
                      (((const cdx_uint8*)(x))[1] << 16) | \
                      (((const cdx_uint8*)(x))[2] <<  8) | \
                       ((const cdx_uint8*)(x))[3])
+#define MOV_AW_RB24(x)                           \
+    ((((const cdx_uint8*)(x))[0] << 16) |         \
+     (((const cdx_uint8*)(x))[1] <<  8) |         \
+      ((const cdx_uint8*)(x))[2])
 
 static int movBswap32(unsigned int val)
 {
@@ -184,7 +189,7 @@ static cdx_uint32 avccGetSpsPpsSize(cdx_uint8 *data, cdx_int32 len)
     if (len > 6)
     {
         /* check for h264 start code */
-        if (MOV_AV_RB32(data) == 0x00000001)
+        if (MOV_AW_RB32(data) == 0x00000001)
         {
             cdx_uint8 *buf=NULL, *end, *start;
             cdx_uint32 sps_size=0, pps_size=0;
@@ -205,7 +210,7 @@ static cdx_uint32 avccGetSpsPpsSize(cdx_uint8 *data, cdx_int32 len)
             {
                 unsigned int size;
                 cdx_uint8 nal_type;
-                size = MOV_AV_RB32(buf);
+                size = MOV_AW_RB32(buf);
                 nal_type = buf[4] & 0x1f;
                 if (nal_type == 7)
                 { /* SPS */
@@ -233,7 +238,7 @@ int avccWriteSpsPps(ByteIOContext *pb, cdx_uint8 *data, int len, MOVTrack *track
     if (len > 6)
     {
         /* check for h264 start code */
-        if (MOV_AV_RB32(data) == 0x00000001)
+        if (MOV_AW_RB32(data) == 0x00000001)
         {
             cdx_uint8 *buf=NULL, *end, *start;
             cdx_uint32 sps_size=0, pps_size=0;
@@ -253,7 +258,7 @@ int avccWriteSpsPps(ByteIOContext *pb, cdx_uint8 *data, int len, MOVTrack *track
             {
                 unsigned int size;
                 cdx_uint8 nal_type;
-                size = MOV_AV_RB32(buf);
+                size = MOV_AW_RB32(buf);
                 nal_type = buf[4] & 0x1f;
                 if (nal_type == 7)
                 { /* SPS */
@@ -297,6 +302,14 @@ static cdx_uint32 videoGetAvccTagSize(MOVTrack *track)
     avcc_tag_size += avccGetSpsPpsSize((cdx_uint8*)track->vos_data, track->vos_len);
     return avcc_tag_size;
 }
+
+static cdx_uint32 VideoGetHvccTagSize(MOVTrack *track, cdx_int32 PsArrayCompleteness)
+{
+    cdx_uint32 hvcc_tag_size = 8;
+    hvcc_tag_size += hvccGetSpsPpsSize((cdx_uint8*)track->vos_data, track->vos_len, PsArrayCompleteness);
+    return hvcc_tag_size;
+}
+
 static int videoWriteAvccTag(ByteIOContext *pb, MOVTrack *track)
 {
     cdx_uint32 avcc_tag_size = videoGetAvccTagSize(track);
@@ -304,6 +317,16 @@ static int videoWriteAvccTag(ByteIOContext *pb, MOVTrack *track)
     writeTagStream(pb, "avcC");
     avccWriteSpsPps(pb, (cdx_uint8*)track->vos_data, track->vos_len, track);
     return avcc_tag_size;
+}
+
+static int VideoWriteHvccTag(ByteIOContext *pb, MOVTrack *track)
+{
+    MuxMOVContextT *mov = track->mov;
+    cdx_uint32 hvcc_tag_size = VideoGetHvccTagSize(track, 0);
+    writeBe32Stream(pb, hvcc_tag_size);
+    writeTagStream(pb, "hvcC");
+    hvccWriteSpsPps(pb, (cdx_uint8*)track->vos_data, track->vos_len, 0);
+    return hvcc_tag_size;
 }
 
 static cdx_uint32 calDescrLength(cdx_uint32 len)
@@ -398,6 +421,11 @@ static cdx_uint32 stsdGetVideoTagSize(MOVTrack *track)
     {
         video_tag_size += videoGetEsdsTagSize(track);
     }
+    else if(track->tag == MOV_MKTAG('h','v','c','1'))
+    {
+        video_tag_size += VideoGetHvccTagSize(track, 0);
+    }
+
     return video_tag_size;
 }
 
@@ -432,6 +460,7 @@ static cdx_int32 stsdWriteVideoTag(ByteIOContext *pb, MOVTrack *track)
 
     writeBe16Stream(pb, 0x18); /* Reserved */
     writeBe16Stream(pb, 0xffff); /* Reserved */
+
     if (track->tag == MOV_MKTAG('a','v','c','1'))
     {
         videoWriteAvccTag(pb, track);
@@ -440,6 +469,11 @@ static cdx_int32 stsdWriteVideoTag(ByteIOContext *pb, MOVTrack *track)
     {
         videoWriteEsdsTag(pb, track);
     }
+    else if (track->tag == MOV_MKTAG('h','v','c','1'))
+    {
+        VideoWriteHvccTag(pb, track);
+    }
+
 
     return video_tag_size;
 }
@@ -1278,7 +1312,7 @@ static void writeLatitude(ByteIOContext *pb, int degreex10000)
     {
         fractional_pat = -fractional_pat;
     }
-    snprintf(&str[4], 5, "%.4d", fractional_pat);
+    snprintf(&str[4], 5, "%.4d", fractional_pat) < 0 ? abort() : (void)0;
 
     // Do not write the null terminator
     writeBufferStream(pb, (cdx_int8 *)str, 8);
@@ -1308,7 +1342,7 @@ static void writeLongitude(ByteIOContext *pb, int degreex10000)
     {
         fractional_pat = -fractional_pat;
     }
-    snprintf(&str[5], 5, "%.4d", fractional_pat);
+    snprintf(&str[5], 5, "%.4d", fractional_pat) < 0 ? abort() : (void)0;
 
     // Do not write the null terminator
     writeBufferStream(pb, (cdx_int8 *)str, 9);
@@ -1565,6 +1599,12 @@ static cdx_int32 findCodecTag(MOVTrack *track)
             tag = MOV_MKTAG('a','v','c','1');
             break;
         }
+	case MUX_CODEC_ID_H265:
+        {
+            tag = MOV_MKTAG('h','v','c','1');
+            break;
+        }
+
         case MUX_CODEC_ID_MPEG4:
         {
             tag = MOV_MKTAG('m','p','4','v');
@@ -1940,7 +1980,16 @@ cdx_int32 Mp4WritePacket(Mp4MuxContext *s, CdxMuxerPacketT *pkt)
             }
 
         }
-        else if (trk->enc.codec_id == MUX_CODEC_ID_MPEG4)
+	else if(trk->enc.codec_id == MUX_CODEC_ID_H265)
+        {
+            if(pkt->keyFrameFlag & 1) //AVPACKET_FLAG_KEYFRAME
+            {
+                mov->cache_keyframe_ptr[trk->key_frame_num] = trk->stts_total_num;
+                trk->key_frame_num++;
+            }
+        }
+
+	else if (trk->enc.codec_id == MUX_CODEC_ID_MPEG4)
         {
             if ((tmp_strm_byte>>6) == 0)
             {
@@ -1967,7 +2016,7 @@ cdx_int32 Mp4WritePacket(Mp4MuxContext *s, CdxMuxerPacketT *pkt)
             return -1;
         }
 
-        if (mov->tracks[CODEC_TYPE_VIDEO]->enc.codec_id == MUX_CODEC_ID_H264)
+        if ((mov->tracks[CODEC_TYPE_VIDEO]->enc.codec_id == MUX_CODEC_ID_H264 || mov->tracks[CODEC_TYPE_VIDEO]->enc.codec_id == MUX_CODEC_ID_H265 ) && 0 != size)
         {
             int pkt_size = movBswap32(size - 4);
             memcpy(pkt_buf, &pkt_size, 4);

@@ -13,6 +13,7 @@ LOCAL_INCLUDE = -I../include \
 		-I../../base/include \
 		-I../base \
                 -I$(top_srcdir)/external/include/aencoder \
+		-I$(top_srcdir)/../mpp_libcedarc/include \
                 -I$(top_srcdir)/../libcedarc/include \
 		-I$(top_srcdir)/
 

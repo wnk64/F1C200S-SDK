@@ -11,7 +11,7 @@
 //#define CONFIG_LOG_LEVEL LOG_LEVEL_VERBOSE
 #define LOG_TAG "audioRender"
 #include "cdx_log.h"
-
+#include <stdlib.h>
 #include <string.h>
 #include "audioRenderComponent.h"
 #include "AwMessageQueue.h"
@@ -707,8 +707,9 @@ static int startSoundDevice(AudioRenderComp *p)
 
     logd("start sound device.");
     SoundDeviceStart(p->pSoundCtrl);
-
     threadCtx->bFirstFrameSend = 1;
+    p->callback(p->pUserData, PLAYER_AUDIO_RENDER_NOTIFY_AUDIO_START, NULL);
+
     return 0;
 }
 
@@ -766,6 +767,7 @@ static inline int writeToSoundDevice(AudioRenderComp *p)
                                        pPcmData, nPcmDataLen);
         if(nWritten > 0)
         {
+            nWritten = (nWritten > nPcmDataLen ? nPcmDataLen : nWritten);
             nPcmDataLen -= nWritten;
             pPcmData    += nWritten;
             AudioDecCompReleasePcmData(p->pDecComp, nWritten);

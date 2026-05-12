@@ -128,13 +128,13 @@ typedef enum {
 #define SizeToReadEverytimeInLocal (500*1024)
 #define SizeToReadEverytimeInNet (4*1024)
 #define SizeToReadEverytimeInMiracast (188*7)
-#define VideoStreamBufferSize (1024*1024)
+#define VideoStreamBufferSize (512)
 #define OPEN_CHECK (0)
 #define Debug (0)
 #define PtsDebug (0)
 #define PROBE_STREAM (1)
 #define ProbeSpecificData (1)
-#define SIZE_OF_VIDEO_PROVB_DATA (2*1024*1024)
+#define SIZE_OF_VIDEO_PROVB_DATA (1024*1024)
 #define SIZE_OF_AUDIO_PROVB_DATA (150*1024)
 #define    DVB_USED    (1)
 #define    DVB_TEST    (0)
@@ -286,8 +286,9 @@ struct TSParserS
     ParserCallback callback;
     void *pUserData;
     cdx_int32 endPosFlag;
-
+#ifndef ONLY_ENABLE_AUDIO
     VideoStreamInfo tempVideoInfo;
+#endif
     cdx_int64 firstPts;
     cdx_int32 mIslastSegment;
     cdx_int32 mClrInfo;

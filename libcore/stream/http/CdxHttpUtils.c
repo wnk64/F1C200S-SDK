@@ -691,6 +691,14 @@ int CacheManagerRequestData(HttpCacheManagerT *p, int nRequireSize, void *buf)
     }
 
     c = &p->cacheFifo.pCaches[p->cacheFifo.nReadPos];
+    if((p->nReqDataPos < c->nStartPos) || (p->nReqDataPos > c->nEndPos))
+    {
+        logv("HttpCacheT get data error, nReqDataPos=%lld, s-e(%lld, %lld), wait for cache(%p) refresh.",
+            p->nReqDataPos, c->nStartPos, c->nEndPos, c);
+        pthread_mutex_unlock(&p->mutex);
+        return 0;
+    }
+
     logv("nRequireSize=%d, c->nNodeValidSize=%d, c->cacheFifo.nReadPos,nWritePos=%d,%d, "
         "pCaches=%p, c->tmpNode(%p), curNodeNum=%d, nDatasize=%d, head=%p",
         nRequireSize, c->nNodeValidSize, p->cacheFifo.nReadPos, p->cacheFifo.nWritePos,
@@ -706,9 +714,9 @@ int CacheManagerRequestData(HttpCacheManagerT *p, int nRequireSize, void *buf)
             memcpy(buf, c->tmpNode->pData + c->nNodeReadPos, nRequireSize);
             c->nNodeValidSize -= nRequireSize;
             c->nNodeReadPos += nRequireSize;
-            p->nReqDataPos += nRequireSize;
             c->nDataSize -= nRequireSize;
             c->nPassedSize += nRequireSize;
+            p->nReqDataPos += nRequireSize;
             pthread_mutex_unlock(&p->mutex);
             return nRequireSize;
         }
@@ -717,6 +725,7 @@ int CacheManagerRequestData(HttpCacheManagerT *p, int nRequireSize, void *buf)
             memcpy(buf, c->tmpNode->pData + c->nNodeReadPos, c->nNodeValidSize);
             c->nDataSize -= c->nNodeValidSize;
             c->nPassedSize += c->nNodeValidSize;
+            p->nReqDataPos += c->nNodeValidSize;
             readSize = c->nNodeValidSize;
             c->nNodeValidSize = 0;
             c->nNodeReadPos = 0;
@@ -728,6 +737,14 @@ int CacheManagerRequestData(HttpCacheManagerT *p, int nRequireSize, void *buf)
                 p->cacheFifo.nReadPos = (p->cacheFifo.nReadPos + 1) % p->cacheFifo.nCacheNum;
                 c = &p->cacheFifo.pCaches[p->cacheFifo.nReadPos];
                 c->nCurNodeNum = 0;
+                if((p->nReqDataPos < c->nStartPos) || (p->nReqDataPos > c->nEndPos))
+                {
+                    logv("HttpCacheT get data error, nReqDataPos=%lld, s-e(%lld, %lld), wait for cache(%p) refresh.",
+                        p->nReqDataPos, c->nStartPos, c->nEndPos, c);
+                    pthread_mutex_unlock(&p->mutex);
+                    return readSize;
+                }
+
                 logv("c=%p, c->pHead=%p, size=%d, passedsize=%d, s-e(%lld, %lld), nodeNum=%d",
                     c, c->pHead, c->nDataSize, c->nPassedSize, c->nStartPos,
                     c->nEndPos, c->nNodeNum);
@@ -761,6 +778,7 @@ int CacheManagerRequestData(HttpCacheManagerT *p, int nRequireSize, void *buf)
             c->nNodeReadPos += needLen;
             c->nDataSize -= needLen;
             c->nPassedSize += needLen;
+            p->nReqDataPos += needLen;
             readSize = nRequireSize;
             break;
         }
@@ -771,6 +789,7 @@ int CacheManagerRequestData(HttpCacheManagerT *p, int nRequireSize, void *buf)
             c->nPassedSize += c->tmpNode->nLength;
             c->nNodeValidSize = 0;
             c->nNodeReadPos = 0;
+            p->nReqDataPos += c->tmpNode->nLength;
             readSize += c->tmpNode->nLength;
             needLen -= c->tmpNode->nLength;
             c->tmpNode = NULL;
@@ -781,6 +800,13 @@ int CacheManagerRequestData(HttpCacheManagerT *p, int nRequireSize, void *buf)
                 p->cacheFifo.nReadPos = (p->cacheFifo.nReadPos + 1) % p->cacheFifo.nCacheNum;
                 c = &p->cacheFifo.pCaches[p->cacheFifo.nReadPos];
                 c->nCurNodeNum = 0;
+                if((p->nReqDataPos < c->nStartPos) || (p->nReqDataPos > c->nEndPos))
+                {
+                    logv("HttpCacheT get data error, nReqDataPos=%lld, s-e(%lld, %lld), wait for cache(%p) refresh.",
+                        p->nReqDataPos, c->nStartPos, c->nEndPos, c);
+                    break;
+                }
+
                 logv("c=%p, c->pHead=%p, size=%d, passedsize=%d, s-e(%lld, %lld), nodeNum=%d",
                     c, c->pHead, c->nDataSize, c->nPassedSize, c->nStartPos,
                     c->nEndPos, c->nNodeNum);
@@ -788,7 +814,6 @@ int CacheManagerRequestData(HttpCacheManagerT *p, int nRequireSize, void *buf)
         }
     }
 
-    p->nReqDataPos += readSize;
     pthread_mutex_unlock(&p->mutex);
 
     return readSize;

@@ -269,7 +269,7 @@ cdx_int16 AviBuildIdxForIndexMode(CdxAviParserImplT *p)
     }
 
     //check if the index table is exsit in media file
-    if((!aviIn->idx1Total) || (!p->hasVideo))
+    if(!aviIn->idx1Total)
     {
         CDX_LOGW("No valid index table in the media file!\n");
         return AVI_ERR_NO_INDEX_TABLE;

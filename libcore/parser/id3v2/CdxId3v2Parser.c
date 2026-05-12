@@ -84,6 +84,15 @@ impl->cur_id3_offset, impl->cur_id3_offset + offset, probeData->sync_pos, impl->
     {
         strcpy(impl->newurl, impl->keyinfo);
         impl->cdxDataSource.offset = impl->cur_id3_offset;
+
+		CdxHttpHeaderFieldsT *pHttpHeaders = NULL;
+		CdxStreamGetMetaData(impl->stream,"httpHeader",(void **)&pHttpHeaders);
+		if(pHttpHeaders && pHttpHeaders->pHttpHeader){
+			impl->cdxDataSource.extraData = pHttpHeaders;
+			impl->cdxDataSource.extraDataType = EXTRA_DATA_HTTP_HEADER;
+			CDX_LOGD("pHttpHeader: key=%s, val=%s\n",pHttpHeaders->pHttpHeader->key,
+				pHttpHeaders->pHttpHeader->val);
+		}
     }
 
     logd("impl->newurl(%s), impl->file_offset(%lld)", impl->newurl, impl->cur_id3_offset);
@@ -112,6 +121,7 @@ impl->cur_id3_offset, impl->cur_id3_offset + offset, probeData->sync_pos, impl->
             impl->fdoffset, probeData->len, offset, PROBE_PREOTECTION);
     ret = CdxParserPrepare(&impl->cdxDataSource, NO_NEED_DURATION|DO_NOT_EXTRACT_ID3_METADATA,
         &impl->lock, &impl->forceStop, &impl->child, &impl->childStream, NULL, NULL);
+
     if(ret < 0)
     {
         CDX_LOGE("CdxParserPrepare fail");

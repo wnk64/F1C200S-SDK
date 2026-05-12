@@ -9,6 +9,16 @@ libxplayer_la_SOURCES =  xplayer.c \
 
 libxplayer_la_CFLAGS = $(CFLAGS_CDXG)
 
+if TEST_ONLY_ENABLE_AUDIO
+LOCAL_INCLUDE = -I$(top_srcdir) \
+                -I$(top_srcdir)/xplayer/include \
+		-I$(top_srcdir)/libcore/common/iniparser \
+		-I$(top_srcdir)/libcore/base/include \
+		-I$(top_srcdir)/libcore/stream/include \
+		-I$(top_srcdir)/libcore/playback/include \
+		-I$(top_srcdir)/libcore/parser/include \
+		-I$(top_srcdir)/external/include/adecoder
+else
 LOCAL_INCLUDE = -I$(top_srcdir) \
                 -I$(top_srcdir)/xplayer/include \
 		-I$(top_srcdir)/libcore/common/iniparser \
@@ -17,7 +27,9 @@ LOCAL_INCLUDE = -I$(top_srcdir) \
 		-I$(top_srcdir)/libcore/playback/include \
 		-I$(top_srcdir)/libcore/parser/include \
 		-I$(top_srcdir)/external/include/adecoder \
+		-I$(top_srcdir)/../mpp_libcedarc/include \
 		-I$(top_srcdir)/../libcedarc/include
+endif
 
 libxplayer_la_CFLAGS += $(LOCAL_INCLUDE)
 
@@ -29,5 +41,15 @@ libxplayer_la_LIBADD = $(top_srcdir)/libcore/parser/base/libcdx_parser.la \
 			$(top_srcdir)/libcore/playback/libcdx_playback.la \
 			$(top_srcdir)/libcore/common/libcdx_common.la
 
-LOCAL_LIB = -lpthread -lz -lvdecoder -ladecoder -lsubdecoder
+if TEST_ONLY_ENABLE_AUDIO
+LOCAL_LIB = -lpthread -lz -ladecoder
+else
+LOCAL_LIB = -lpthread -lz -lvdecoder
+if !ONLY_DISABLE_AUDIO
+LOCAL_LIB += -ladecoder
+endif
+if CONFIG_ENABLE_SUBTITLE
+LOCAL_LIB += -lsubdecoder
+endif
+endif
 libxplayer_la_LDFLAGS += $(LOCAL_LIB)

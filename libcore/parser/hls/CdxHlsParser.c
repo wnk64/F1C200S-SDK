@@ -20,7 +20,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <openssl/md5.h>
-//#include <openssl/aes.h>
+#include <openssl/aes.h>
 #include <time.h>
 #include <inttypes.h>
 
@@ -850,6 +850,10 @@ static int RefreshPlaylist(CdxHlsParser *hlsParser)
         CDX_LOGE("get the uri of the stream error!");
         return -1;
     }
+    if(strncmp(tmpUrl, "fd://", 5) == 0)
+    {
+	ret = CdxStreamGetMetaData(hlsParser->cdxStream, "stream.redirectUri", (void **)&tmpUrl);
+    }
     if(strcmp(tmpUrl, hlsParser->m3u8Url))
     {
         free(hlsParser->m3u8Url);
@@ -958,6 +962,114 @@ static void *PeriodicTaskThread(void *arg)
     return NULL;
 }
 
+static cdx_int32 SetMediaInfo(CdxHlsParser *hlsParser);
+static cdx_int32 UpdateInitInfo(CdxHlsParser *hlsParser)
+{
+    Playlist *playlist = hlsParser->mPlaylist;
+    PlaylistItem *item = playlist->mItems;
+    cdx_int32 initSeqNum = 0;
+    int ret;
+
+_next:
+    while(item && item->u.mediaItemAttribute.isInitItem != 1)
+    {
+	item = item->next;
+    }
+    if(!item)
+    {
+        CDX_LOGE("findInitItem fail");
+        goto _exit;
+    }
+    initSeqNum = item->u.mediaItemAttribute.seqNum;
+
+    ret = SetDataSourceForSegment(hlsParser, item);
+    if(ret == -1)
+    {
+	CDX_LOGE("SetDataSourceForSegment fail");
+	goto _exit;
+    }
+    else if(ret == -2)
+    {
+	CDX_LOGW("please check this code, when error happen");
+	initSeqNum++;
+	goto _next;
+    }
+    hlsParser->curDownloadObject = initSeqNum;
+    hlsParser->curDownloadUri = hlsParser->cdxDataSource.uri;
+    struct CallBack cb;
+    cb.callback = CallbackProcess;
+    cb.pUserData = (void *)hlsParser;
+
+    ContorlTask parserContorlTask;
+    parserContorlTask.cmd = CDX_PSR_CMD_SET_CALLBACK;
+    parserContorlTask.param = (void *)&cb;
+    parserContorlTask.next = NULL;
+    int flags = NO_NEED_DURATION;
+    if(!hlsParser->mPlaylist->u.mediaPlaylistPrivate.mIsComplete ||
+		initSeqNum < hlsParser->mPlaylist->u.mediaPlaylistPrivate.lastSeqNum)
+    {
+	flags |= NOT_LASTSEGMENT;
+    }
+
+    hlsParser->u.media.baseTimeUs = item->u.mediaItemAttribute.baseTimeUs;
+    hlsParser->u.media.curItemInf.item = item;
+    hlsParser->u.media.curItemInf.givenPcr = 0;
+
+    ret = CdxParserPrepare(&hlsParser->cdxDataSource, flags, &hlsParser->statusLock,
+			&hlsParser->forceStop, &hlsParser->child[0],
+			&hlsParser->childStream[0], &parserContorlTask, &parserContorlTask);
+    if(ret < 0)
+    {
+	CDX_LOGE("CdxParserPrepare fail, hlsParser->childStream[0](%p)",
+				  hlsParser->childStream[0]);
+	goto _exit;
+    }
+
+    GetExtraDataContainer(hlsParser, NULL, hlsParser->child[0]);
+
+    int i;
+    for(i = 0; i < 3; i++)
+    {
+	if(hlsParser->child[i])
+	{
+	    hlsParser->streamPts[i] = 0;
+	}
+    }
+    ret = SetMediaInfo(hlsParser);
+    if(ret < 0)
+    {
+	CDX_LOGE("SetMediaInfo fail");
+	goto _exit;
+    }
+
+    int noCacheDataFlag = 0;
+    CdxHlsParser *masterHlsParser = (CdxHlsParser*)hlsParser->pUserData;
+    while(!noCacheDataFlag)
+    {
+	usleep(1000);
+	masterHlsParser->callback(masterHlsParser->pUserData,
+			PARSER_NOTIFY_HLS_GET_STREAM_CACHE_UNDERFLOW_FLAG, &noCacheDataFlag);
+	CDX_LOGV("Wait for the stream cache to empty");
+    }
+    hlsParser->callback(hlsParser->pUserData, PARSER_NOTIFY_AUDIO_STREAM_CHANGE, NULL);
+
+    hlsParser->mErrno = PSR_OK;
+    pthread_mutex_lock(&hlsParser->statusLock);
+    hlsParser->status = CDX_PSR_IDLE;
+    pthread_mutex_unlock(&hlsParser->statusLock);
+    pthread_cond_signal(&hlsParser->cond);
+    CDX_LOGI("UpdateInitInfo success");
+    return 0;
+_exit:
+    hlsParser->mErrno = PSR_OPEN_FAIL;
+    pthread_mutex_lock(&hlsParser->statusLock);
+    hlsParser->status = CDX_PSR_IDLE;
+    pthread_mutex_unlock(&hlsParser->statusLock);
+    pthread_cond_signal(&hlsParser->cond);
+    CDX_LOGE("UpdateInitInfo fail");
+    return -1;
+}
+
 static int UpdateHlsParser(CdxHlsParser *hlsParser, const char *url)
 {
     if (hlsParser->isMasterParser)
@@ -977,7 +1089,20 @@ static int UpdateHlsParser(CdxHlsParser *hlsParser, const char *url)
     }
     hlsParser->u.media.cipherReference = NULL;
     hlsParser->ivIsAppointed = 0;
-    return RefreshPlaylist(hlsParser);
+    if(RefreshPlaylist(hlsParser) < 0)
+    {
+	CDX_LOGE("RefreshPlaylist fail.");
+	return -1;
+    }
+    if(hlsParser->child[hlsParser->prefetchType]->type == CDX_PARSER_MOV)
+    {
+	if(UpdateInitInfo(hlsParser) < 0)
+	{
+	    CDX_LOGE("UpdateHlsParser fail.");
+	    return -1;
+	}
+    }
+    return 0;
 }
 
 static int GetCacheState(CdxHlsParser *hlsParser, struct ParserCacheStateS *cacheState)
@@ -1356,6 +1481,12 @@ _RefreshPlaylist:
 #else
     rdLockPlaylist(hlsParser);
     playlist = hlsParser->mPlaylist;
+    if(!playlist)
+    {
+        CDX_LOGE("playlist is NULL");
+        ret = -1;
+        goto out;
+    }
     if (!playlist->u.mediaPlaylistPrivate.mIsComplete &&
             hlsParser->refreshFaild == 1)
     {
@@ -1503,10 +1634,12 @@ static cdx_int32 SetMediaInfo(CdxHlsParser *hlsParser)
             CDX_LOGE("Subtitle stream getMediaInfo error!");
             return -1;
         }
+#ifndef ONLY_ENABLE_AUDIO
         pMediaInfo->program[0].subtitleNum = subtitleMediaInfo.program[0].subtitleNum;
         pMediaInfo->program[0].subtitleIndex = subtitleMediaInfo.program[0].subtitleIndex;
         memcpy(pMediaInfo->program[0].subtitle, subtitleMediaInfo.program[0].subtitle,
                sizeof(pMediaInfo->program[0].subtitle));
+#endif
     }
 
     if(!hlsParser->isMasterParser)
@@ -1898,7 +2031,7 @@ _NextSegment:
                         PARSER_NOTIFY_HLS_DISCONTINUITY, NULL);
                 }
                 pthread_mutex_unlock(&hlsParser->statusLock);
-				
+		#if 0      //此处会造成普通m3u8音频pts错误，导致执行reset the timer
 		ret = CdxParserInit(hlsParser->child[hlsParser->prefetchType]);
 		if(ret < 0)
 		{
@@ -1906,7 +2039,8 @@ _NextSegment:
 		    hlsParser->mErrno = PSR_UNKNOWN_ERR;
 		    goto _exit;
 		}
-				
+                #endif
+
                 hlsParser->u.media.curItemInf.size = CdxStreamSize(hlsParser->childStream[0]);
                 ret = CdxParserPrefetch(hlsParser->child[hlsParser->prefetchType], pkt);
                 if(ret < 0)
@@ -2811,7 +2945,8 @@ _next:
         }
         else if(hlsParser->mPlayQuality == 2)
         {
-            hlsParser->u.master.curBandwidthIndex = (p/2==p-1)&&(p>1)?(p/2 -1) : p/2;
+            //hlsParser->u.master.curBandwidthIndex = (p/2==p-1)&&(p>1)?(p/2 -1) : p/2;
+            hlsParser->u.master.curBandwidthIndex = p%2==1? (p-1)/2 : p/2;
         }
 
         int m =0;

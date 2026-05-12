@@ -7,6 +7,7 @@ include $(CEDARM_PATH)/config.mk
 CONF_ANDROID_MAJOR_VERSION = $(shell echo $(PLATFORM_VERSION) | cut -c 1)
 
 product = $(TARGET_BOARD_PLATFORM)
+$(error !!!!TARGET_BOARD_PLATFORM:$(TARGET_BOARD_PLATFORM))
 
 ifeq ($(product),)
     $(error No TARGET_BOARD_PLATFORM value found!)

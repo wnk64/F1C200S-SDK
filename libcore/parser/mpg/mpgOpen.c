@@ -904,15 +904,17 @@ cdx_uint8 *MpgOpenFindNextStartCode(CdxMpgParserT *MpgParser, cdx_uint8 *buf, cd
     while(buf <= buf_end-4)
     {
         flag1 = (buf[0] == 0x00 && buf[1] == 0x00 && buf[2] == 0x01);
+        if (!flag1) {
+			goto retry;
+        }
         code = (0x01<<8) | buf[3];
-
         flag2 = ((code == mMpgParserCxt->nVideoId) || (code == mMpgParserCxt->nAudioId) ||
                 ((code & 0xe0) == MPG_AUDIO_ID) || (buf[3] == 0xba));
-
-        if(flag1 && flag2)
-        {
-            return buf;
-        }
+        if (!flag2) {
+			goto retry;
+		}
+		return buf;
+retry:
         buf++;
     }
     return NULL;

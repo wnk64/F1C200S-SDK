@@ -12,12 +12,16 @@
 
 #include <string.h>
 #include "player_i.h"
+#ifndef ONLY_DISABLE_AUDIO
 #include "audioDecComponent.h"
+#include "audioRenderComponent.h"
+#endif
+#ifndef ONLY_ENABLE_AUDIO
 #include "videoDecComponent.h"
 #include "subtitleDecComponent.h"
-#include "audioRenderComponent.h"
 #include "videoRenderComponent.h"
 #include "subtitleRenderComponent.h"
+#endif
 #include "AwMessageQueue.h"
 #include "avtimer.h"
 #include "bitrateEstimater.h"
@@ -27,7 +31,6 @@
 #include "player.h"
 
 #define CONFIG_DISABLE_VIDEO    (0)
-#define CONFIG_DISABLE_AUDIO    (0)
 #define CONFIG_DISABLE_SUBTITLE (0)
 
 #define CdxAbs(a) ((a)>0 ? (a) : -(a))
@@ -42,58 +45,95 @@
 
 typedef struct PlayerContext
 {
+#ifndef ONLY_ENABLE_AUDIO
     VideoStreamInfo*            pVideoStreamInfo;
+#endif
+#ifndef ONLY_DISABLE_AUDIO
     AudioStreamInfo*            pAudioStreamInfo;
+#endif
+#ifndef ONLY_ENABLE_AUDIO
     SubtitleStreamInfo*         pSubtitleStreamInfo;
+#endif
     int                         nAudioStreamNum;
     int                         nAudioStreamSelected;
+#ifndef ONLY_ENABLE_AUDIO
     int                         nSubtitleStreamNum;
     int                         nSubtitleStreamSelected;
     LayerCtrl*                  pLayerCtrl;
+#endif
+#ifndef ONLY_DISABLE_AUDIO
     SoundCtrl*                  pAudioSink;
+#endif
+#ifndef ONLY_ENABLE_AUDIO
     SubCtrl*                    pSubCtrl;
     Deinterlace*                pDeinterlace;
-
     VideoRenderComp*            pVideoRender;
+#endif
+#ifndef ONLY_DISABLE_AUDIO
     AudioRenderComp*            pAudioRender;
+#endif
+#ifndef ONLY_ENABLE_AUDIO
     SubtitleRenderComp*         pSubtitleRender;
     VideoDecComp*               pVideoDecComp;
+#endif
+#ifndef ONLY_DISABLE_AUDIO
     AudioDecComp*               pAudioDecComp;
+#endif
+#ifndef ONLY_ENABLE_AUDIO
     SubtitleDecComp*            pSubtitleDecComp;
+#endif
     AvTimer*                    pAvTimer;
-
+#ifndef ONLY_ENABLE_AUDIO
     BitrateEstimater*           pVideoBitrateEstimater;
+#endif
     BitrateEstimater*           pAudioBitrateEstimater;
+#ifndef ONLY_ENABLE_AUDIO
     FramerateEstimater*         pVideoFramerateEstimater;
-
+#endif
+#ifndef ONLY_DISABLE_AUDIO
     XAudioPlaybackRate          nPlayRate;
+#endif
 
     enum EPLAYERSTATUS          eStatus;
 
     PlayerCallback              callback;
     void*                       pUserData;
-
+#ifndef ONLY_ENABLE_AUDIO
     //* buffer for crashed media stream.
 #if CONFIG_DISABLE_VIDEO
     void*                       pVideoStreamBuffer;
     int                         nVideoStreamBufferSize;
 #endif
-#if CONFIG_DISABLE_AUDIO
+
+#endif
+
+#ifdef ONLY_DISABLE_AUDIO
     void*                       pAudioStreamBuffer;
     int                         nAudioStreamBufferSize;
 #endif
+
+#ifndef ONLY_ENABLE_AUDIO
+
 #if CONFIG_DISABLE_SUBTITLE
     void*                       pSubtitleStreamBuffer;
     int                         nSubtitleStreamBufferSize;
 #endif
+
+#endif
+
+#ifndef ONLY_ENABLE_AUDIO
 
 #if !defined(CONF_3D_ENABLE)
     void*                       pVideoSecondStreamBuffer;
     int                         nVideoSecondStreamBufferSize;
 #endif
 
+#endif
+
     int                         bProcessingCommand;
+#ifndef ONLY_ENABLE_AUDIO
     int64_t                     nFirstVideoRenderPts;
+#endif
     int64_t                     nFirstAudioRenderPts;
     int64_t                     nTimeBase;
     int64_t                     nTimeOffset;
@@ -101,47 +141,67 @@ typedef struct PlayerContext
     int64_t                     nLastTimeTimerAdjusted;
     int onResetNotSync;
     int64_t ptsBeforeReset;
-
+#ifndef ONLY_ENABLE_AUDIO
     int64_t                     nPreVideoPts;
+#endif
     int64_t                     nPreAudioPts;
+
+#ifndef ONLY_ENABLE_AUDIO
     int                         nUnsyncVideoFrameCnt;
+#endif
+
     //* for pts loop back detect in subtitle pts notify process.
     int64_t                     nLastInputPts;
     int64_t                     nFirstPts;
 
     int                         bStreamEosSet;
+#ifndef ONLY_ENABLE_AUDIO
     int                         bVideoRenderEosReceived;
+#endif
     int                         bAudioRenderEosReceived;
     pthread_mutex_t             eosMutex;
 
     int                         bInFastMode;
+#ifndef ONLY_ENABLE_AUDIO
     VConfig                     sVideoConfig;
     int                         sVideoCropWindow[4];
-
+#endif
     //* audio decoder mutex, currently for synchronization of the switch audio
     //* operation and the demux sending job.
+#ifndef ONLY_DISABLE_AUDIO
     pthread_mutex_t             audioDecoderMutex;
+#endif
+#ifndef ONLY_ENABLE_AUDIO
     pthread_mutex_t             subtitleDecoderMutex;
-
     int                         bVideoCrash;
+#endif
     int                         bAudioCrash;
+#ifndef ONLY_ENABLE_AUDIO
     int                         bSubtitleCrash;
-
     //*
     int                         bUnSurpportVideoFlag;
     void*                       pUnSurpportVideoBuffer;
     int                         nUnSurpportVideoBufferSize;
-
+#endif
     int                         bDiscardAudio;
     int64_t                     mNeedDorpAudioTime;
     int64_t                     mAudioJumpTime[3];
     int                         nAvgByteRate;
+    int                         nG2dRotateDegree;
 }PlayerContext;
 
 static int CallbackProcess(void* pSelf, int eMessageId, void* param);
+#ifndef ONLY_ENABLE_AUDIO
 static int PlayerInitialVideo(PlayerContext* p);
+#endif
+#ifndef ONLY_DISABLE_AUDIO
 static int PlayerInitialAudio(PlayerContext* p);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
 static int PlayerInitialSubtitle(PlayerContext* p);
+#endif
+#endif
 
 Player* PlayerCreate(void)
 {
@@ -154,20 +214,22 @@ Player* PlayerCreate(void)
         return NULL;
     }
     memset(p, 0, sizeof(*p));
-
+#ifndef ONLY_DISABLE_AUDIO
     p->nPlayRate.mSpeed = 1.0f;
     p->nPlayRate.mPitch= 1.0f;
     p->nPlayRate.mSpeed = AUDIO_TIMESTRETCH_STRETCH_DEFAULT;
     p->nPlayRate.mSpeed = XAUDIO_TIMESTRETCH_FALLBACK_DEFAULT;
-
+#endif
     p->eStatus = PLAYER_STATUS_STOPPED;
     p->pAvTimer = AvTimerCreate();
     p->onResetNotSync = 0;
     pthread_mutex_init(&p->eosMutex, NULL);
     pthread_mutex_init(&p->timerMutex, NULL);
+#ifndef ONLY_DISABLE_AUDIO
     pthread_mutex_init(&p->audioDecoderMutex, NULL);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
     pthread_mutex_init(&p->subtitleDecoderMutex, NULL);
-
 #if CONFIG_DISABLE_VIDEO
     p->nVideoStreamBufferSize = 256*1024;
     p->pVideoStreamBuffer = malloc(p->nVideoStreamBufferSize);
@@ -177,7 +239,9 @@ Player* PlayerCreate(void)
         return NULL;
     }
 #endif
-#if CONFIG_DISABLE_AUDIO
+#endif
+
+#ifdef ONLY_DISABLE_AUDIO
     p->nAudioStreamBufferSize = 128*1024;
     p->pAudioStreamBuffer = malloc(p->nAudioStreamBufferSize);
     if(p->pAudioStreamBuffer == NULL)
@@ -186,6 +250,8 @@ Player* PlayerCreate(void)
         return NULL;
     }
 #endif
+
+#ifndef ONLY_ENABLE_AUDIO
 #if CONFIG_DISABLE_SUBTITLE
     p->nSubtitleStreamBufferSize = 256*1024;
     p->pSubtitleStreamBuffer = malloc(p->nSubtitleStreamBufferSize);
@@ -205,8 +271,9 @@ Player* PlayerCreate(void)
         return NULL;
     }
 #endif
-
     p->sVideoConfig.bDispErrorFrame = 1;   // set the default value of the bDispErrorFrame is 1
+#endif
+
     return (Player*)p;
 }
 
@@ -224,8 +291,12 @@ void PlayerDestroy(Player* pl)
     }
     pthread_mutex_destroy(&p->eosMutex);
     pthread_mutex_destroy(&p->timerMutex);
+#ifndef ONLY_DISABLE_AUDIO
     pthread_mutex_destroy(&p->audioDecoderMutex);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
     pthread_mutex_destroy(&p->subtitleDecoderMutex);
+
 #if CONFIG_DISABLE_VIDEO
     if(p->pVideoStreamBuffer != NULL)
     {
@@ -233,13 +304,17 @@ void PlayerDestroy(Player* pl)
         p->pVideoStreamBuffer = NULL;
     }
 #endif
-#if CONFIG_DISABLE_AUDIO
+#endif
+
+#ifdef ONLY_DISABLE_AUDIO
     if(p->pAudioStreamBuffer != NULL)
     {
         free(p->pAudioStreamBuffer);
         p->pAudioStreamBuffer = NULL;
     }
 #endif
+
+#ifndef ONLY_ENABLE_AUDIO
 #if CONFIG_DISABLE_SUBTITLE
     if(p->pSubtitleStreamBuffer != NULL)
     {
@@ -268,11 +343,17 @@ void PlayerDestroy(Player* pl)
         LayerDestroy(p->pLayerCtrl);
         p->pLayerCtrl = NULL;
     }
+#endif
+
+#ifndef ONLY_DISABLE_AUDIO
     if(p->pAudioSink != NULL)
     {
         SoundDeviceDestroy(p->pAudioSink);
         p->pAudioSink = NULL;
     }
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+
     if(p->pSubCtrl)
     {
         CdxSubRenderDestory(p->pSubCtrl);
@@ -283,12 +364,14 @@ void PlayerDestroy(Player* pl)
         CdxDiDestroy(p->pDeinterlace);
         p->pDeinterlace = NULL;
     }
+#endif
 
     free(p);
 
     return;
 }
 
+#ifndef ONLY_ENABLE_AUDIO
 int PlayerSetVideoStreamInfo(Player* pl, VideoStreamInfo* pStreamInfo)
 {
     PlayerContext* p;
@@ -359,7 +442,8 @@ int PlayerSetVideoStreamInfo(Player* pl, VideoStreamInfo* pStreamInfo)
     }
 #endif
 }
-
+#endif
+#ifndef ONLY_DISABLE_AUDIO
 int PlayerSetAudioStreamInfo(Player* pl, AudioStreamInfo* pStreamInfo,
         int nStreamNum, int nDefaultStream)
 {
@@ -374,9 +458,6 @@ int PlayerSetAudioStreamInfo(Player* pl, AudioStreamInfo* pStreamInfo,
         return 0;
     }
 
-#if CONFIG_DISABLE_AUDIO
-    return 0;
-#else
     if(p->pAudioStreamInfo != NULL && p->nAudioStreamNum > 0)
     {
         for(i=0; i<p->nAudioStreamNum; i++)
@@ -466,7 +547,6 @@ int PlayerSetAudioStreamInfo(Player* pl, AudioStreamInfo* pStreamInfo,
     {
         return -1;
     }
-#endif
 }
 
 int PlayerAddAudioStream(Player* pl, AudioStreamInfo* pStreamInfo)
@@ -558,7 +638,8 @@ int PlayerCanSupportAudioStream(Player* pl, AudioStreamInfo* pStreamInfo)
     p = (PlayerContext*)pl;
     return 1;
 }
-
+#endif
+#ifndef ONLY_ENABLE_AUDIO
 int PlayerCanSupportVideoStream(Player* pl, VideoStreamInfo* pStreamInfo)
 {
     PlayerContext* p;
@@ -568,7 +649,8 @@ int PlayerCanSupportVideoStream(Player* pl, VideoStreamInfo* pStreamInfo)
     p = (PlayerContext*)pl;
     return 1;
 }
-
+#endif
+#ifndef ONLY_DISABLE_AUDIO
 int PlayerSetDiscardAudio(Player* pl, int f)
 {
     PlayerContext* p;
@@ -578,7 +660,8 @@ int PlayerSetDiscardAudio(Player* pl, int f)
 
     return 0;
 }
-
+#endif
+#ifndef ONLY_ENABLE_AUDIO
 int PlayerSetWindow(Player* pl, LayerCtrl* pLc)
 {
     PlayerContext* p;
@@ -594,7 +677,8 @@ int PlayerSetWindow(Player* pl, LayerCtrl* pLc)
 
     return 0;
 }
-
+#endif
+#ifndef ONLY_DISABLE_AUDIO
 int PlayerSetAudioSink(Player* pl, SoundCtrl* pAudioSink)
 {
     PlayerContext* p;
@@ -631,10 +715,11 @@ int PlayerSetPlayBackSettings(Player* pl,const XAudioPlaybackRate* rate)
         p->nPlayRate.mFallbackMode= rate->mFallbackMode;
         p->nPlayRate.mStretchMode= rate->mStretchMode;
         p->pAvTimer->SetPlayRate(p->pAvTimer,rate->mSpeed);
-
+#ifndef ONLY_ENABLE_AUDIO
 #if !CONFIG_DISABLE_VIDEO
         if (p->pVideoRender != NULL)
             VideoRenderSetPlayRate(p->pVideoRender,p->nPlayRate.mSpeed);
+#endif
 #endif
     }
     else
@@ -656,7 +741,9 @@ int PlayerGetPlayBackSettings(Player* pl,XAudioPlaybackRate* rate)
     rate->mStretchMode = p->nPlayRate.mStretchMode;
     return 0;
 }
+#endif
 
+#ifndef ONLY_ENABLE_AUDIO
 int PlayerSetDeinterlace(Player* pl, Deinterlace* pDi)
 {
     PlayerContext* p;
@@ -670,7 +757,7 @@ int PlayerSetDeinterlace(Player* pl, Deinterlace* pDi)
 
     return 0;
 }
-
+#if !CONFIG_DISABLE_SUBTITLE
 int PlayerSetSubCtrl(Player* pl, SubCtrl* pSubCtrl)
 {
     PlayerContext* p;
@@ -685,6 +772,8 @@ int PlayerSetSubCtrl(Player* pl, SubCtrl* pSubCtrl)
 
     return 0;
 }
+#endif
+#endif
 
 int PlayerSetCallback(Player* pl, PlayerCallback callback, void* pUserData)
 {
@@ -696,6 +785,7 @@ int PlayerSetCallback(Player* pl, PlayerCallback callback, void* pUserData)
     return 0;
 }
 
+#ifndef ONLY_ENABLE_AUDIO
 int PlayerHasVideo(Player* pl)
 {
     PlayerContext* p;
@@ -706,18 +796,22 @@ int PlayerHasVideo(Player* pl)
     else
         return 0;
 }
-
+#endif
 int PlayerHasAudio(Player* pl)
 {
+#ifndef ONLY_DISABLE_AUDIO
     PlayerContext* p;
 
     p = (PlayerContext*)pl;
-    if(p->pAudioRender != NULL)
+    if (p->pAudioRender != NULL) {
         return 1;
-    else
+    }
+	else
+#endif
+	{
         return 0;
+	}
 }
-
 int PlayerStart(Player* pl,int bSeekClosest,int nSeekTimeMs)
 {
     PlayerContext* p;
@@ -737,66 +831,101 @@ int PlayerStart(Player* pl,int bSeekClosest,int nSeekTimeMs)
 
     if(p->eStatus == PLAYER_STATUS_PAUSED)
     {
+#ifndef ONLY_ENABLE_AUDIO
         if(p->bInFastMode)
         {
             //* set timer to the max value to make the audio render to discard all data.
             p->pAvTimer->SetTime(p->pAvTimer, 0x7000000000000000LL);
         }
         else
+#endif
         {
             if(p->nTimeBase != -1)
                 p->pAvTimer->Start(p->pAvTimer);
         }
-
+#ifndef ONLY_ENABLE_AUDIO
         //* resume components.
         if(p->pVideoDecComp != NULL)
             VideoDecCompStart(p->pVideoDecComp);
+#endif
+#ifndef ONLY_DISABLE_AUDIO
         if(p->pAudioDecComp != NULL)
             AudioDecCompStart(p->pAudioDecComp);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
         if(p->pSubtitleDecComp != NULL)
             SubtitleDecCompStart(p->pSubtitleDecComp);
+#endif
         if(p->pVideoRender != NULL)
         {
             VideoRenderCompSetSeekInfo(p->pVideoRender,bSeekClosest,nSeekTimeMs);
             VideoRenderCompStart(p->pVideoRender);
         }
+#endif
+#ifndef ONLY_DISABLE_AUDIO
         if(p->pAudioRender != NULL)
             AudioRenderCompStart(p->pAudioRender);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
         if(p->pSubtitleRender != NULL)
             SubtitleRenderCompStart(p->pSubtitleRender);
+#endif
+#endif
     }
     else
     {
-        if((p->pVideoDecComp == NULL || p->pVideoRender == NULL) &&
-           (p->pAudioDecComp == NULL || p->pAudioRender == NULL))
+
+#if defined(ONLY_ENABLE_AUDIO)
+		if (p->pAudioDecComp == NULL || p->pAudioRender == NULL)
+#elif defined(ONLY_DISABLE_AUDIO)
+		if (p->pVideoDecComp == NULL || p->pVideoRender == NULL)
+#else
+		if ((p->pVideoDecComp == NULL || p->pVideoRender == NULL) &&
+			(p->pAudioDecComp == NULL || p->pAudioRender == NULL))
+#endif
+
         {
             loge("neither video nor audio stream exits.");
             return -1;
         }
-
+#ifndef ONLY_ENABLE_AUDIO
         p->nFirstVideoRenderPts    = -1;
+#endif
         p->nFirstAudioRenderPts    = -1;
         p->bStreamEosSet           = 0;
+#ifndef ONLY_ENABLE_AUDIO
         p->bVideoRenderEosReceived = 0;
+#endif
         p->bAudioRenderEosReceived = 0;
         p->nLastTimeTimerAdjusted  = 0;
+#ifndef ONLY_ENABLE_AUDIO
         p->nPreVideoPts            = -1;
+#endif
         p->nPreAudioPts            = -1;
+#ifndef ONLY_ENABLE_AUDIO
         p->nUnsyncVideoFrameCnt    = 0;
+#endif
         p->nLastInputPts           = -1;
 
         //* nTimeBase==-1 means timer will be started at the first pts callback.
         p->nTimeBase               = -1;
         p->nTimeOffset             = 0;
-
+#ifndef ONLY_ENABLE_AUDIO
         if(p->pVideoBitrateEstimater)
             BitrateEstimaterReset(p->pVideoBitrateEstimater);
+#endif
+#ifndef ONLY_DISABLE_AUDIO
         if(p->pAudioBitrateEstimater)
             BitrateEstimaterReset(p->pAudioBitrateEstimater);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
         if(p->pVideoFramerateEstimater)
             FramerateEstimaterReset(p->pVideoFramerateEstimater);
-
+#endif
         p->pAvTimer->Stop(p->pAvTimer);
+#ifndef ONLY_ENABLE_AUDIO
         if(p->bInFastMode)
         {
             /* set timer to a big value(but not easy to loop back) to make the
@@ -805,6 +934,7 @@ int PlayerStart(Player* pl,int bSeekClosest,int nSeekTimeMs)
             p->pAvTimer->SetTime(p->pAvTimer, 0x7000000000000000LL);
         }
         else
+#endif
             p->pAvTimer->SetTime(p->pAvTimer, 0);
         p->pAvTimer->SetSpeed(p->pAvTimer, 1000);
 
@@ -816,21 +946,35 @@ int PlayerStart(Player* pl,int bSeekClosest,int nSeekTimeMs)
          * and this will cause the render thread crash when calling methods
          * like AudioDecCompRequestPcmData().
          */
+#ifndef ONLY_ENABLE_AUDIO
         if(p->pVideoDecComp != NULL)
             VideoDecCompStart(p->pVideoDecComp);
+#endif
+#ifndef ONLY_DISABLE_AUDIO
         if(p->pAudioDecComp != NULL)
             AudioDecCompStart(p->pAudioDecComp);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
         if(p->pSubtitleDecComp != NULL)
             SubtitleDecCompStart(p->pSubtitleDecComp);
+#endif
         if(p->pVideoRender != NULL)
         {
             VideoRenderCompSetSeekInfo(p->pVideoRender,bSeekClosest,nSeekTimeMs);
             VideoRenderCompStart(p->pVideoRender);
         }
+#endif
+#ifndef ONLY_DISABLE_AUDIO
         if(p->pAudioRender != NULL)
             AudioRenderCompStart(p->pAudioRender);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
         if(p->pSubtitleRender != NULL)
             SubtitleRenderCompStart(p->pSubtitleRender);
+#endif
+#endif
     }
 
     p->mNeedDorpAudioTime = 0;
@@ -866,30 +1010,49 @@ int PlayerStop(Player* pl)      //* media stream information is still kept by th
      * render thread crash when calling methods like
      * AudioDecCompRequestPcmData().
      */
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
     if(p->pSubtitleRender != NULL)
         SubtitleRenderCompStop(p->pSubtitleRender);
+#endif
+#endif
+#ifndef ONLY_DISABLE_AUDIO
     if(p->pAudioRender != NULL)
         AudioRenderCompStop(p->pAudioRender);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
     if(p->pVideoRender != NULL)
         VideoRenderCompStop(p->pVideoRender);
+#if !CONFIG_DISABLE_SUBTITLE
     if(p->pSubtitleDecComp != NULL)
         SubtitleDecCompStop(p->pSubtitleDecComp);
+#endif
+#endif
+#ifndef ONLY_DISABLE_AUDIO
     if(p->pAudioDecComp != NULL)
         AudioDecCompStop(p->pAudioDecComp);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
     if(p->pVideoDecComp != NULL)
         VideoDecCompStop(p->pVideoDecComp);
-
+#endif
     logd("****** PlayerStop end");
 
     p->pAvTimer->Stop(p->pAvTimer);
     p->pAvTimer->SetTime(p->pAvTimer, 0);
 
     p->bProcessingCommand = 0;
+#ifndef ONLY_ENABLE_AUDIO
     p->bInFastMode        = 0;
+#endif
     p->eStatus = PLAYER_STATUS_STOPPED;
+#ifndef ONLY_ENABLE_AUDIO
     p->bVideoCrash = 0;
+#endif
     p->bAudioCrash = 0;
+#ifndef ONLY_ENABLE_AUDIO
     p->bSubtitleCrash = 0;
+#endif
     p->bDiscardAudio  = 0;
 
     return 0;
@@ -909,21 +1072,35 @@ int PlayerPause(Player* pl)
     }
 
     p->bProcessingCommand = 1;
-
+#ifndef ONLY_ENABLE_AUDIO
     //* pause components.
     if(p->pVideoRender != NULL)
         VideoRenderCompPause(p->pVideoRender);
+#endif
+#ifndef ONLY_DISABLE_AUDIO
     if(p->pAudioRender != NULL)
         AudioRenderCompPause(p->pAudioRender);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
     if(p->pSubtitleRender != NULL)
         SubtitleRenderCompPause(p->pSubtitleRender);
+#endif
+#endif
+#ifndef ONLY_ENABLE_AUDIO
     if(p->pVideoDecComp != NULL)
         VideoDecCompPause(p->pVideoDecComp);
+#endif
+#ifndef ONLY_DISABLE_AUDIO
     if(p->pAudioDecComp != NULL)
         AudioDecCompPause(p->pAudioDecComp);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
     if(p->pSubtitleDecComp != NULL)
         SubtitleDecCompPause(p->pSubtitleDecComp);
-
+#endif
+#endif
     p->pAvTimer->Stop(p->pAvTimer);
 
     p->bProcessingCommand = 0;
@@ -959,50 +1136,102 @@ int PlayerReset(Player* pl, int64_t nSeekTimeUs)
     if(p->eStatus == PLAYER_STATUS_STARTED)
     {
         //* pause components.
+#ifndef ONLY_ENABLE_AUDIO
         if(p->pVideoRender != NULL)
             VideoRenderCompPause(p->pVideoRender);
+#endif
+#ifndef ONLY_DISABLE_AUDIO
         if(p->pAudioRender != NULL)
             AudioRenderCompPause(p->pAudioRender);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
         if(p->pSubtitleRender != NULL)
             SubtitleRenderCompPause(p->pSubtitleRender);
+#endif
         if(p->pVideoDecComp != NULL)
             VideoDecCompPause(p->pVideoDecComp);
+#endif
+#ifndef ONLY_DISABLE_AUDIO
         if(p->pAudioDecComp != NULL)
             AudioDecCompPause(p->pAudioDecComp);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
         if(p->pSubtitleDecComp != NULL)
             SubtitleDecCompPause(p->pSubtitleDecComp);
+#endif
+#endif
     }
 
+#ifndef ONLY_ENABLE_AUDIO
     //* reset components.
     if(p->pVideoDecComp != NULL)
         VideoDecCompReset(p->pVideoDecComp);
+#endif
+#ifndef ONLY_DISABLE_AUDIO
     if(p->pAudioDecComp != NULL)
         AudioDecCompReset(p->pAudioDecComp, nSeekTimeUs);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
     if(p->pSubtitleDecComp != NULL)
         SubtitleDecCompReset(p->pSubtitleDecComp, nSeekTimeUs);
+#endif
     if(p->pVideoRender != NULL)
         VideoRenderCompReset(p->pVideoRender);
+#endif
+
+#ifndef ONLY_DISABLE_AUDIO
     if(p->pAudioRender != NULL)
         AudioRenderCompReset(p->pAudioRender);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
     if(p->pSubtitleRender != NULL)
         SubtitleRenderCompReset(p->pSubtitleRender);
+#endif
+#endif
 
     p->pAvTimer->Stop(p->pAvTimer);
     p->pAvTimer->SetTime(p->pAvTimer, 0);
 
+#ifndef ONLY_ENABLE_AUDIO
     p->nFirstVideoRenderPts    = -1;
+#endif
+
     p->nFirstAudioRenderPts    = -1;
     p->bStreamEosSet           = 0;
+
+#ifndef ONLY_ENABLE_AUDIO
     p->bVideoRenderEosReceived = 0;
+#endif
+
     p->bAudioRenderEosReceived = 0;
     p->nLastTimeTimerAdjusted  = 0;
+
+#ifndef ONLY_ENABLE_AUDIO
     p->nPreVideoPts            = -1;
+#endif
+
     p->nPreAudioPts            = -1;
+
+#ifndef ONLY_ENABLE_AUDIO
     p->nUnsyncVideoFrameCnt    = 0;
+#endif
+
     p->nLastInputPts           = -1;
+
+#ifndef ONLY_ENABLE_AUDIO
     p->bVideoCrash             = 0;
+#endif
+
     p->bAudioCrash             = 0;
+
+#ifndef ONLY_ENABLE_AUDIO
     p->bSubtitleCrash          = 0;
+#endif
+
     p->mNeedDorpAudioTime      = 0;
     p->mAudioJumpTime[0]       = 0;
     p->mAudioJumpTime[1]       = 0;
@@ -1012,12 +1241,18 @@ int PlayerReset(Player* pl, int64_t nSeekTimeUs)
     p->nTimeBase               = -1;
     p->nTimeOffset             = nSeekTimeUs;
 
+#ifndef ONLY_ENABLE_AUDIO
     if(p->pVideoBitrateEstimater)
         BitrateEstimaterReset(p->pVideoBitrateEstimater);
+#endif
+
     if(p->pAudioBitrateEstimater)
         BitrateEstimaterReset(p->pAudioBitrateEstimater);
+
+#ifndef ONLY_ENABLE_AUDIO
     if(p->pVideoFramerateEstimater)
         FramerateEstimaterReset(p->pVideoFramerateEstimater);
+#endif
 
     p->bProcessingCommand = 0;
 
@@ -1031,18 +1266,32 @@ int PlayerReset(Player* pl, int64_t nSeekTimeUs)
          * and this will cause the render thread crash when calling methods
          * like AudioDecCompRequestPcmData().
          */
+#ifndef ONLY_ENABLE_AUDIO
         if(p->pVideoRender != NULL)
             VideoRenderCompStart(p->pVideoRender);
+#endif
+#ifndef ONLY_DISABLE_AUDIO
         if(p->pAudioRender != NULL)
             AudioRenderCompStart(p->pAudioRender);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
         if(p->pSubtitleRender != NULL)
             SubtitleRenderCompStart(p->pSubtitleRender);
+#endif
         if(p->pVideoDecComp != NULL)
             VideoDecCompStart(p->pVideoDecComp);
+#endif
+#ifndef ONLY_DISABLE_AUDIO
         if(p->pAudioDecComp != NULL)
             AudioDecCompStart(p->pAudioDecComp);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
         if(p->pSubtitleDecComp != NULL)
             SubtitleDecCompStart(p->pSubtitleDecComp);
+#endif
+#endif
     }
 
     return 0;
@@ -1062,13 +1311,27 @@ int PlayerClear(Player* pl)
     }
 
     p->bProcessingCommand      = 1;
+
+#ifndef ONLY_ENABLE_AUDIO
     p->nFirstVideoRenderPts    = -1;
+#endif
+
     p->nFirstAudioRenderPts    = -1;
     p->bStreamEosSet           = 0;
+
+#ifndef ONLY_ENABLE_AUDIO
     p->bVideoRenderEosReceived = 0;
+#endif
+
     p->bAudioRenderEosReceived = 0;
+
+#ifndef ONLY_ENABLE_AUDIO
     p->bVideoCrash             = 0;
+#endif
+
     p->bAudioCrash             = 0;
+
+#ifndef ONLY_ENABLE_AUDIO
     p->bSubtitleCrash          = 0;
     p->sVideoCropWindow[0]     = 0;
     p->sVideoCropWindow[1]     = 0;
@@ -1080,44 +1343,57 @@ int PlayerClear(Player* pl)
         VideoRenderCompDestroy(p->pVideoRender);
         p->pVideoRender = NULL;
     }
+#endif
 
+#ifndef ONLY_DISABLE_AUDIO
     if(p->pAudioRender != NULL)
     {
         AudioRenderCompDestroy(p->pAudioRender);
         p->pAudioRender = NULL;
     }
-
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
     if(p->pSubtitleRender != NULL)
     {
         SubtitleRenderCompDestroy(p->pSubtitleRender);
         p->pSubtitleRender = NULL;
     }
-
+#endif
     if(p->pVideoDecComp != NULL)
     {
         VideoDecCompDestroy(p->pVideoDecComp);
         p->pVideoDecComp = NULL;
     }
+#endif
 
+#ifndef ONLY_DISABLE_AUDIO
     if(p->pAudioDecComp != NULL)
     {
         AudioDecCompDestroy(p->pAudioDecComp);
         p->pAudioDecComp = NULL;
     }
+#endif
 
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
     if(p->pSubtitleDecComp != NULL)
     {
         SubtitleDecCompDestroy(p->pSubtitleDecComp);
         p->pSubtitleDecComp = NULL;
     }
+#endif
+#endif
 
     p->bProcessingCommand = 0;
 
+#ifndef ONLY_ENABLE_AUDIO
     if(p->pVideoBitrateEstimater != NULL)
     {
         BitrateEstimaterDestroy(p->pVideoBitrateEstimater);
         p->pVideoBitrateEstimater = NULL;
     }
+#endif
 
     if(p->pAudioBitrateEstimater != NULL)
     {
@@ -1125,11 +1401,13 @@ int PlayerClear(Player* pl)
         p->pAudioBitrateEstimater = NULL;
     }
 
+#ifndef ONLY_ENABLE_AUDIO
     if(p->pVideoFramerateEstimater)
     {
         FramerateEstimaterDestroy(p->pVideoFramerateEstimater);
         p->pVideoFramerateEstimater = NULL;
     }
+#endif
 
     if(p->pAvTimer != NULL)
     {
@@ -1137,6 +1415,7 @@ int PlayerClear(Player* pl)
         p->pAvTimer->SetTime(p->pAvTimer, 0);
     }
 
+#ifndef ONLY_ENABLE_AUDIO
     if(p->pVideoStreamInfo != NULL)
     {
         if(p->pVideoStreamInfo->pCodecSpecificData != NULL &&
@@ -1151,24 +1430,7 @@ int PlayerClear(Player* pl)
         p->pVideoStreamInfo = NULL;
     }
 
-    if(p->pAudioStreamInfo != NULL && p->nAudioStreamNum > 0)
-    {
-        int i;
-        for(i=0; i<p->nAudioStreamNum; i++)
-        {
-            if(p->pAudioStreamInfo[i].pCodecSpecificData != NULL &&
-               p->pAudioStreamInfo[i].nCodecSpecificDataLen > 0)
-            {
-                free(p->pAudioStreamInfo[i].pCodecSpecificData);
-                p->pAudioStreamInfo[i].pCodecSpecificData = NULL;
-                p->pAudioStreamInfo[i].nCodecSpecificDataLen = 0;
-            }
-        }
-
-        free(p->pAudioStreamInfo);
-        p->pAudioStreamInfo = NULL;
-    }
-
+#if !CONFIG_DISABLE_SUBTITLE
     if(p->pSubtitleStreamInfo != NULL && p->nSubtitleStreamNum > 0)
     {
         int i;
@@ -1191,6 +1453,27 @@ int PlayerClear(Player* pl)
         free(p->pSubtitleStreamInfo);
         p->pSubtitleStreamInfo = NULL;
     }
+#endif
+#endif
+#ifndef ONLY_DISABLE_AUDIO
+	if(p->pAudioStreamInfo != NULL && p->nAudioStreamNum > 0)
+	{
+		int i;
+		for(i=0; i<p->nAudioStreamNum; i++)
+		{
+			if(p->pAudioStreamInfo[i].pCodecSpecificData != NULL &&
+			   p->pAudioStreamInfo[i].nCodecSpecificDataLen > 0)
+			{
+				free(p->pAudioStreamInfo[i].pCodecSpecificData);
+				p->pAudioStreamInfo[i].pCodecSpecificData = NULL;
+				p->pAudioStreamInfo[i].nCodecSpecificDataLen = 0;
+			}
+		}
+
+		free(p->pAudioStreamInfo);
+		p->pAudioStreamInfo = NULL;
+	}
+#endif
 
     return 0;
 }
@@ -1200,13 +1483,20 @@ int PlayerSetEos(Player* pl)
     PlayerContext* p;
 
     p = (PlayerContext*)pl;
+#ifndef ONLY_ENABLE_AUDIO
     if(p->pVideoDecComp != NULL)
         VideoDecCompSetEOS(p->pVideoDecComp);
+#endif
+#ifndef ONLY_DISABLE_AUDIO
     if(p->pAudioDecComp != NULL)
         AudioDecCompSetEOS(p->pAudioDecComp);
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
     if(p->pSubtitleDecComp != NULL)
         SubtitleDecCompSetEOS(p->pSubtitleDecComp);
-
+#endif
+#endif
     p->bStreamEosSet = 1;
 
     return 0;
@@ -1218,9 +1508,12 @@ int PlayerSetFirstPts(Player* pl, int64_t nFirstPts)
 
     p = (PlayerContext*)pl;
     p->nFirstPts = nFirstPts;
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
     if(p->pSubtitleRender != NULL)
         SubtitleRenderCompSetVideoOrAudioFirstPts(p->pSubtitleRender,p->nFirstPts);
-
+#endif
+#endif
     return 0;
 }
 int PlayerRequestStreamBuffer(Player*         pl,
@@ -1252,6 +1545,7 @@ int PlayerRequestStreamBuffer(Player*         pl,
 
     if(eMediaType == MEDIA_TYPE_VIDEO)
     {
+#ifndef ONLY_ENABLE_AUDIO
         if(p->bUnSurpportVideoFlag == 1)
         {
             if(nRequireSize > p->nUnSurpportVideoBufferSize)
@@ -1296,16 +1590,15 @@ int PlayerRequestStreamBuffer(Player*         pl,
 
         return ret;
 #endif
+
+#else
+      loge("no video decode component, can not request video stream.");
+      return -1;
+#endif//ONLY_ENABLE_AUDIO
     }
     else if(eMediaType == MEDIA_TYPE_AUDIO)
     {
-#if CONFIG_DISABLE_AUDIO
-        if(nRequireSize > p->nAudioStreamBufferSize)
-            nRequireSize = p->nAudioStreamBufferSize;
-        *pBufSize = nRequireSize;
-        *ppBuf = p->pAudioStreamBuffer;
-        return 0;
-#else
+#ifndef ONLY_DISABLE_AUDIO
         pthread_mutex_lock(&p->audioDecoderMutex);
 
         if(p->pAudioDecComp == NULL)
@@ -1325,10 +1618,14 @@ int PlayerRequestStreamBuffer(Player*         pl,
 
         pthread_mutex_unlock(&p->audioDecoderMutex);
         return ret;
+#else
+		return 0;
 #endif
     }
     else
     {
+#ifndef ONLY_ENABLE_AUDIO
+
 #if CONFIG_DISABLE_SUBTITLE
         if(nRequireSize > p->nSubtitleStreamBufferSize)
             nRequireSize = p->nSubtitleStreamBufferSize;
@@ -1354,6 +1651,12 @@ int PlayerRequestStreamBuffer(Player*         pl,
         pthread_mutex_unlock(&p->subtitleDecoderMutex);
         return ret;
 #endif
+
+#else
+        loge("no subtitle decode component, can not request subtitle stream.");
+	return -1;
+
+#endif//ONLY_ENABLE_AUDIO
     }
 }
 
@@ -1380,6 +1683,7 @@ int PlayerSubmitStreamData(Player*              pl,
 
     if(eMediaType == MEDIA_TYPE_VIDEO)
     {
+#ifndef ONLY_ENABLE_AUDIO
         if(p->bUnSurpportVideoFlag == 1)
             return 0;
 
@@ -1471,16 +1775,20 @@ int PlayerSubmitStreamData(Player*              pl,
         dataInfo.bIsFirstPart = pDataInfo->bIsFirstPart;
         dataInfo.bIsLastPart  = pDataInfo->bIsLastPart;
         dataInfo.nStreamIndex = nStreamIndex;
+        dataInfo.bValid       = 1;
 
         ret = VideoDecCompSubmitStreamData(p->pVideoDecComp, &dataInfo, nStreamIndex);
         return ret;
 #endif
+
+#else
+        loge("no video decode component, can not submit video stream.");
+	return 0;
+#endif//ONLY_ENABLE_AUDIO
     }
+#ifndef ONLY_DISABLE_AUDIO
     else if(eMediaType == MEDIA_TYPE_AUDIO)
     {
-#if CONFIG_DISABLE_AUDIO
-        return 0;
-#else
         AudioStreamDataInfo dataInfo;
 
         pthread_mutex_lock(&p->audioDecoderMutex);
@@ -1524,10 +1832,11 @@ int PlayerSubmitStreamData(Player*              pl,
         pthread_mutex_unlock(&p->audioDecoderMutex);
 
         return ret;
-#endif
     }
+#endif
     else
     {
+#ifndef ONLY_ENABLE_AUDIO
 #if CONFIG_DISABLE_SUBTITLE
         return 0;
 #else
@@ -1557,6 +1866,11 @@ int PlayerSubmitStreamData(Player*              pl,
 
         return ret;
 #endif
+
+#else
+        loge("no subtitle decode component, can not submit subtitle stream.");
+	return 0;
+#endif
     }
 }
 
@@ -1568,8 +1882,10 @@ int64_t PlayerGetPositionCMCC(Player* pl)    //* current time position in us.
 
     p = (PlayerContext*)pl;
 
+#ifndef ONLY_ENABLE_AUDIO
     if(p->bInFastMode)
         return p->nPreVideoPts;
+#endif
 
     if(p->nTimeBase != -1)
     {
@@ -1592,10 +1908,10 @@ int64_t PlayerGetPosition(Player* pl)    //* current time position in us.
     int64_t        nCurPosition;
 
     p = (PlayerContext*)pl;
-
+#ifndef ONLY_ENABLE_AUDIO
     if(p->bInFastMode)
         return p->nPreVideoPts;
-
+#endif
     if(p->nTimeBase != -1)
     {
         nCurTime = p->pAvTimer->GetTime(p->pAvTimer);
@@ -1616,8 +1932,10 @@ int64_t PlayerGetPts(Player* pl)    //* current pts in us.
 
     p = (PlayerContext*)pl;
 
+#ifndef ONLY_ENABLE_AUDIO
     if(p->bInFastMode)
         return p->nPreVideoPts;
+#endif
 
     if(p->nTimeBase != -1)
     {
@@ -1631,6 +1949,7 @@ int64_t PlayerGetPts(Player* pl)    //* current pts in us.
     }
 }
 
+#ifndef ONLY_ENABLE_AUDIO
 int PlayerSet3DMode(Player* pl, enum EPICTURE3DMODE ePicture3DMode,
         enum EDISPLAY3DMODE eDisplay3DMode)
 {
@@ -1709,6 +2028,22 @@ int PlayerConfigVideoRotateDegree(Player* pl, int nDegree)
     return 0;
 }
 
+int PlayerConfigVideoG2dRotateDegree(Player* pl, int nDegree)
+{
+    PlayerContext* p;
+    int            ret;
+
+    p = (PlayerContext*)pl;
+
+    if(p->eStatus != PLAYER_STATUS_STOPPED)
+    {
+        loge("player not in stopped status, can not config video scale down ratio.");
+        return -1;
+    }
+    p->nG2dRotateDegree = nDegree;
+    return 0;
+}
+
 int PlayerConfigVideoDeinterlace(Player* pl, int bDeinterlace)
 {
     PlayerContext* p;
@@ -1726,6 +2061,24 @@ int PlayerConfigVideoDeinterlace(Player* pl, int bDeinterlace)
     return 0;
 }
 
+int PlayerConfigVideoLbcLossyComMod(Player* pl, int nLbcMode)
+{
+    PlayerContext* p;
+    int            ret;
+
+    p = (PlayerContext*)pl;
+
+    if(p->eStatus != PLAYER_STATUS_STOPPED)
+    {
+        loge("player not in stopped status, can not config video lbc mode.");
+        return -1;
+    }
+
+    p->sVideoConfig.nLbcLossyComMod = nLbcMode;
+    return 0;
+}
+#endif
+
 int PlayerConfigTvStreamFlag(Player* pl, int bFlag)
 {
     PlayerContext* p;
@@ -1737,11 +2090,13 @@ int PlayerConfigTvStreamFlag(Player* pl, int bFlag)
         loge("player not in stopped status, can not config video deinterlace flag.");
         return -1;
     }
-
+#ifndef ONLY_ENABLE_AUDIO
     p->sVideoConfig.bIsTvStream = bFlag;
+#endif
     return 0;
 }
 
+#ifndef ONLY_ENABLE_AUDIO
 int PlayerConfigDispErrorFrame(Player* pl, int bDispErrorFrame)
 {
     PlayerContext* p;
@@ -1856,7 +2211,8 @@ int PlayerGetValidPictureNum(Player* pl)
     else
         return 0;
 }
-
+#endif
+#ifndef ONLY_DISABLE_AUDIO
 //* estimated by pts and stream data size.
 int PlayerGetAudioBitrate(Player* pl)
 {
@@ -2151,11 +2507,12 @@ int PlayerSetAudioForceWriteToDeviceFlag(Player* pl, int bForceFlag)
     else
         return -1;
 }
-
+#endif
 //*****************************************************************************//
 //* TODO.
 //*****************************************************************************//
 
+#ifndef ONLY_ENABLE_AUDIO
 //* set video window.
 int PlayerSetVideoRegion(Player* pl, int x, int y, int nWidth, int nHeight)
 {
@@ -2179,7 +2536,7 @@ int PlayerSetDisplayRatio(Player* pl, enum EDISPLAYRATIO eDisplayRatio)
 //*****************************************************************************//
 //* TODO end.
 //*****************************************************************************//
-
+#if !CONFIG_DISABLE_SUBTITLE
 int PlayerSetSubtitleStreamInfo(Player* pl, SubtitleStreamInfo* pStreamInfo,
         int nStreamNum, int nDefaultStream)
 {
@@ -2194,9 +2551,6 @@ int PlayerSetSubtitleStreamInfo(Player* pl, SubtitleStreamInfo* pStreamInfo,
         return 0;
     }
 
-#if CONFIG_DISABLE_SUBTITLE
-    return 0;
-#else
     if(p->pSubtitleStreamInfo != NULL && p->nSubtitleStreamNum > 0)
     {
         for(i=0; i<p->nSubtitleStreamNum; i++)
@@ -2307,7 +2661,6 @@ int PlayerSetSubtitleStreamInfo(Player* pl, SubtitleStreamInfo* pStreamInfo,
     {
         return -1;
     }
-#endif
 }
 
 int PlayerAddSubtitleStream(Player* pl, SubtitleStreamInfo* pStreamInfo)
@@ -2543,6 +2896,7 @@ int PlayerGetSubtitleShowTimeAdjustment(Player* pl)
     else
         return -1;
 }
+#endif
 
 //* show video layer.
 int PlayerVideoShow(Player* pl)
@@ -2654,6 +3008,7 @@ int PlayerStopFast(Player* pl)
         PlayerStart(pl,0,0);
     return 0;
 }
+#endif
 
 static int CallbackProcess(void* pSelf, int eMessageId, void* param)
 {
@@ -2663,12 +3018,16 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
 
     switch(eMessageId)
     {
+
+#ifndef ONLY_ENABLE_AUDIO
         case PLAYER_VIDEO_DECODER_NOTIFY_EOS:
         {
             if(p->pVideoRender != NULL)
                 VideoRenderCompSetEOS(p->pVideoRender);
             return 0;
         }
+#endif
+#ifndef ONLY_DISABLE_AUDIO
 
         case PLAYER_AUDIO_DECODER_NOTIFY_EOS:
         {
@@ -2676,14 +3035,16 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
                 AudioRenderCompSetEOS(p->pAudioRender);
             return 0;
         }
-
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
         case PLAYER_SUBTITLE_DECODER_NOTIFY_EOS:
         {
             if(p->pSubtitleRender != NULL)
                 SubtitleRenderCompSetEOS(p->pSubtitleRender);
             return 0;
         }
-
+#endif
         case PLAYER_VIDEO_RENDER_NOTIFY_EOS:
         {
             pthread_mutex_lock(&p->eosMutex);
@@ -2706,13 +3067,16 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
             pthread_mutex_unlock(&p->eosMutex);
             return 0;
         }
+#endif
 
         case PLAYER_AUDIO_RENDER_NOTIFY_EOS:
         {
             pthread_mutex_lock(&p->eosMutex);
             p->bAudioRenderEosReceived = 1;
+#ifndef ONLY_ENABLE_AUDIO
             if(p->bVideoRenderEosReceived == 1 || PlayerHasVideo((Player*)p) == 0
                     || p->bVideoCrash == 1)
+#endif
             {
                 //*When recive eos, we should stop the avTimer,
                 //*or the PlayerGetPts() function will return wrong values.
@@ -2722,7 +3086,9 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
                 if(p->callback != NULL)
                 {
                     p->callback(p->pUserData, PLAYBACK_NOTIFY_EOS, NULL);
+#ifndef ONLY_ENABLE_AUDIO
                     p->bVideoRenderEosReceived = 0;
+#endif
                     p->bAudioRenderEosReceived = 0;
                 }
             }
@@ -2730,6 +3096,7 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
             return 0;
         }
 
+#ifndef ONLY_ENABLE_AUDIO
         case PLAYER_VIDEO_RENDER_NOTIFY_CRASH:
         {
             p->bVideoRenderEosReceived = 1;
@@ -2779,7 +3146,7 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
             p->nFirstVideoRenderPts = *((int64_t*)param);
 
             logd("first video pts = %lld", p->nFirstVideoRenderPts);
-
+            printf("****player(%p): first video pts = %lld*****\n",p, p->nFirstVideoRenderPts);
             if(p->bInFastMode)
             {
                 //* in fast mode, video is showed without any synchronization,
@@ -2874,6 +3241,7 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
             p->nPreVideoPts = p->nFirstVideoRenderPts;
             return 0;
         }
+#endif//ONLY_ENABLE_AUDIO
 
         case PLAYER_AUDIO_RENDER_NOTIFY_FIRST_FRAME:
         {
@@ -2904,8 +3272,10 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
             p->nFirstAudioRenderPts = *((int64_t*)param);
 
             logd("first audio pts = %" PRId64 "", p->nFirstAudioRenderPts);
-
+            printf("****player(%p): first audio pts = %lld*****\n",p, p->nFirstAudioRenderPts);
+#ifndef ONLY_ENABLE_AUDIO
             if(PlayerHasVideo((Player*)p) == 0)
+#endif
             {
                 pthread_mutex_lock(&p->timerMutex);
                 p->nTimeBase = p->nFirstAudioRenderPts;
@@ -2913,6 +3283,7 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
                 p->pAvTimer->Start(p->pAvTimer);
                 pthread_mutex_unlock(&p->timerMutex);
             }
+#ifndef ONLY_ENABLE_AUDIO
             else
             {
                 int nWaitTime = 0;
@@ -3282,12 +3653,13 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
                     }
                 }
             }
-
+#endif
             p->nPreAudioPts = p->nFirstAudioRenderPts;
             p->nLastTimeTimerAdjusted = p->nFirstAudioRenderPts;
             return 0;
         }
 
+#ifndef ONLY_ENABLE_AUDIO
         case PLAYER_VIDEO_RENDER_NOTIFY_PICTURE_PTS:
         {
             int64_t nVideoPts;
@@ -3438,11 +3810,13 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
                     p->onResetNotSync = 0;
                 }
             }
-
             if(!IS_DTMB_STREAM || (PlayerHasAudio((Player*)p) && (p->bAudioCrash == 0)))
             {
-                if(CdxAbs(nTimeDiff) <= CONFIG_THREASHOLD_OF_PTS_DIFFERENCE_TO_JUDGE_PTS_jUMP ||
-                   p->nPlayRate.mSpeed != 1.0)
+                if(CdxAbs(nTimeDiff) <= CONFIG_THREASHOLD_OF_PTS_DIFFERENCE_TO_JUDGE_PTS_jUMP
+#ifndef ONLY_DISABLE_AUDIO
+					||p->nPlayRate.mSpeed != 1.0
+#endif
+					)
                 {
                     //* time difference seems to be normal, video render thread will
                     //* wait to sync the timer if nTimeDiff>0 or hurry up to catch the
@@ -3561,6 +3935,7 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
 
             return nWaitTimeMs;
         }
+#endif
 
         case PLAYER_AUDIO_RENDER_NOTIFY_PTS_AND_CACHETIME:
         {
@@ -3676,6 +4051,7 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
                    (p->nLastTimeTimerAdjusted > nAudioPts))
                 {
                     //* adjust timer speed to make the timer follow audio.
+#ifndef ONLY_DISABLE_AUDIO
                     if (p->nPlayRate.mSpeed != 1.0)
                     {
                         if(nTimeDiff > 50000)
@@ -3706,6 +4082,7 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
                             p->pAvTimer->SetSpeed(p->pAvTimer, 1000);
                     }
                     else
+#endif
                     {
                         p->pAvTimer->SetSpeed(p->pAvTimer, 1000);
                     }
@@ -3720,6 +4097,8 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
             return 0;
         }
 
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
         case PLAYER_SUBTITLE_RENDER_NOTIFY_ITEM_PTS_AND_DURATION:
         {
             //* check whether a subtitle item is time to show or expired.
@@ -3924,7 +4303,7 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
                 p->callback(p->pUserData, PLAYBACK_NOTIFY_SUBTITLE_ITEM_EXPIRED, param);
             return 0;
         }
-
+#endif
         case PLAYER_VIDEO_DECODER_NOTIFY_STREAM_UNDERFLOW:
         case PLAYER_AUDIO_DECODER_NOTIFY_STREAM_UNDERFLOW:
         case PLAYER_SUBTITLE_DECODER_NOTIFY_STREAM_UNDERFLOW:
@@ -3959,6 +4338,7 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
                 p->callback(p->pUserData, PLAYBACK_NOTIFY_VIDEO_RENDER_FRAME, NULL);
             }
             break;
+#endif
 
         case PLAYER_AUDIO_DECODER_NOTIFY_CRASH:
 
@@ -3967,21 +4347,26 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
             p->bAudioCrash = 1;
             if(p->callback != NULL)
                 p->callback(p->pUserData, PLAYBACK_NOTIFY_AUDIO_UNSUPPORTED, NULL);
-
+#ifndef ONLY_ENABLE_AUDIO
             if(p->bVideoRenderEosReceived == 1 ||
                     PlayerHasVideo((Player*)p) == 0 ||
                     p->bVideoCrash == 1)
+#endif
             {
                 if(p->callback != NULL)
                 {
                     p->callback(p->pUserData, PLAYBACK_NOTIFY_EOS, NULL);
+#ifndef ONLY_ENABLE_AUDIO
                     p->bVideoRenderEosReceived = 0;
+#endif
                     p->bAudioRenderEosReceived = 0;
                 }
             }
             pthread_mutex_unlock(&p->eosMutex);
             break;
 
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
         case PLAYER_SUBTITLE_DECODER_NOTIFY_CRASH:
 
             pthread_mutex_lock(&p->eosMutex);
@@ -3992,6 +4377,8 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
 
             pthread_mutex_unlock(&p->eosMutex);
             break;
+#endif
+#endif
 
         case PLAYER_AUDIO_DECODER_NOTIFY_AUDIORAWPLAY:
             loge("%s,1",__func__);
@@ -4013,8 +4400,14 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
             }
             break;
 
+#ifndef ONLY_ENABLE_AUDIO
         case PLAYER_VIDEO_RENDER_RESET_BUFFER_FINISHED:
             p->callback(p->pUserData, PLAYBACK_RESET_BUFFER_FINISHED, NULL);
+            break;
+#endif
+
+        case PLAYER_AUDIO_RENDER_NOTIFY_AUDIO_START:
+            p->callback(p->pUserData, PLAYBACK_NOTIFY_FIRST_AUDIO, NULL);
             break;
 
         default:
@@ -4024,6 +4417,7 @@ static int CallbackProcess(void* pSelf, int eMessageId, void* param)
     return 0;
 }
 
+#ifndef ONLY_ENABLE_AUDIO
 static int PlayerInitialVideo(PlayerContext* p)
 {
 	int vbv_size;
@@ -4071,6 +4465,10 @@ static int PlayerInitialVideo(PlayerContext* p)
     {
         p->sVideoConfig.eOutputPixelFormat = PIXEL_FORMAT_YV12;
     }
+    else if (strcmp(vd_outfmt, "yu12") == 0)
+    {
+        p->sVideoConfig.eOutputPixelFormat = PIXEL_FORMAT_YUV_PLANER_420;
+    }
     else if (strcmp(vd_outfmt, "nv21") == 0)
     {
         p->sVideoConfig.eOutputPixelFormat = PIXEL_FORMAT_NV21;
@@ -4091,6 +4489,22 @@ static int PlayerInitialVideo(PlayerContext* p)
     if(p->pVideoStreamInfo->bIs3DStream == 1)
         p->sVideoConfig.eOutputPixelFormat = PIXEL_FORMAT_NV21;
 #endif
+
+    p->sVideoConfig.nLbcLossyComMod = GetConfigParamterInt("vd_lbc_mode", 0);
+
+    if (p->sVideoConfig.nLbcLossyComMod > 0 && p->pVideoStreamInfo->nFrameRate > 40000
+        && (p->nG2dRotateDegree == 180 || GetConfigParamterInt("g2d_rotate_degree", 0) == 180))
+    {
+        loge("play 1080P@60FPS, close LBC.");
+        p->sVideoConfig.nLbcLossyComMod = 0;
+    }
+
+    if (p->sVideoConfig.nLbcLossyComMod > 0)
+    {
+        p->sVideoConfig.eOutputPixelFormat = PIXEL_FORMAT_YV12;//PIXEL_FORMAT_YUV_PLANER_420;
+        p->sVideoConfig.bIsLossy = GetConfigParamterInt("vd_lbc_is_lossy", 1);
+        p->sVideoConfig.bRcEn = GetConfigParamterInt("vd_lbc_rc_en", 1);
+    }
 
     p->sVideoConfig.bSecureosEn = p->pVideoStreamInfo->bSecureStreamFlagLevel1;
 
@@ -4207,7 +4621,8 @@ static int PlayerInitialVideo(PlayerContext* p)
     VideoRenderCompSetFrameRateEstimater(p->pVideoRender, p->pVideoFramerateEstimater);
     return 0;
 }
-
+#endif
+#ifndef ONLY_DISABLE_AUDIO
 static int PlayerInitialAudio(PlayerContext* p)
 {
     int ret;
@@ -4271,7 +4686,16 @@ static int PlayerInitialAudio(PlayerContext* p)
 
     return 0;
 }
+int PlayerGetAudioTrack(Player* pl)
+{
+    PlayerContext* p;
+    p = (PlayerContext*)pl;
+    return p->nAudioStreamSelected;
+}
+#endif
 
+#ifndef ONLY_ENABLE_AUDIO
+#if !CONFIG_DISABLE_SUBTITLE
 static int PlayerInitialSubtitle(PlayerContext* p)
 {
     int ret;
@@ -4333,7 +4757,7 @@ static int PlayerInitialSubtitle(PlayerContext* p)
 
     return 0;
 }
-
+#endif
 int PlayerConfigExtraScaleInfo(Player* pl, int nWidthTh, int nHeightTh,
         int nHorizontalScaleRatio, int nVerticalScaleRatio)
 {
@@ -4364,3 +4788,5 @@ int PlayerGetVideoDispFramerate(Player* pl,float* dispFrameRate){
     else
         return -1;
 }
+
+#endif //ONLY_ENABLE_AUDIO

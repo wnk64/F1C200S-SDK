@@ -23,7 +23,7 @@ enum CDX_LOG_LEVEL_TYPE {
     LOG_LEVEL_ERROR = 6,
 };
 
-extern enum CDX_LOG_LEVEL_TYPE GLOBAL_LOG_LEVEL;
+extern enum CDX_LOG_LEVEL_TYPE CDX_GLOBAL_LOG_LEVEL;
 
 #ifndef CONFIG_LOG_LEVEL
 #define CONFIG_LOG_LEVEL    (0xFFFF)
@@ -43,12 +43,12 @@ typedef char CHECK_LOG_LEVEL_EQUAL_TO_ANDROID[CDX_LOG_ORDER > 0 ? 1 : -1];
 
 #define AWLOG(level, fmt, arg...)  \
     do { \
-        if (level >= GLOBAL_LOG_LEVEL || level >= CONFIG_LOG_LEVEL) \
+        if (level >= CDX_GLOBAL_LOG_LEVEL || level >= CONFIG_LOG_LEVEL) \
             LOG_PRI(level, LOG_TAG, "<%s:%u>: " fmt, __FUNCTION__, __LINE__, ##arg); \
     } while (0)
 
 #define CDX_TRACE() \
-    CDX_LOGI("<%s:%u> tid(%d)", __FUNCTION__, __LINE__, gettid_sunxi())
+    CDX_LOGI("<%s:%u> tid(%d)", __FUNCTION__, __LINE__, gettid())
 
 /*check when realease version*/
 #define CDX_FORCE_CHECK(e) \
@@ -90,7 +90,7 @@ typedef char CHECK_LOG_LEVEL_EQUAL_TO_ANDROID[CDX_LOG_ORDER > 0 ? 1 : -1];
 extern const char *CDX_LOG_LEVEL_NAME[];
 #define AWLOG(level, fmt, arg...)  \
     do { \
-        if ((level >= GLOBAL_LOG_LEVEL || level >= CONFIG_LOG_LEVEL) && \
+        if ((level >= CDX_GLOBAL_LOG_LEVEL || level >= CONFIG_LOG_LEVEL) && \
                 level <= LOG_LEVEL_ERROR) \
             printf("%s: %s <%s:%u>: " fmt "\n", \
                     CDX_LOG_LEVEL_NAME[level], LOG_TAG, __FUNCTION__, __LINE__, ##arg); \
@@ -164,7 +164,7 @@ extern "C"
 {
 #endif
 
-void log_set_level(unsigned level);
+void cdx_log_set_level(unsigned level);
 
 #ifdef __cplusplus
 }

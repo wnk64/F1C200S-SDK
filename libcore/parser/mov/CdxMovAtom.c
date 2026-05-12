@@ -453,6 +453,7 @@ static int _MovParseEsds(MOVContext *c,MOV_atom_t a)
         offset += 12;
         switch (object_type_id)
         {
+#ifndef ONLY_ENABLE_AUDIO
             case 32:
             {
                 st->eCodecFormat = VIDEO_CODEC_FORMAT_XVID;
@@ -481,6 +482,7 @@ static int _MovParseEsds(MOVContext *c,MOV_atom_t a)
                                     VIDEO_CODEC_FORMAT_MPEG2);
                 break;
             }
+#endif
             case 64:
             case 102:
             case 103:
@@ -515,6 +517,7 @@ static int _MovParseEsds(MOVContext *c,MOV_atom_t a)
             st->codec.extradataSize = len;
             memcpy(st->codec.extradata, buffer+offset, len);
 
+#ifndef ONLY_ENABLE_AUDIO
             if(st->eCodecFormat == VIDEO_CODEC_FORMAT_MPEG4
                 || st->eCodecFormat == VIDEO_CODEC_FORMAT_DIVX3
                 || st->eCodecFormat == VIDEO_CODEC_FORMAT_DIVX4
@@ -529,6 +532,7 @@ static int _MovParseEsds(MOVContext *c,MOV_atom_t a)
                     CDX_LOGD("esds width = %d, height = %d", st->codec.width, st->codec.height);
                 }
             }
+#endif
         }
     }
 
@@ -986,6 +990,7 @@ static int _MovParseStsd(MOVContext *c,MOV_atom_t a)
         {
             switch (st->codec.codecTag)
             {
+#ifndef ONLY_ENABLE_AUDIO
                 //parse video format type
                 case MKTAG('m', 'p', '4', 'v'):
                 case MKTAG('X', 'V', 'I', 'D'):
@@ -1074,7 +1079,7 @@ static int _MovParseStsd(MOVContext *c,MOV_atom_t a)
                     st->stream_index = c->video_stream_num;
                     c->video_stream_num++;
                     break;
-
+#endif
                 case MKTAG('S', 'V', 'Q', '3'):
                     CDX_LOGD("---- can not support svq3");
                     st->stsd_type = 0;
@@ -1222,7 +1227,7 @@ static int _MovParseStsd(MOVContext *c,MOV_atom_t a)
                     st->unsurpoort = 1;
                     st->read_va_end = 1;
                     break;
-
+#ifndef ONLY_ENABLE_AUDIO
                 //parse subtitle format type
                 case MKTAG('T', 'E', 'X', 'T'):
                 case MKTAG('T', 'X', '3', 'G'):
@@ -1237,6 +1242,7 @@ static int _MovParseStsd(MOVContext *c,MOV_atom_t a)
                     st->stream_index = c->subtitle_stream_num;
                     c->subtitle_stream_num++;
                     break;
+
                 case MKTAG('m', 'p', '4', 's'):
                     if(st->codec.codecType == CODEC_TYPE_SUBTITLE)
                     {
@@ -1247,6 +1253,7 @@ static int _MovParseStsd(MOVContext *c,MOV_atom_t a)
                         c->subtitle_stream_num++;
                     }
                     break;
+#endif
                 default:
                     CDX_LOGW("unknown format tag: <0x%x>", st->codec.codecTag);
                     if(st->stsd_type == 0) // for cmov_kongfupanda.mov
@@ -1837,6 +1844,7 @@ static int _MovParseHdlr(MOVContext *c,MOV_atom_t a)
     //!latest mplayer del it     if(!ctype)
     //!latest mplayer del it         c->isom = 1;
 
+#ifndef ONLY_ENABLE_AUDIO
     if(type == MKTAG('v', 'i', 'd', 'e'))
     {
         st->codec.codecType = CODEC_TYPE_VIDEO;
@@ -1845,8 +1853,10 @@ static int _MovParseHdlr(MOVContext *c,MOV_atom_t a)
         c->ptr_fpsr->hasVideo ++;
         c->basetime[0] = st->basetime;    //auido basetime -/+
     }
+    else
+#endif
 
-    else if(type == MKTAG('s', 'o', 'u', 'n'))
+    if(type == MKTAG('s', 'o', 'u', 'n'))
     {
         if(c->has_audio < AUDIO_STREAM_LIMIT)//select the first audio track as default
         {
@@ -1855,6 +1865,7 @@ static int _MovParseHdlr(MOVContext *c,MOV_atom_t a)
             c->ptr_fpsr->hasAudio++;
         }
     }
+#ifndef ONLY_ENABLE_AUDIO
     else if(type == MKTAG('t', 'e', 'x', 't') || type == MKTAG('s', 'u', 'b', 'p'))
     {
         if(c->has_subtitle < SUBTITLE_STREAM_LIMIT)
@@ -1864,7 +1875,7 @@ static int _MovParseHdlr(MOVContext *c,MOV_atom_t a)
             c->ptr_fpsr->hasSubTitle++;
         }
     }
-
+#endif
     /* component  manufacture     (4 bytes)*/
     /* component flags                    (4 bytes)*/
     /* component flags mask         (4 bytes)*/
@@ -2862,12 +2873,15 @@ static int _MovParseTrun(MOVContext *s,MOV_atom_t atom)
         return -1;
     }
 
+#ifndef ONLY_ENABLE_AUDIO
     // select the approparite stream when bandwidth changed
     if(st->codec.codecType == CODEC_TYPE_VIDEO)
     {
         s->video_stream_idx = i;
     }
-    else if(st->codec.codecType == CODEC_TYPE_AUDIO)
+    else
+#endif
+    if(st->codec.codecType == CODEC_TYPE_AUDIO)
     {
         s->audio_stream_idx = i;
     }
@@ -2993,6 +3007,7 @@ static int _MovParseTrun(MOVContext *s,MOV_atom_t atom)
 
         //CDX_LOGD("duration = %x, offset = %llx, sample size = %x, flag = %x, data_offset = %llu",
         //sample_duration, data_offset, tmp->size, sample_flags, data_offset);
+#ifndef ONLY_ENABLE_AUDIO
         if(st->codec.codecType == CODEC_TYPE_VIDEO)
         {
             if( aw_list_add(s->Vsamples, tmp) < 0)
@@ -3001,7 +3016,9 @@ static int _MovParseTrun(MOVContext *s,MOV_atom_t atom)
                 return -1;
             }
         }
-        else if(st->codec.codecType == CODEC_TYPE_AUDIO)
+        else
+#endif
+        if(st->codec.codecType == CODEC_TYPE_AUDIO)
         {
             if( aw_list_add(s->Asamples, tmp) < 0)
             {
@@ -3894,7 +3911,7 @@ int _MovTop(MOVContext *s)
                 ret = CdxStreamSkip(s->fp, a.size-8);
                 if(ret < 0) return -1;
             }
-	    #endif 
+	    #endif
 	    s->fragment.moof_offset = a.offset;
             ret = g_mov_top_parser[MESSAGE_ID_MOOF].movParserFunc(s,buf,a);
             break;

@@ -34,26 +34,43 @@ static int streamInit = 0;
 
 struct CdxStreamListS streamList;
 
+#ifdef FILE_STREAM_ENABLE
 extern CdxStreamCreatorT fileStreamCtor;
+#endif
 
-#ifdef RTSP_CLIENT_ENABLE
+#ifdef RTSP_STREAM_ENABLE
 extern CdxStreamCreatorT rtspStreamCtor;
 #endif
 
+#ifdef HTTP_STREAM_ENABLE
 extern CdxStreamCreatorT httpStreamCtor;
-extern CdxStreamCreatorT tcpStreamCtor;
+#endif
 
-#ifdef HTTPS_ENABLE
+#ifdef TCP_STREAM_ENABLE
+extern CdxStreamCreatorT tcpStreamCtor;
+#endif
+
+#ifdef HTTPS_STREAM_ENABLE
 extern CdxStreamCreatorT sslStreamCtor;
 extern CdxStreamCreatorT aesStreamCtor;
 #endif
 
-#ifdef __ANDROID__
+#ifdef RTMP_STREAM_ENABLE
 extern CdxStreamCreatorT rtmpStreamCtor;
+#endif
+
+#ifdef __ANDROID__
 extern CdxStreamCreatorT mmsStreamCtor;
 #endif
+
+#ifdef UDP_STREAM_ENABLE
 extern CdxStreamCreatorT udpStreamCtor;
+#endif
+
+#if 0
 extern CdxStreamCreatorT customerStreamCtor;
+#endif
+
 #ifdef __ANDROID__
 extern CdxStreamCreatorT rtpStreamCreator;
 //extern CdxStreamCreatorT sslStreamCtor;
@@ -96,29 +113,47 @@ static void AwStreamInit(void) __attribute__((constructor));
 void AwStreamInit(void)
 {
     CDX_LOGD("aw stream init...");
-
+#ifdef FILE_STREAM_ENABLE
     AwStreamRegister(&fileStreamCtor,"fd");
     AwStreamRegister(&fileStreamCtor,"file");
-#ifdef RTSP_CLIENT_ENABLE
+#endif
+
+#ifdef RTSP_STREAM_ENABLE
     AwStreamRegister(&rtspStreamCtor,"rtsp");
 #endif
-    AwStreamRegister(&httpStreamCtor,"http");
 
-#ifdef HTTPS_ENABLE
+#ifdef HTTP_STREAM_ENABLE
+    AwStreamRegister(&httpStreamCtor,"http");
+#endif
+
+#ifdef HTTPS_STREAM_ENABLE
     AwStreamRegister(&httpStreamCtor,"https");
     AwStreamRegister(&sslStreamCtor,"ssl");
     AwStreamRegister(&aesStreamCtor,"aes");
 #endif
+
+#ifdef TCP_STREAM_ENABLE
     AwStreamRegister(&tcpStreamCtor,"tcp");
-#ifdef __ANDROID__
+#endif
+
+#ifdef RTMP_STREAM_ENABLE
     AwStreamRegister(&rtmpStreamCtor,"rtmp");
+#endif
+
+#ifdef __ANDROID__
     AwStreamRegister(&mmsStreamCtor,"mms");
     AwStreamRegister(&mmsStreamCtor,"mmsh");
     AwStreamRegister(&mmsStreamCtor,"mmst");
     AwStreamRegister(&mmsStreamCtor,"mmshttp");
 #endif
+
+#ifdef UDP_STREAM_ENABLE
     AwStreamRegister(&udpStreamCtor,"udp");
+#endif
+
+#if 0
     AwStreamRegister(&customerStreamCtor,"customer");
+#endif
 #ifdef __ANDROID__
 //    AwStreamRegister(&sslStreamCtor,"ssl");
 //    AwStreamRegister(&aesStreamCtor,"aes");

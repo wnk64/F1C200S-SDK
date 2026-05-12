@@ -554,7 +554,9 @@ char* CdxMmshBuildRequest(CdxHttpHeaderT *httpHdr)
 
     //-- Compute the request length.
     // Add the Method line
-    len = strlen(httpHdr->method) + strlen(uri) + 12;//GET uri HTTP/1.1\r\n
+    if(uri){
+	len = strlen(httpHdr->method) + strlen(uri) + 12;//GET uri HTTP/1.1\r\n
+    }
     // Add the fields
     field = httpHdr->firstField;
     while(field != NULL)

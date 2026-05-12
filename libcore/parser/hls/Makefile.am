@@ -15,6 +15,7 @@ LOCAL_INCLUDE = -I../include \
 		-I$(top_srcdir)/ \
 		-I$(top_srcdir)/external/include/adecoder/ \
 		-I$(top_srcdir)/external/include/ \
+		-I$(top_srcdir)/../mpp_libcedarc/include \
 		-I$(top_srcdir)/../libcedarc/include
 
 libcdx_hls_parser_la_CFLAGS += $(LOCAL_INCLUDE)

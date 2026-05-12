@@ -79,16 +79,15 @@ AwMessageQueue* AwMessageQueueCreate__(int nMaxMessageNum, const char* pName,
         mqCtx->Nodes[i].msg = calloc(1, nMessageSize);
         if (mqCtx->Nodes[i].msg == NULL)
         {
-            int j;
-            for (j = 0; j < i; j++)
-                free(mqCtx->Nodes[j].msg);
-            free(mqCtx->pName);
-            free(mqCtx->Nodes);
-            free(mqCtx);
-            return NULL;
+                int j;
+                for (j = 0; j < i; j++)
+                        free(mqCtx->Nodes[j].msg);
+                free(mqCtx->pName);
+                free(mqCtx->Nodes);
+                free(mqCtx);
+                return NULL;
         }
     }
-
     mqCtx->nMaxMessageNum = nMaxMessageNum;
     mqCtx->nMessageSize = nMessageSize;
 
@@ -271,6 +270,10 @@ int AwMessageQueueGetCount(AwMessageQueue* mq)
     return mqCtx->nCount;
 }
 
+#include <CdxTime.h>
+#include <errno.h>
+#define min(x, y)   ((x) <= (y) ? (x) : (y));
+
 int SemTimedWait(sem_t* sem, int64_t time_ms)
 {
     int err;
@@ -281,6 +284,7 @@ int SemTimedWait(sem_t* sem, int64_t time_ms)
     }
     else
     {
+        #if 0
         struct timespec ts;
         clock_gettime(CLOCK_REALTIME, &ts);
         ts.tv_nsec += time_ms % 1000 * 1000 * 1000;
@@ -288,6 +292,60 @@ int SemTimedWait(sem_t* sem, int64_t time_ms)
         ts.tv_nsec = ts.tv_nsec % (1000*1000*1000);
 
         err = sem_timedwait(sem, &ts);
+        #else
+        // sem_trywait + usleep的方式实现
+        // 如果信号量大于0，则减少信号量并立马返回true
+        // 如果信号量小于0，则阻塞等待，当阻塞超时时返回false
+        const int64_t timeoutUs = time_ms * 1000; // 延时时间由毫米转换为微秒
+        const int64_t maxTimeWait = 100000; // 最大的睡眠的时间为100000微秒，也就是100毫秒
+
+        int64_t timeWait = 10; // 睡眠时间，默认为10微秒
+        int64_t delayUs = 0; // 剩余需要延时睡眠时间
+
+        const int64_t startUs = CdxMonoTimeUs(); // 循环前的开始时间，单位微秒
+        int64_t elapsedUs = 0; // 过期时间，单位微秒
+
+        int ret = 0;
+
+        do
+        {
+            // 如果信号量大于0，则减少信号量并立马返回true
+            if(sem_trywait(sem) == 0)
+            {
+                return 0;
+            }
+
+            // 系统信号则立马返回false
+            if(errno != EAGAIN)
+            {
+                return -1;
+            }
+
+            // delayUs一定是大于等于0的，因为do-while的条件是elapsedUs <= timeoutUs.
+            delayUs = timeoutUs - elapsedUs;
+
+            // 睡眠时间取最小的值
+            timeWait = min(delayUs, timeWait);
+
+            // 进行睡眠 单位是微秒
+            ret = usleep(timeWait);
+            if( ret != 0 )
+            {
+                return -1;
+            }
+
+            // 睡眠延时时间双倍自增
+            timeWait *= 2;
+
+            // 睡眠延时时间不能超过最大值
+            timeWait = min(timeWait, maxTimeWait);
+
+            // 计算开始时间到现在的运行时间 单位是微秒
+            elapsedUs = CdxMonoTimeUs() - startUs;
+        } while( elapsedUs <= timeoutUs ); // 如果当前循环的时间超过预设延时时间则退出循环
+
+        return -1;
+        #endif
     }
 
     return err;

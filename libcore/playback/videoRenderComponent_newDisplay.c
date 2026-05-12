@@ -131,6 +131,7 @@ static void NotifyVideoSizeAndSetDisplayRegion(VideoRenderComp* p);
 
 static inline int ProcessVideoSync(VideoRenderComp* p, VideoPicture* pPicture);
 static int QueueBufferToShow(VideoRenderComp* p, VideoPicture* pPicture);
+static int RecycleBufferToDecoder(VideoRenderComp* p);
 static int ProcessDeinterlace(VideoRenderComp* p, int nDeinterlaceTime);
 static int RenderGetVideoFbmBufInfo(VideoRenderComp* p);
 
@@ -560,9 +561,6 @@ static void handleSetHoldLastPicture(AwMessage *msg, void *arg)
     if (p->pLayerCtrl && p->eStatus == PLAYER_STATUS_STOPPED)
     {
         LayerCtrlHoldLastPicture(p->pLayerCtrl, p->bHoldLastPicture);
-
-        if (!p->bHoldLastPicture)
-            LayerCtrlHideVideo(p->pLayerCtrl);
     }
 
     ContinueRender(p);
@@ -786,6 +784,7 @@ static int requestPicture(VideoRenderComp *p)
         if(p->pPicture != NULL || (p->pPicture == NULL && p->bEosFlag))
             break;
 
+        RecycleBufferToDecoder(p);
         if(p->bResolutionChange)
         {
             //* reopen the video engine.
@@ -829,6 +828,7 @@ static int notifyFirstPts(VideoRenderComp *p)
     {
         //* video first frame pts small (too much) than the audio,
         //* discard this frame to catch up the audio.
+        loge("to drop the first frame.");
         VideoDecCompReturnPicture(p->pDecComp, p->pPicture);
         p->pPicture = NULL;
         BaseCompContinue(&p->base);
@@ -840,6 +840,7 @@ static int notifyFirstPts(VideoRenderComp *p)
          * broken by a new message to player, so the player tell
          * us to notify again later.
          */
+        loge("need again to notify first pts.");
         if (AwMessageQueueWaitMessage(p->mq, 10) <= 0)
             BaseCompContinue(&p->base);
         return -1;
@@ -859,7 +860,6 @@ static int showProgressivePicture(VideoRenderComp *p)
             VideoPicture* pReturnPicture = NULL;
 
             QueueBufferToShow(p, p->pPicture);
-
             if(p->nSetToDecoderBufferNum < p->nGpuBufferNum)
             {
                 // set all of the nativeBuffer to decoder
@@ -870,7 +870,7 @@ static int showProgressivePicture(VideoRenderComp *p)
                 ret = LayerDequeueBuffer(p->pLayerCtrl, &pTmpVideoPicture, 1);
                 if(ret == 0)
                 {
-                    p->nSetToDecoderBufferNum ++;
+                    p->nSetToDecoderBufferNum++;
                     VideoDecCompSetVideoFbmBufAddress(p->pDecComp, pTmpVideoPicture, 0);
                 }
                 else
@@ -929,7 +929,7 @@ static int showProgressivePicture(VideoRenderComp *p)
             ret = LayerDequeueBuffer(p->pLayerCtrl, &pTmpVideoPicture, 1);
             if(ret == 0)
             {
-                p->nSetToDecoderBufferNum ++;
+                p->nSetToDecoderBufferNum++;
                 VideoDecCompSetVideoFbmBufAddress(p->pDecComp, pTmpVideoPicture, 0);
             }
             else
@@ -1327,6 +1327,20 @@ static inline int ProcessVideoSync(VideoRenderComp* p, VideoPicture* pPicture)
     return 0;
 }
 
+static int RecycleBufferToDecoder(VideoRenderComp *p)
+{
+    VideoPicture* pReturnPicture = NULL;
+
+    LayerReturnBuffer(p->pLayerCtrl, &pReturnPicture);
+    if (pReturnPicture != NULL)
+    {
+        logv("recycle buffer\n");
+        VideoDecCompReturnPicture(p->pDecComp, pReturnPicture);
+    }
+
+    return 0;
+}
+
 static int QueueBufferToShow(VideoRenderComp* p, VideoPicture* pPicture)
 {
     if(p->pLayerCtrl != NULL)
@@ -1357,7 +1371,7 @@ static int QueueBufferToShow(VideoRenderComp* p, VideoPicture* pPicture)
     if (p->ptsSecs != ptsSecs)
     {
         p->ptsSecs = ptsSecs;
-        logd("video pts(%.3f) ", pPicture->nPts/1000000.0);
+        logv("video pts(%.3f) ", pPicture->nPts/1000000.0);
     }
 
     if(p->pLayerCtrl != NULL && p->bHideVideo == 0)
@@ -1491,6 +1505,7 @@ static int RenderGetVideoFbmBufInfo(VideoRenderComp* p)
     LayerSetIsSoftDecoderFlag(p->pLayerCtrl, pFbmBufInfo->bIsSoftDecoderFlag);
     p->nGpuBufferNum = LayerSetDisplayBufferCount(p->pLayerCtrl,
             pFbmBufInfo->nBufNum);
+    LayerControl(p->pLayerCtrl, CDX_LAYER_CMD_SET_VIDEOCODEC_LBC_MODE, pFbmBufInfo);
 
     p->bHadSetLayerInfoFlag  = 1;
 
@@ -1516,7 +1531,7 @@ static int SetGpuBufferToDecoder(VideoRenderComp*p)
             {
                 p->pCancelPicture[p->nCancelPictureNum] =
                     VideoDecCompSetVideoFbmBufAddress(p->pDecComp, pTmpVideoPicture, 1);
-                p->nCancelPictureNum ++;
+                p->nCancelPictureNum++;
             }
             else
             {

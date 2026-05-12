@@ -11,7 +11,7 @@
 #include <stdarg.h>
 #include "cdx_log.h"
 
-enum CDX_LOG_LEVEL_TYPE GLOBAL_LOG_LEVEL = LOG_LEVEL_WARNING;
+enum CDX_LOG_LEVEL_TYPE CDX_GLOBAL_LOG_LEVEL = LOG_LEVEL_WARNING;
 
 #ifndef __ANDROID__
 const char *CDX_LOG_LEVEL_NAME[] = {
@@ -25,8 +25,8 @@ const char *CDX_LOG_LEVEL_NAME[] = {
 };
 #endif
 
-void log_set_level(unsigned level)
+void cdx_log_set_level(unsigned level)
 {
-    logw("Set log level to %u", level);
-    GLOBAL_LOG_LEVEL = level;
+    logw("cdx Set log level to %u", level);
+    CDX_GLOBAL_LOG_LEVEL = level;
 }

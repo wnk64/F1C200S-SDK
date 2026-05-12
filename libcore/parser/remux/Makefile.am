@@ -15,6 +15,7 @@ LOCAL_INCLUDE = -I../include \
 		-I../../stream/rtsp \
 		-I$(top_srcdir)/ \
 		-I$(top_srcdir)/external/include/adecoder/ \
+		-I$(top_srcdir)/../mpp_libcedarc/include \
 		-I$(top_srcdir)/../libcedarc/include
 
 libcdx_remux_parser_la_CFLAGS += $(LOCAL_INCLUDE)

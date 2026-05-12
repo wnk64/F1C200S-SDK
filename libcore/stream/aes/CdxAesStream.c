@@ -68,10 +68,10 @@ static int SampleAesHandleMpegData(CdxAesStream *aesStream, cdx_uint8 *in, cdx_u
 
     if(media_data_flag == 1)
     {
-    	int tmp_size = size & 0xFFFFFFF0;
+	int tmp_size = size & 0xFFFFFFF0;
 	AES_cbc_encrypt(in, out, tmp_size, &aesStream->aesKey, aesStream->iv, AES_DECRYPT);
 	memcpy(out+tmp_size, in+tmp_size, size%16);
-	media_data_flag = 0; 
+	media_data_flag = 0;
     }
     else
     {
@@ -88,7 +88,7 @@ int AesStreamDecryptSample(CdxAesStream *aesStream, cdx_uint8 *in, cdx_uint8 *ou
         CDX_LOGE("mediaUri is NULL.");
         return 0;
     }
-	
+
     int uriLen = strlen(aesStream->mediaUri);
     if (strncmp(".mp4",aesStream->mediaUri+uriLen-4,4)== 0)
     {
@@ -252,7 +252,7 @@ static cdx_int32 AesStreamRead(CdxStreamT *stream, void *buf, cdx_uint32 size)
 	    {
 	        memcpy(aesStream->iv, aesStream->bigBuf + readLen - 16, 16);
 	    }
-	    
+
 	}
     }
     else
@@ -279,12 +279,12 @@ static cdx_int32 AesStreamRead(CdxStreamT *stream, void *buf, cdx_uint32 size)
 	            readLen = ret;//readLen = ret / 16 * 16;//readLen = ret;
 	        }
 	    }
-	    
+
 	    AesStreamDecryptSample(aesStream, aesStream->bigBuf, data + offset, readLen, 0);
 	    offset += readLen;
             len -= readLen;
-			
-	    memcpy(aesStream->iv, aesStream->originalIv, 16);   
+
+	    memcpy(aesStream->iv, aesStream->originalIv, 16);
 	}
     }
 
@@ -634,7 +634,7 @@ CdxStreamT *AesStreamCreate(CdxDataSourceT *dataSource)
 
     if (strncmp("file://",aesStream->mediaUri,7)== 0)
     {
-    	#if 0
+	#if 0
         getAes128Key(aesStream->key);
         getAes128Iv(aesStream->originalIv);
         aesStream->paddingType = CDX_PKCS7;
@@ -648,7 +648,7 @@ CdxStreamT *AesStreamCreate(CdxDataSourceT *dataSource)
             CDX_LOGE("dataSource error");
             goto _error;
         }
-		
+
 	AesStreamExtraDataT *extraData = (AesStreamExtraDataT *)dataSource->extraData;
 
         //need to set key for diffrent stream

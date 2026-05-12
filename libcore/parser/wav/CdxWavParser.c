@@ -7,7 +7,7 @@
 * History :
 *   Author  : Ls Zhang <lszhang@allwinnertech.com>
 *   Date    : 2014/08/08
-*   Comment : 创建初始版本，实现 WAV 的解复用功能
+*   Comment : 麓麓陆篓鲁玫脢录掳忙卤戮拢卢脢碌脧脰 WAV 碌脛陆芒赂麓脫脙鹿娄脛脺
 */
 
 #include <CdxTypes.h>
@@ -193,10 +193,22 @@ static int WavInit(CdxParserT* parameter)
                     }
                 case dataF:
                     {
+                        cdx_uint32 pcm_data_size = CdxStreamSize(impl->stream) - CdxStreamTell(impl->stream);
+                        if (WAVObject.Dsize > pcm_data_size)
+                        {
+                            CDX_LOGW ("data field error, WAVObject.Dsize = %u, file size = %ld", WAVObject.Dsize, CdxStreamSize(impl->stream));
+                            WAVObject.Dsize = pcm_data_size;
+                        }
+
                         ulFlag = 1;
                         impl->WavFormat.nDataCKSzie        =    WAVObject.Dsize;
                         nFindAllFlag++;
-                        if(nFindAllFlag>1)break;
+                        if(nFindAllFlag>1)
+                        {
+                            CdxStreamSeek(impl->stream, impl->WavFormat.nDataCKSzie, SEEK_CUR);
+                            impl->dFileSize = CdxStreamTell(impl->stream);
+                            break;
+                        }
                         CdxStreamSeek(impl->stream,WAVObject.Dsize, SEEK_CUR);
                         break;
 
@@ -334,10 +346,22 @@ static int WavInit(CdxParserT* parameter)
                     }
                 case dataF:
                     {
+                        cdx_uint32 pcm_data_size = CdxStreamSize(impl->stream) - CdxStreamTell(impl->stream);
+                        if (WAVObject.Dsize > pcm_data_size)
+                        {
+                            CDX_LOGW ("data field error, WAVObject.Dsize = %u, file size = %ld", WAVObject.Dsize, CdxStreamSize(impl->stream));
+                            WAVObject.Dsize = pcm_data_size;
+                        }
+
                         ulFlag = 1;
                         impl->WavFormat.nDataCKSzie        =    WAVObject.Dsize;
                         nFindAllFlag++;
-                        if(nFindAllFlag>1)break;
+                        if(nFindAllFlag>1)
+                        {
+                            CdxStreamSeek(impl->stream, impl->WavFormat.nDataCKSzie, SEEK_CUR);
+                            impl->dFileSize = CdxStreamTell(impl->stream);
+                            break;
+                        }
                         CdxStreamSeek(impl->stream,WAVObject.Dsize, SEEK_CUR);
                         break;
                     }
@@ -357,7 +381,6 @@ static int WavInit(CdxParserT* parameter)
         goto OPENFAILURE;
     }
 
-    impl->dFileSize = CdxStreamSize(impl->stream);
     CdxStreamSeek(impl->stream,ulLength, SEEK_SET);
     //during
     if((impl->WavFormat.wFormatag == WAVE_FORMAT_DVI_ADPCM)&&(impl->WavFormat.nChannls))
@@ -373,7 +396,7 @@ static int WavInit(CdxParserT* parameter)
           (impl->WavFormat.wFormatag == WAVE_FORMAT_MULAW))
            && (impl->WavFormat.nSamplesPerSec) )
     {
-        cdx_int32 nDataCKSzie = impl->WavFormat.nDataCKSzie;
+        cdx_uint32 nDataCKSzie = impl->WavFormat.nDataCKSzie;
         cdx_int16 nChannls    = impl->WavFormat.nChannls;
         cdx_int16 wBitsPerSample = impl->WavFormat.wBitsPerSample;
         cdx_int32 nSamplesPerSec = impl->WavFormat.nSamplesPerSec;
@@ -382,7 +405,7 @@ static int WavInit(CdxParserT* parameter)
     }
     else if(impl->WavFormat.nSamplesPerBlock)
     {
-        cdx_int32 nDataCKSzie = impl->WavFormat.nDataCKSzie;
+        cdx_uint32 nDataCKSzie = impl->WavFormat.nDataCKSzie;
         cdx_int16 nSamplesPerBlock = impl->WavFormat.nSamplesPerBlock;
         cdx_int32 nSamplesPerSec = impl->WavFormat.nSamplesPerSec;
         cdx_int16 nBlockAlign = impl->WavFormat.nBlockAlign;
@@ -542,7 +565,7 @@ static cdx_int32 __WavParserRead(CdxParserT *parser, CdxPacketT *pkt)
         impl->mErrno = PSR_IO_ERR;
         return CDX_FAILURE;
     }
-    else if(read_length == 0)
+    else if(read_length == 0 || CdxStreamTell(cdxStream) >= impl->dFileSize)
     {
        CDX_LOGD("CdxStream EOS");
        impl->mErrno = PSR_EOS;
@@ -583,12 +606,15 @@ static cdx_int32 __WavParserGetMediaInfo(CdxParserT *parser, CdxMediaInfoT *medi
     memset(cdxProgram, 0, sizeof(struct CdxProgramS));
     cdxProgram->id = 0;
     cdxProgram->audioNum = 1;
+#ifndef ONLY_ENABLE_AUDIO
     cdxProgram->videoNum = 0;//
     cdxProgram->subtitleNum = 0;
+#endif
     cdxProgram->audioIndex = 0;
+#ifndef ONLY_ENABLE_AUDIO
     cdxProgram->videoIndex = 0;
     cdxProgram->subtitleIndex = 0;
-
+#endif
     mediaInfo->bSeekable = CdxStreamSeekAble(impl->stream);
     mediaInfo->fileSize = impl->dFileSize;
 
@@ -611,8 +637,8 @@ static cdx_int32 __WavParserSeekTo(CdxParserT *parser, cdx_int64 timeUs, SeekMod
 {
     CDX_UNUSE(seekModeType);
     struct WavParserImplS *impl = NULL;
-    cdx_int32 file_location = 0;
-    cdx_int32 nFrames = 0;
+    cdx_int64 file_location = 0;
+    cdx_int64 nFrames = 0;
     impl = CdxContainerOf(parser, struct WavParserImplS, base);
     nFrames = (timeUs/1000000) * impl->WavFormat.nSamplesPerSec /impl->nFrameSamples;
     file_location = nFrames *  impl->nFrameLen;
@@ -898,26 +924,26 @@ static cdx_int32 DcaProbe(CdxStreamProbeDataT *p)
 
         /* regular bitstream */
         if (state == AW_DCA_MARKER_RAW_BE || state == AW_DCA_MARKER_RAW_LE)
+        {
             markers[0]++;
-
+        }
         /* 14 bits big-endian bitstream */
-        if (state == AW_DCA_MARKER_14B_BE)
+        else if (state == AW_DCA_MARKER_14B_BE)
+        {
             if ((aw_bytestream_get_be16((cdx_uint8**)&dp) & 0xFFF0) == 0x07F0)
                 markers[1]++;
-
+        }
         /* 14 bits little-endian bitstream */
-        if (state == AW_DCA_MARKER_14B_LE)
+        else if (state == AW_DCA_MARKER_14B_LE)
+        {
             if ((aw_bytestream_get_be16((cdx_uint8**)&dp) & 0xF0FF) == 0xF007)
                 markers[2]++;
+        }
     }
     sum = markers[0] + markers[1] + markers[2];
     max = markers[1] > markers[0];
     max = markers[2] > markers[max] ? 2 : max;
     if (markers[max] > 3 && p->len / markers[max] < 32*1024 &&  markers[max] * 4 > sum * 3){
-        CDX_LOGD("DTS PARSER");
-        return CDX_TRUE;
-    }else if(sum)
-    {
         CDX_LOGD("DTS PARSER");
         return CDX_TRUE;
     }

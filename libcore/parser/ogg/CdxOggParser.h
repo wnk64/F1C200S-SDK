@@ -668,7 +668,11 @@ struct CdxOggParserS {
     cdx_uint32 packetNum;
     cdx_uint32 packetPos;
     ProbeSpecificDataBuf vProbeBuf;
+#ifndef ONLY_ENABLE_AUDIO
     VideoStreamInfo tempVideoInfo;
+#endif
+	cdx_uint8 *comment;
+	cdx_uint32 comment_size;
 };
 
 void aw_freep(void *arg);

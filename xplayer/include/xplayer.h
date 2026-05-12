@@ -24,7 +24,11 @@
 #include "xplayerUtil.h"
 
 #define AWPLAYER_CONFIG_DISABLE_VIDEO       0
+#ifdef ONLY_DISABLE_AUDIO
+#define AWPLAYER_CONFIG_DISABLE_AUDIO       1
+#else
 #define AWPLAYER_CONFIG_DISABLE_AUDIO       0
+#endif
 #define AWPLAYER_CONFIG_DISABLE_SUBTITLE    0
 #define AWPLAYER_CONFIG_DISALBE_MULTI_AUDIO 0
 
@@ -40,6 +44,7 @@ enum MediaEventType {
     AWPLAYER_MEDIA_NOP = MEDIA_EVENT_VALID_RANGE_MIN, // = 0, interface test message
     AWPLAYER_MEDIA_PREPARED,
     AWPLAYER_MEDIA_PLAYBACK_COMPLETE,
+    AWPLAYER_MEDIA_PLAYBACK_PRE_COMPLETE,
     AWPLAYER_MEDIA_BUFFERING_UPDATE,
     AWPLAYER_MEDIA_SEEK_COMPLETE,
     AWPLAYER_MEDIA_SET_VIDEO_SIZE,
@@ -51,6 +56,7 @@ enum MediaEventType {
     AWPLAYER_MEDIA_ERROR,
     AWPLAYER_MEDIA_INFO,
     AWPLAYER_MEDIA_SUBTITLE_DATA,
+    AWPLAYER_MEDIA_FORMAT,
 
     AWPLAYER_MEDIA_LOG_RECORDER,
 
@@ -67,7 +73,9 @@ enum MediaInfoType
 {
     AW_MEDIA_INFO_UNKNOWN = 1,
     AW_MEDIA_INFO_STARTED_AS_NEXT = 2,
-    AW_MEDIA_INFO_RENDERING_START = 3,
+    AW_MEDIA_INFO_PICTURE_RENDERING_START = 3,
+    AW_MEDIA_INFO_AUDIO_RENDERING_START = 4,
+
     AW_MEDIA_INFO_BUFFERING_START = 701,
     AW_MEDIA_INFO_BUFFERING_END = 702,
 
@@ -173,9 +181,11 @@ int XPlayerIsPlaying(XPlayer* p);
 
 int XPlayerSeekTo(XPlayer* p, int nSeekTimeMs, SeekModeType nSeekModeType);
 
+#ifndef ONLY_ENABLE_AUDIO
 int XPlayerSetSpeed(XPlayer* p, int nSpeed);
 
 int XPlayerSetScaleDownRatio(XPlayer* p,int widthRatio,int heightRatio);
+#endif
 
 int XPlayerGetCurrentPosition(XPlayer* p, int* msec);
 
@@ -185,53 +195,81 @@ int XPlayerReset(XPlayer* p);
 
 int XPlayerSetLooping(XPlayer* p, int bLoop);
 
+#ifndef ONLY_ENABLE_AUDIO
+#if !AWPLAYER_CONFIG_DISABLE_SUBTITLE
 int XPlayerGetSubDelay(XPlayer* p);
+#endif
+#endif
 
 int XPlayerGetBitrate(XPlayer* p);
 
 int XPlayerGetCacheSize(XPlayer* p);
 
+#ifndef ONLY_ENABLE_AUDIO
+#if !AWPLAYER_CONFIG_DISABLE_SUBTITLE
 int XPlayerSetSubDelay(XPlayer* p, int nTimeMs);
 
 int XPlayerGetSubCharset(XPlayer* p, char *charset);
 
 int XPlayerSetSubCharset(XPlayer* p, const char* strFormat);
-
+#endif
 int XPlayerSetVideoSurfaceTexture(XPlayer* p, const LayerCtrl* surfaceTexture);
+#endif
+#ifndef ONLY_DISABLE_AUDIO
 
 void XPlayerSetAudioSink(XPlayer* p, const SoundCtrl* audioSink);
-
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !AWPLAYER_CONFIG_DISABLE_SUBTITLE
 void XPlayerSetSubCtrl(XPlayer* p, const SubCtrl* subctrl);
 
 void XPlayerSetDeinterlace(XPlayer* p, const Deinterlace* di);
+#endif
+#endif
 
 MediaInfo* XPlayerGetMediaInfo(XPlayer* p);
 
+#ifndef ONLY_ENABLE_AUDIO
+#if !AWPLAYER_CONFIG_DISABLE_SUBTITLE
 int XPlayerSwitchSubtitle(XPlayer* pl, int nStreamIndex);
+#endif
+#endif
 
 int XPlayerSwitchAudio(XPlayer* p, int nStreamIndex);
 
+#ifndef ONLY_ENABLE_AUDIO
+#if !AWPLAYER_CONFIG_DISABLE_SUBTITLE
 int XPlayerSetExternalSubUrl(XPlayer* p, const char* fileName);
 
 int XPlayerSetExternalSubFd(XPlayer* p, int fd, int64_t offset, int64_t len, int fdSub);
+#endif
+#endif
+#ifndef ONLY_DISABLE_AUDIO
 
 int XPlayerGetPlaybackSettings(XPlayer* p,XAudioPlaybackRate *rate);
 
 int XPlayerSetPlaybackSettings(XPlayer* p,const XAudioPlaybackRate *rate);
-
+#endif
+#ifndef ONLY_ENABLE_AUDIO
 int XPlayerSetScaleDown(XPlayer* p,int bSetScaleDown);
+#endif
 
 int XPlayerSetBufferingSettings(XPlayer* p, AwBufferingSettings* pBuffering);
 
 int XPlayerGetBufferingSettings(XPlayer* p, AwBufferingSettings* pBuffering);
 
+#ifndef ONLY_ENABLE_AUDIO
 int XPlayerGetVideoDispFramerate(XPlayer* p,float* dispFramerate);
 
 int XPlayerSetHoldLastPicture(XPlayer* p,int bHoldFlag);
 
 int XPlayerSetRotateDegree(XPlayer* p,int rotateDegree);
-
-
+int XPlayerSetG2dRotateDegree(XPlayer* p,int rotateDegree);
+void XPlayerSetTag(XPlayer* p, int nTimeOffset);
+int XPlayerGetAudioBalance(XPlayer* p);
+int XPlayerSetAudioBalance(XPlayer* p,int val);
+int XPlayerGetAudioTrack(XPlayer* p);
+#endif
 
 #ifdef __cplusplus
 }

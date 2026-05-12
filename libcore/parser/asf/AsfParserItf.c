@@ -95,6 +95,7 @@ static cdx_int32 __AsfPsrClose(CdxParserT *psr)
 static int asfOnPrefetch(struct AsfParserImplS *impl, CdxPacketT *pkt)
 {
     cdx_int32 result;
+    cdx_int32  ret;
     struct BufStoreS *store;
 
     memset(pkt, 0x00, sizeof(*pkt));
@@ -148,14 +149,27 @@ static int asfOnPrefetch(struct AsfParserImplS *impl, CdxPacketT *pkt)
     {
         if (impl->ctx->frame_ctrl & 2)
         {
-            CdxStreamRead(impl->stream, store->buf + store->len, impl->ctx->packet_frag_size);
+            ret = CdxStreamRead(impl->stream, store->buf + store->len, impl->ctx->packet_frag_size);
+            if (ret < 0)
+            {
+                impl->mErrno = PSR_IO_ERR;
+                CDX_LOGE("read error!");
+                return -1;
+            }
             store->intact = CDX_TRUE;
             store->len += impl->ctx->packet_frag_size;
             pkt->length = store->len;
         }
         else if (impl->ctx->frame_ctrl & 1)
         {
-            CdxStreamRead(impl->stream, store->buf + store->len, impl->ctx->packet_frag_size);
+            ret = CdxStreamRead(impl->stream, store->buf + store->len, impl->ctx->packet_frag_size);
+            if (ret < 0)
+            {
+                impl->mErrno = PSR_IO_ERR;
+                CDX_LOGE("read error!");
+                return -1;
+            }
+
             store->intact = CDX_FALSE;
             store->len += impl->ctx->packet_frag_size;
             pkt->length = 0;
@@ -164,14 +178,27 @@ static int asfOnPrefetch(struct AsfParserImplS *impl, CdxPacketT *pkt)
         {
             if (store->len == 0)
             {
-                CdxStreamRead(impl->stream, store->buf, impl->ctx->packet_frag_size);
+                ret = CdxStreamRead(impl->stream, store->buf, impl->ctx->packet_frag_size);
+                if (ret < 0)
+                {
+                    impl->mErrno = PSR_IO_ERR;
+                    CDX_LOGE("read error!");
+                    return -1;
+                }
+
                 store->intact = CDX_TRUE;
                 store->len = impl->ctx->packet_frag_size;
                 pkt->length = store->len;
             }
             else
             {
-                CdxStreamRead(impl->stream, store->buf + store->len, impl->ctx->packet_frag_size);
+                ret = CdxStreamRead(impl->stream, store->buf + store->len, impl->ctx->packet_frag_size);
+                if (ret < 0)
+                {
+                    impl->mErrno = PSR_IO_ERR;
+                    CDX_LOGE("read error!");
+                    return -1;
+                }
                 store->intact = CDX_FALSE;
                 store->len += impl->ctx->packet_frag_size;
                 pkt->length = 0;
@@ -180,7 +207,13 @@ static int asfOnPrefetch(struct AsfParserImplS *impl, CdxPacketT *pkt)
     }
     else
     {
-        CdxStreamRead(impl->stream, store->buf, impl->ctx->packet_frag_size);
+        ret = CdxStreamRead(impl->stream, store->buf, impl->ctx->packet_frag_size);
+        if (ret < 0)
+        {
+            impl->mErrno = PSR_IO_ERR;
+            CDX_LOGE("read error!");
+            return -1;
+        }
         store->intact = CDX_TRUE;
         store->len = impl->ctx->packet_frag_size;
         pkt->length = store->len;
@@ -213,6 +246,18 @@ doPrefetch:
         if (ret != 0)
         {
             CDX_LOGE("prefetch failure.");
+            if (impl->mErrno == PSR_EOS)
+            {
+                CDX_LOGE("eos...");
+                pthread_mutex_unlock(&impl->mutex);
+                return -1;
+            }
+            else if (impl->mErrno == PSR_IO_ERR)
+            {
+                CDX_LOGE("io error!");
+                pthread_mutex_unlock(&impl->mutex);
+                return -1;
+            }
             break;
         }
     } while (pkt->length == 0);

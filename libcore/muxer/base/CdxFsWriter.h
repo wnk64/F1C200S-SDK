@@ -15,7 +15,7 @@
  */
 
 #ifndef __CDX__FS_WRITER_H__
-#define __CDX_FS_WRITER_H__
+#define __CDX__FS_WRITER_H__
 
 #include <stdlib.h>
 #include <stdint.h>

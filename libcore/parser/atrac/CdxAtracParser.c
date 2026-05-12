@@ -14,6 +14,7 @@
 #include <CdxTypes.h>
 #include <CdxParser.h>
 #include <CdxStream.h>
+#include <CdxMemory.h>
 #include <string.h>
 
 #include "CdxAtracParser.h"
@@ -408,6 +409,17 @@ static int CdxAtracParserClose(CdxParserT *parser)
         close(atrac->teeFd);
     }
 #endif
+
+    if(atrac->stream)
+    {
+        CdxStreamClose(atrac->stream);
+        atrac->stream = NULL;
+    }
+
+    if(atrac)
+    {
+        CdxFree(atrac);
+    }
 
 Exit:
     return ret;

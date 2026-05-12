@@ -123,16 +123,26 @@ typedef struct CDX_ID3_IMAGE_INFO
 
 }cdx_id3_image_info_t;
 
+typedef struct frameSlot {
+    cdx_int64 frameIndex;
+    cdx_int64 offset;
+}frameSlot_t;
+
 typedef struct XINGSeeker {
     int64_t mFirstFramePos;
     int64_t mDurationUs;
     int32_t mSizeBytes;
     int32_t mEncoderDelay;
     int32_t mEncoderPadding;
+    int32_t mFrameNum; //record frame count
+    int32_t mSamplePerFrame;
 
     // TOC entries in XING header. Skip the first one since it's always 0.
-    unsigned char mTOC[99];
+    unsigned char mTOC[100];
+    frameSlot_t* mSlots;
     cdx_bool mTOCValid;
+    cdx_bool mFrameSlotValid;
+    cdx_bool isCBR;
 }XINGSeeker;
 
 typedef struct VBRISeeker {

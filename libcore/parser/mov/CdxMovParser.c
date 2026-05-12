@@ -333,6 +333,7 @@ static int MovGetCacheState(struct CdxMovParser *impl, struct ParserCacheStateS 
     return 0;
 }
 
+#ifndef ONLY_ENABLE_AUDIO
 // check the sample is key frame
 static int checkKeyFrame(struct CdxMovParser *impl, MOVStreamContext *st)
 {
@@ -375,7 +376,7 @@ static int checkKeyFrame(struct CdxMovParser *impl, MOVStreamContext *st)
 
     return 0;
 }
-
+#endif
 static cdx_int32 __CdxMovParserClose(CdxParserT *parser)
 {
     struct CdxMovParser          *tmpMovPsr;
@@ -509,6 +510,7 @@ static cdx_int32 __CdxMovParserPrefetch(CdxParserT *parser, CdxPacketT * pkt)
         }
     }
 
+#ifndef ONLY_ENABLE_AUDIO
     if(1 == st->stsd_type)
     {
         // the unit of pkt pts is us
@@ -526,13 +528,16 @@ static cdx_int32 __CdxMovParserPrefetch(CdxParserT *parser, CdxPacketT * pkt)
         }
 
     }
-    else if (2 == st->stsd_type)
+    else
+#endif
+    if (2 == st->stsd_type)
     {
         pkt->streamIndex = st->stream_index;
         pkt->type = CDX_MEDIA_AUDIO;
         pkt->pts = (CDX_S64)st->mov_idx_curr.current_dts * 1000*1000
                             / st->time_scale + st->basetime*1000*1000;
     }
+#ifndef ONLY_ENABLE_AUDIO
     else if(3 == st->stsd_type)
     {
         pkt->streamIndex = st->stream_index;
@@ -576,6 +581,7 @@ static cdx_int32 __CdxMovParserPrefetch(CdxParserT *parser, CdxPacketT * pkt)
             c->chunk_info.offset += 2;
         }
     }
+#endif
 
     pkt->flags |= (FIRST_PART|LAST_PART);
     tmpMovPsr->packet.length    = pkt->length;
@@ -665,7 +671,7 @@ static cdx_int32 __CdxMovParserRead(CdxParserT *parser, CdxPacketT *pkt)
     }
 
     CdxStreamControl(fp, STREAM_CMD_SET_MEDIAFLAG, NULL);
-	
+
     int size = 0;
     if(pkt->length <= pkt->buflen)
     {
@@ -771,9 +777,10 @@ static cdx_int32 __CdxMovParserGetMediaInfo(CdxParserT *parser, CdxMediaInfoT * 
     struct CdxMovParser* tmpMovPsr ;
     MOVContext                    *c;
     //CDX_S32                     nSubStrmNum = 0;
+#ifndef ONLY_ENABLE_AUDIO
     CDX_U32              video_max_bitrate;
     CDX_U32              video_avg_bitrate = 0;
-
+#endif
     CDX_CHECK(parser);
     tmpMovPsr = (struct CdxMovParser*)parser;
     if(!tmpMovPsr)
@@ -812,16 +819,20 @@ static cdx_int32 __CdxMovParserGetMediaInfo(CdxParserT *parser, CdxMediaInfoT * 
               */
         SetMetaData(pMediaInfo, DATE, (const char*)c->date, ENCODE_DEFAULT);
     }
-
+#ifndef ONLY_ENABLE_AUDIO
     VideoStreamInfo* video;
+#endif
     AudioStreamInfo* audio;
+#ifndef ONLY_ENABLE_AUDIO
     SubtitleStreamInfo* subtitle;
+#endif
     //****< classical the type of stream: audio, video, subtitle
     // NOTE:   we only support one video, audio, subtitle stream .
     // we should modify the code of stsd and hdlr, if we want to support the multi video stream
     for(i=0; i<c->nb_streams; i++)
     {
         MOVStreamContext *st = c->streams[i];
+#ifndef ONLY_ENABLE_AUDIO
         if(st->codec.codecType == CODEC_TYPE_VIDEO && !st->unsurpoort)
         {
             video = &pMediaInfo->program[0].video[pMediaInfo->program[0].videoNum];
@@ -869,7 +880,9 @@ static cdx_int32 __CdxMovParserGetMediaInfo(CdxParserT *parser, CdxMediaInfoT * 
 
             memcpy(pMediaInfo->rotate,st->rotate,4*sizeof(cdx_uint8));
         }
-        else if(st->codec.codecType == CODEC_TYPE_AUDIO && !st->unsurpoort)
+        else
+#endif
+        if(st->codec.codecType == CODEC_TYPE_AUDIO && !st->unsurpoort)
         {
             audio = &pMediaInfo->program[0].audio[pMediaInfo->program[0].audioNum];
             audio->eCodecFormat    = st->eCodecFormat;
@@ -903,9 +916,10 @@ static cdx_int32 __CdxMovParserGetMediaInfo(CdxParserT *parser, CdxMediaInfoT * 
             if(pMediaInfo->program[0].audioNum > MAX_STREAM_NUM-1)
             {
                 CDX_LOGW("audio stream number<%d> > MAX_STREAM_NUM",
-                    pMediaInfo->program[0].videoNum);
+                    pMediaInfo->program[0].audioNum);
             }
         }
+#ifndef ONLY_ENABLE_AUDIO
         else if(st->codec.codecType == CODEC_TYPE_SUBTITLE)
         {
             subtitle = &pMediaInfo->program[0].subtitle[pMediaInfo->program[0].subtitleNum];
@@ -929,24 +943,30 @@ static cdx_int32 __CdxMovParserGetMediaInfo(CdxParserT *parser, CdxMediaInfoT * 
             st->SubStreamSyncFlg = 1;
             pMediaInfo->program[0].subtitleNum++;
         }
+#endif
     }
-
+#ifndef ONLY_ENABLE_AUDIO
     CDX_LOGD("streamNum = %d, videoNum = %d, audioNum = %d, subtitleNum = %d",
         c->nb_streams, pMediaInfo->program[0].videoNum, pMediaInfo->program[0].audioNum,
         pMediaInfo->program[0].subtitleNum);
+#endif
 
     //**< set the default stream index
     pMediaInfo->program[0].audioIndex    = 0;
+#ifndef ONLY_ENABLE_AUDIO
     pMediaInfo->program[0].videoIndex    = 0;
     pMediaInfo->program[0].subtitleIndex = 0;
     c->video_stream_idx     = c->v2st[pMediaInfo->program[0].videoIndex];
+#endif
     c->audio_stream_idx     = c->a2st[pMediaInfo->program[0].audioIndex];
+#ifndef ONLY_ENABLE_AUDIO
     c->subtitle_stream_idx  = c->s2st[pMediaInfo->program[0].subtitleIndex];
-
+#endif
     CdxMovSetStream(tmpMovPsr);
 
     pMediaInfo->program[0].duration = tmpMovPsr->totalTime;
     CDX_LOGD("-- mov duration = %d", tmpMovPsr->totalTime);
+#ifndef ONLY_ENABLE_AUDIO
     if(tmpMovPsr->hasVideo)
     {
         if(video_avg_bitrate == 0 && tmpMovPsr->totalTime)
@@ -957,8 +977,12 @@ static cdx_int32 __CdxMovParserGetMediaInfo(CdxParserT *parser, CdxMediaInfoT * 
     }
 
     pMediaInfo->bitrate = video_avg_bitrate;
-
-    if(!c->bSeekAble || (tmpMovPsr->hasVideo && !tmpMovPsr->hasIdx))
+#endif
+    if(!c->bSeekAble
+#ifndef ONLY_ENABLE_AUDIO
+      || (tmpMovPsr->hasVideo && !tmpMovPsr->hasIdx)
+#endif
+    )
     {
         CDX_LOGD("can not seek");
         pMediaInfo->bSeekable = 0;
@@ -1269,10 +1293,13 @@ static CdxParserT *__CdxMovParserOpen(CdxStreamT *stream, cdx_uint32 flags)
     //}
 
     //initial some global parameter
+#ifndef ONLY_ENABLE_AUDIO
     tmpMovPsr->nVidPtsOffset = 0;
+#endif
     tmpMovPsr->nAudPtsOffset = 0;
+#ifndef ONLY_ENABLE_AUDIO
     tmpMovPsr->nSubPtsOffset = 0;
-
+#endif
     return &tmpMovPsr->parserinfo;
 
 error:

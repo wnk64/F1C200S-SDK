@@ -896,6 +896,7 @@ XVideoFrame *XRetrieverGetFrameAtTime(XRetriever* v, int64_t timeUs, int option)
                     dataInfo.bIsFirstPart = 1;
                     dataInfo.bIsLastPart  = 1;
                     dataInfo.nStreamIndex = 0;
+                    dataInfo.bValid       = 1;
                     SubmitVideoStreamData(p->mVideoDecoder, &dataInfo, 0);
                 }
                 else
@@ -1227,7 +1228,11 @@ XVideoStream *XRetrieverGetStreamAtTime(XRetriever * v,int64_t timeUs)
     }
 
     //* 2. create a video encoder
+#if MPP_ENC_API
+    pVideoEncoder = VencCreate(VENC_CODEC_H264);
+#else
     pVideoEncoder = VideoEncCreate(VENC_CODEC_H264);
+#endif
     if(pVideoEncoder == NULL)
     {
         bErr = 1;
@@ -1382,6 +1387,7 @@ XVideoStream *XRetrieverGetStreamAtTime(XRetriever * v,int64_t timeUs)
                         dataInfo.bIsFirstPart = 1;
                         dataInfo.bIsLastPart  = 1;
                         dataInfo.nStreamIndex = 0;
+                        dataInfo.bValid       = 1;
                         SubmitVideoStreamData(p->mVideoDecoder, &dataInfo, 0);
                     }
                     else
@@ -1476,7 +1482,11 @@ XVideoStream *XRetrieverGetStreamAtTime(XRetriever * v,int64_t timeUs)
                     h264Param.sQPRange.nMinqp = 20;
                     h264Param.sQPRange.nMaxqp = 40;
 
+#if MPP_ENC_API
+                    VencSetParameter(pVideoEncoder, VENC_IndexParamH264Param, &h264Param);
+#else
                     VideoEncSetParameter(pVideoEncoder, VENC_IndexParamH264Param, &h264Param);
+#endif
 
                     if(pPicture->nFrameRate > 20000)
                     {
@@ -1523,15 +1533,30 @@ XVideoStream *XRetrieverGetStreamAtTime(XRetriever * v,int64_t timeUs)
                             pPicture->nRightOffset, pPicture->nLeftOffset,
                             pPicture->nBottomOffset, pPicture->nTopOffset);
 
-                    if(VideoEncInit(pVideoEncoder, &sBaseEncConfig)!=0)
+#if MPP_ENC_API
+                    if(VencInit(pVideoEncoder, &sBaseEncConfig)!=0)
+                    {
+                        loge("VencInit failed");
+                        bErr = 1;
+                        goto NEED_EXIT;
+                    }
+#else
+
+		    if(VideoEncInit(pVideoEncoder, &sBaseEncConfig)!=0)
                     {
                         loge("VideoEncInit failed");
                         bErr = 1;
                         goto NEED_EXIT;
                     }
 
-                    VideoEncGetParameter(pVideoEncoder, VENC_IndexParamH264SPSPPS, &spsppsInfo);
+#endif
 
+#if MPP_ENC_API
+                    VencGetParameter(pVideoEncoder, VENC_IndexParamH264SPSPPS, &spsppsInfo);
+#else
+
+                    VideoEncGetParameter(pVideoEncoder, VENC_IndexParamH264SPSPPS, &spsppsInfo);
+#endif
                     if(spsppsInfo.pBuffer != 0 &&
                             (spsppsInfo.nLength + 8 <= MAX_OUTPUT_STREAM_SIZE))
                     {
@@ -1598,18 +1623,36 @@ XVideoStream *XRetrieverGetStreamAtTime(XRetriever * v,int64_t timeUs)
                         sInputBuffer.sCropInfo.nTop   = pPicture->nTopOffset ;
                     }
 
+#if MPP_ENC_API
+                    VencQueueInputBuf(pVideoEncoder, &sInputBuffer);
+#else
                     AddOneInputBuffer(pVideoEncoder, &sInputBuffer);
+#endif
+
+#if MPP_ENC_API
+                    ret = encodeOneFrame(pVideoEncoder);
+#else
                     ret = VideoEncodeOneFrame(pVideoEncoder);
+#endif
                     if(ret != VENC_RESULT_OK)
                     {
                         loge("encoder error");
                         bErr = 1;
                         goto NEED_EXIT;
                     }
+#if MPP_ENC_API
+                    VencFbmReturnValidBuffer(pVideoEncoder,&sInputBuffer);
+#else
+
                     AlreadyUsedInputBuffer(pVideoEncoder,&sInputBuffer);
+#endif
 
                     memset(&sOutputBuffer, 0, sizeof(VencOutputBuffer));
+#if MPP_ENC_API
+                    VencDequeueOutputBuf(pVideoEncoder, &sOutputBuffer);
+#else
                     GetOneBitstreamFrame(pVideoEncoder, &sOutputBuffer);
+#endif
                     if((sOutputBuffer.nSize0 + sOutputBuffer.nSize1 + 4) <= MAX_OUTPUT_STREAM_SIZE)
                     {
                         int frameSize = sOutputBuffer.nSize0 + sOutputBuffer.nSize1;
@@ -1637,7 +1680,12 @@ XVideoStream *XRetrieverGetStreamAtTime(XRetriever * v,int64_t timeUs)
                         fwrite(sOutputBuffer.pData1, 1, sOutputBuffer.nSize1, fph264);
                     }
 #endif
+
+#if MPP_ENC_API
+                    VencQueueOutputBuf(pVideoEncoder, &sOutputBuffer);
+#else
                     FreeOneBitStreamFrame(pVideoEncoder, &sOutputBuffer);
+#endif
                 }
 
                 ReturnPicture(p->mVideoDecoder, pPicture);
@@ -1673,8 +1721,15 @@ EOS_EXIT:
 NEED_EXIT:
     if(pVideoEncoder)
     {
+#if !MPP_ENC_API
         VideoEncUnInit(pVideoEncoder);
+#endif
+
+#if MPP_ENC_API
+        VencDestroy(pVideoEncoder);
+#else
         VideoEncDestroy(pVideoEncoder);
+#endif
         pVideoEncoder = NULL;
     }
 

@@ -782,7 +782,7 @@ static status_t parseMap(AString *line, char **URI, uint64_t curOffset, uint64_t
                     || val[0] != '"'
                     || val[len - 1] != '"')
             {
-            	CDX_LOGE("Expected quoted string for BYTERANGE, got '%s' instead.", val);
+		CDX_LOGE("Expected quoted string for BYTERANGE, got '%s' instead.", val);
                 return ERROR_MALFORMED;
             }
             val[len - 1] = '\0';
@@ -1443,9 +1443,9 @@ status_t M3u8Parse(const void *_data, cdx_uint32 size, Playlist **P, const char 
                     err = ERROR_MALFORMED;
                     goto _err;
                 }
-				
-		char *initURI;
-		uint64_t initLength, initOffset;
+
+		char *initURI = NULL;
+		uint64_t initLength = 0, initOffset = 0;
 		err = parseMap(&line, &initURI, segmentRangeOffset, &initLength, &initOffset);
 		if (err != OK)
                 {
@@ -1462,8 +1462,8 @@ status_t M3u8Parse(const void *_data, cdx_uint32 size, Playlist **P, const char 
                 }
                 segmentRangeOffset = initOffset + initLength;
 		mIsVariantPlaylist = 0;
-				
-				
+
+
 		PlaylistItem *item= (PlaylistItem*)malloc(sizeof(PlaylistItem));
 		if (item == NULL)
 		{
@@ -1473,10 +1473,11 @@ status_t M3u8Parse(const void *_data, cdx_uint32 size, Playlist **P, const char 
 		}
 		memset(item, 0, sizeof(PlaylistItem));
 		//Amessage中的atom可能是指针，所以memcpy和free需要小心
-	  	memcpy(&(item->itemMeta),&itemMeta,sizeof(AMessage));
+		memcpy(&(item->itemMeta),&itemMeta,sizeof(AMessage));
 
 		item->u.mediaItemAttribute.durationUs = 0;
-		item->u.mediaItemAttribute.seqNum = 0;
+		item->u.mediaItemAttribute.seqNum = seqNum - 1;
+		item->u.mediaItemAttribute.isInitItem = 1;
 		if(playList->u.mediaPlaylistPrivate.hasEncrypte)
 		{
 		    if(hasEncrypteInf)
@@ -1490,8 +1491,8 @@ status_t M3u8Parse(const void *_data, cdx_uint32 size, Playlist **P, const char 
 		    }
 		}
 		hasEncrypteInf = false;
-		playList->u.mediaPlaylistPrivate.lastSeqNum = 0;
-							
+		playList->u.mediaPlaylistPrivate.lastSeqNum = seqNum - 1;
+
 		MakeURL(playList->mBaseURI.mData, initURI, &item->mURI);
 		item->next = NULL;
 		if (playList->mItems == NULL)
@@ -1506,7 +1507,7 @@ status_t M3u8Parse(const void *_data, cdx_uint32 size, Playlist **P, const char 
 		    item2->next = item;
 		}
 		(playList->mNumItems)++;
-		memset(&itemMeta, 0, sizeof(AMessage)); /*因为itemMeta对应于一个URL*/	
+		memset(&itemMeta, 0, sizeof(AMessage)); /*因为itemMeta对应于一个URL*/
 	    }
             else if (startsWith(line.mData,"#EXT-X-ENDLIST"))
             {
@@ -1632,6 +1633,7 @@ status_t M3u8Parse(const void *_data, cdx_uint32 size, Playlist **P, const char 
             {
                 item->u.mediaItemAttribute.durationUs = durationUs;
                 item->u.mediaItemAttribute.seqNum = seqNum;
+		item->u.mediaItemAttribute.isInitItem = 0;
                 if(playList->u.mediaPlaylistPrivate.hasEncrypte)
                 {
                     if(hasEncrypteInf)

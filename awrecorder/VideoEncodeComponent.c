@@ -37,6 +37,65 @@ static const int ENC_COMMAND_QUIT          = 0x109;
 
 #define ALIGN_16B(x) (((x) + (15)) & ~(15))
 
+#define MPP_INPUT_BUFFER_NUM (3)
+
+typedef struct InputBufferInfo InputBufferInfo;
+
+struct InputBufferInfo
+{
+    VencInputBuffer     inputbuffer;
+    InputBufferInfo*    next;
+};
+
+typedef struct InputBufferMgr
+{
+    InputBufferInfo   buffer_node[MPP_INPUT_BUFFER_NUM];
+    InputBufferInfo*  valid_quene;
+    InputBufferInfo*  empty_quene;
+}InputBufferMgr;
+
+static void enqueue(InputBufferInfo** pp_head, InputBufferInfo* p)
+{
+    InputBufferInfo* cur;
+
+    cur = *pp_head;
+
+    if (cur == NULL)
+    {
+        *pp_head = p;
+        p->next  = NULL;
+        return;
+    }
+    else
+    {
+        while(cur->next != NULL)
+            cur = cur->next;
+
+        cur->next = p;
+        p->next   = NULL;
+
+        return;
+    }
+}
+
+static InputBufferInfo* dequeue(InputBufferInfo** pp_head)
+{
+    InputBufferInfo* head;
+
+    head = *pp_head;
+
+    if (head == NULL)
+    {
+        return NULL;
+    }
+    else
+    {
+        *pp_head = head->next;
+        head->next = NULL;
+        return head;
+    }
+}
+
 typedef struct SoftFrameRateCtrl
 {
     int capture;
@@ -99,8 +158,70 @@ typedef struct EncodeCompContex
 #endif
 	int thumbNailEnable;
 	VencThumbInfo thInfo;
-}EncodeCompContex;
+    InputBufferMgr mInputBufMgr;
 
+#if MPP_ENC_API
+    VencCbType vencCallBack;
+#endif
+
+}EncodeCompContex;
+#if 0
+static int EventHandler(VideoEncoder* pEncoder, void* pAppData, VencEventType eEvent,
+                             unsigned int nData1, unsigned int nData2, void* pEventData)
+{
+    EncodeCompContex* pEncContext = (EncodeCompContex*)pAppData;
+    logv("event = %d", eEvent);
+    switch(eEvent)
+    {
+        case VencEvent_UpdateMbModeInfo:
+        {
+            VencMBModeCtrl *pMbModeCtl = (VencMBModeCtrl *)pEventData;
+            //* update mb_mode here
+            init_mb_mode(&pEncContext->mMBModeCtrl, pEncContext->baseConfig.nDstWidth, pEncContext->baseConfig.nDstHeight);
+
+            memcpy(pMbModeCtl, &pEncContext->mMBModeCtrl, sizeof(VencMBModeCtrl));
+            logv("**mode_ctrl_en = %d", pMbModeCtl->mode_ctrl_en);
+            break;
+        }
+        case VencEvent_UpdateMbStatInfo:
+        {
+            getMbMinfo(pEncContext);
+            break;
+        }
+        default:
+            logw("not support the event: %d", eEvent);
+            break;
+    }
+
+    return 0;
+}
+#endif
+#if MPP_ENC_API
+static int InputBufferDone(VideoEncoder* pEncoder,    void* pAppData,
+                          VencCbInputBufferDoneInfo* pBufferDoneInfo)
+{
+    EncodeCompContex* pEncContext = (EncodeCompContex*)pAppData;
+    InputBufferInfo *pInputBufInfo = NULL;
+    if(pEncContext->mUseAllocInputBuffer)
+    {
+        pInputBufInfo = dequeue(&pEncContext->mInputBufMgr.empty_quene);
+        if(pInputBufInfo == NULL)
+        {
+            loge("error: dequeue empty_queue failed");
+            return -1;
+        }
+        memcpy(&pInputBufInfo->inputbuffer, pBufferDoneInfo->pInputBuffer, sizeof(VencInputBuffer));
+        enqueue(&pEncContext->mInputBufMgr.valid_quene, pInputBufInfo);
+    }
+    else
+    {
+		logd("return this buf(%lu)", pBufferDoneInfo->pInputBuffer->nID);
+		pEncContext->mCallback(pEncContext->mUserData, VIDEO_ENCODE_NOTIFY_RETURN_BUFFER,
+		                        &(pBufferDoneInfo->pInputBuffer->nID));
+    }
+    return 0;
+}
+#endif
 #if NEED_CONV_NV12
 static int yu12_nv12(unsigned int width, unsigned int height,
                     unsigned char *addr_uv, unsigned char *addr_tmp_uv)
@@ -266,7 +387,11 @@ static void* VideoEncodeThread(void* pArg)
         else if(msg.messageId == ENC_COMMAND_ENCODE)
         {
             sem_wait(&p->mSemWaitData);
+#if !MPP_ENC_API
             ret = VideoEncodeOneFrame(p->pEncoder);
+#else
+            ret = VENC_RESULT_OK;
+#endif
             if(ret == VENC_RESULT_ERROR)
             {
                 loge("encode error");
@@ -292,14 +417,18 @@ static void* VideoEncodeThread(void* pArg)
 			p->mCallback(p->mUserData, VIDEO_ENCODE_NOTIFY_THUMBNAIL_GETBUFFER,
 				NULL);
 		}
-
 		if(p->thumbNailEnable && p->thInfo.nThumbSize != -1 && p->thInfo.pThumbBuf != NULL)
 		{
 			int ret;
-			ret = VideoEncGetParameter(p->pEncoder, VENC_IndexParamGetThumbYUV, (void *)&p->thInfo);
-                        p->mCallback(p->mUserData, VIDEO_ENCODE_NOTIFY_THUMBNAIL_BUFFER,&p->thInfo);
+#if MPP_ENC_API
+            ret = VencGetParameter(p->pEncoder, VENC_IndexParamGetThumbYUV, (void *)&p->thInfo);
+#else
+            ret = VideoEncGetParameter(p->pEncoder, VENC_IndexParamGetThumbYUV, (void *)&p->thInfo);
+#endif
+            p->mCallback(p->mUserData, VIDEO_ENCODE_NOTIFY_THUMBNAIL_BUFFER,&p->thInfo);
 		}
 
+#if !MPP_ENC_API
 		if(p->mUseAllocInputBuffer == 0)
 		{
 		    //* check used buffer, return it
@@ -310,6 +439,7 @@ static void* VideoEncodeThread(void* pArg)
 		                        &inputBufferReturn.nID);
 		    }
 		}
+#endif
 		PostEncodeMessage(p->mMessageQueue);
 		continue;
             }
@@ -325,12 +455,16 @@ static void* VideoEncodeThread(void* pArg)
 				if(p->mUseAllocInputBuffer == 0)
 				{
 				    //* check used buffer, return it
+#if MPP_ENC_API
+//				    if(0==VencFbmReturnValidBuffer(xxx, &inputBufferReturn))
+#else
 				    if(0==AlreadyUsedInputBuffer(p->pEncoder, &inputBufferReturn))
 				    {
 				        logv("return this buf(%lu)", inputBufferReturn.nID);
 				        p->mCallback(p->mUserData, VIDEO_ENCODE_NOTIFY_RETURN_BUFFER,
 				                        &inputBufferReturn.nID);
 				    }
+#endif
 				}
 				if(p->thumbNailEnable)
 				{
@@ -339,7 +473,12 @@ static void* VideoEncodeThread(void* pArg)
 				if(p->thumbNailEnable && p->thInfo.nThumbSize != -1 && p->thInfo.pThumbBuf != NULL)
 				{
 					int ret;
+#if MPP_ENC_API
+					ret = VencGetParameter(p->pEncoder, VENC_IndexParamGetThumbYUV, (void *)&p->thInfo);
+#else
+
 					ret = VideoEncGetParameter(p->pEncoder, VENC_IndexParamGetThumbYUV, (void *)&p->thInfo);
+#endif
 					p->mCallback(p->mUserData, VIDEO_ENCODE_NOTIFY_THUMBNAIL_BUFFER, &p->thInfo);
 				}
 
@@ -375,8 +514,15 @@ static void* VideoEncodeThread(void* pArg)
         } //* end ENC_COMMAND_PAUSE.
         else if(msg.messageId == ENC_COMMAND_RESET)
         {
+#if !MPP_ENC_API
             VideoEncUnInit(p->pEncoder);
+#endif
+
+#if MPP_ENC_API
+            VencDestroy(p->pEncoder);
+#else
             VideoEncDestroy(p->pEncoder);
+#endif
             if(pReplyValue != NULL)
                 *pReplyValue = 0;
             sem_post(pReplySem);
@@ -407,6 +553,8 @@ static int setEncodeType(EncodeCompContex *p, VideoEncodeConfig* config)
         p->mEncodeType = VENC_CODEC_H264;
     else if(config->nType == VIDEO_ENCODE_JPEG)
         p->mEncodeType = VENC_CODEC_JPEG;
+    else if(config->nType == VIDEO_ENCODE_H265)
+        p->mEncodeType = VENC_CODEC_H265;
     else
     {
         loge("not support this video encode type");
@@ -420,14 +568,18 @@ static int setEncodeType(EncodeCompContex *p, VideoEncodeConfig* config)
     p->mInputWidth   = config->nSrcWidth;
     p->mInputHeight  = config->nOutHeight;
     p->mSrcFrameRate = config->nSrcFrameRate;
-    if(p->mEncodeType != VENC_CODEC_H264 && p->mEncodeType != VENC_CODEC_JPEG)
+    if(p->mEncodeType != VENC_CODEC_H264 && p->mEncodeType != VENC_CODEC_JPEG && p->mEncodeType != VENC_CODEC_H265)
     {
         loge("connot support this video type, p->mEncodeType(%d)", p->mEncodeType);
         return -1;
     }
 
     //* create an encoder.
+#if MPP_ENC_API
+    p->pEncoder = VencCreate(p->mEncodeType);
+#else
     p->pEncoder = VideoEncCreate(p->mEncodeType);
+#endif
     if(p->pEncoder == NULL)
     {
         loge("VideoEncCreate fail");
@@ -445,6 +597,16 @@ static int setEncodeType(EncodeCompContex *p, VideoEncodeConfig* config)
     baseConfig.nDstHeight   = p->mDesOutHeight;
 
     baseConfig.memops = p->memops;
+
+#if MPP_ENC_API
+    baseConfig.bOnlineMode    = 0;
+    baseConfig.bOnlineChannel = 0;
+#endif
+
+    if(config->bUsePhyBuf)
+    {
+         p->mUseAllocInputBuffer   = 0;
+    }
 
     memset(&bufferParam, 0 ,sizeof(VencAllocateBufferParam));
 
@@ -559,7 +721,11 @@ static int setEncodeType(EncodeCompContex *p, VideoEncodeConfig* config)
 	{
 		int ret;
 		p->thumbNailEnable = 1;
+#if MPP_ENC_API
+		ret = VencSetParameter(p->pEncoder, VENC_IndexParamSetThumbScaler, (void *)&config->ratio);
+#else
 		ret = VideoEncSetParameter(p->pEncoder, VENC_IndexParamSetThumbScaler, (void *)&config->ratio);
+#endif
 		p->thInfo.nThumbSize = -1;
 		p->thInfo.pThumbBuf = NULL;
 
@@ -568,58 +734,17 @@ static int setEncodeType(EncodeCompContex *p, VideoEncodeConfig* config)
     //for jpeg
     if(p->mEncodeType == VENC_CODEC_JPEG)
     {
-        EXIFInfo exifinfo;
-        exifinfo.ThumbWidth = 176;
-        exifinfo.ThumbHeight = 144;
-
-        strcpy((char*)exifinfo.CameraMake,        "allwinner make test");
-        strcpy((char*)exifinfo.CameraModel,        "allwinner model test");
-        strcpy((char*)exifinfo.DateTime,         "2014:02:21 10:54:05");
-        strcpy((char*)exifinfo.gpsProcessingMethod,  "allwinner gps");
-
-        exifinfo.Orientation = 0;
-
-        exifinfo.ExposureTime.num = 2;
-        exifinfo.ExposureTime.den = 1000;
-
-        exifinfo.FNumber.num = 20;
-        exifinfo.FNumber.den = 10;
-        exifinfo.ISOSpeed = 50;
-
-        exifinfo.ExposureBiasValue.num= -4;
-        exifinfo.ExposureBiasValue.den= 1;
-
-        exifinfo.MeteringMode = 1;
-        exifinfo.FlashUsed = 0;
-
-        exifinfo.FocalLength.num = 1400;
-        exifinfo.FocalLength.den = 100;
-
-        exifinfo.DigitalZoomRatio.num = 4;
-        exifinfo.DigitalZoomRatio.den = 1;
-
-        exifinfo.WhiteBalance = 1;
-        exifinfo.ExposureMode = 1;
-
-        exifinfo.enableGpsInfo = 1;
-
-        exifinfo.gps_latitude = 23.2368;
-        exifinfo.gps_longitude = 24.3244;
-        exifinfo.gps_altitude = 1234.5;
-
-        exifinfo.gps_timestamp = (long)time(NULL);
-
-        strcpy((char*)exifinfo.CameraSerialNum,  "123456789");
-        strcpy((char*)exifinfo.ImageName,  "exif-name-test");
-        strcpy((char*)exifinfo.ImageDescription,  "exif-descriptor-test");
-
         int quality = 50;
         int jpeg_mode = 1;
 
         printf("quality:50\n");
-        VideoEncSetParameter(p->pEncoder, VENC_IndexParamJpegExifInfo, &exifinfo);
-        VideoEncSetParameter(p->pEncoder, VENC_IndexParamJpegQuality, &quality);
+#if MPP_ENC_API
+        VencSetParameter(p->pEncoder, VENC_IndexParamJpegQuality, &quality);
+        VencSetParameter(p->pEncoder, VENC_IndexParamJpegEncMode, &jpeg_mode);
+#else
+	VideoEncSetParameter(p->pEncoder, VENC_IndexParamJpegQuality, &quality);
         VideoEncSetParameter(p->pEncoder, VENC_IndexParamJpegEncMode, &jpeg_mode);
+#endif
     }
     else if(p->mEncodeType == VENC_CODEC_H264)
     {
@@ -636,7 +761,7 @@ static int setEncodeType(EncodeCompContex *p, VideoEncodeConfig* config)
             h264Param.nBitrate = 150000;    //* 400 kbits.
         }
         h264Param.nCodingMode             = VENC_FRAME_CODING;
-        h264Param.nMaxKeyInterval         = 15; //30; //mFrameRate / 1000;
+        h264Param.nMaxKeyInterval         = 30; //30; //mFrameRate / 1000;
         h264Param.sProfileLevel.nProfile  = VENC_H264ProfileMain;
         h264Param.sProfileLevel.nLevel    = VENC_H264Level31;
         h264Param.sQPRange.nMinqp = 10;
@@ -650,16 +775,32 @@ static int setEncodeType(EncodeCompContex *p, VideoEncodeConfig* config)
             h264Param.nFramerate = 30;
         }
 
+#if MPP_ENC_API
+        VencSetParameter(p->pEncoder, VENC_IndexParamH264Param, &h264Param);
+#else
         VideoEncSetParameter(p->pEncoder, VENC_IndexParamH264Param, &h264Param);
+#endif
 
         value = 0;
+#if MPP_ENC_API
+        VencSetParameter(p->pEncoder, VENC_IndexParamIfilter, &value);
+#else
         VideoEncSetParameter(p->pEncoder, VENC_IndexParamIfilter, &value);
+#endif
 
         value = 0; //degree
+#if MPP_ENC_API
+        VencSetParameter(p->pEncoder, VENC_IndexParamRotation, &value);
+#else
         VideoEncSetParameter(p->pEncoder, VENC_IndexParamRotation, &value);
+#endif
 
         value = 0;
+#if MPP_ENC_API
+        VencSetParameter(p->pEncoder, VENC_IndexParamSetPSkip, &value);
+#else
         VideoEncSetParameter(p->pEncoder, VENC_IndexParamSetPSkip, &value);
+#endif
 
         //sAspectRatio.aspect_ratio_idc = 255;
         //sAspectRatio.sar_width = 4;
@@ -668,6 +809,54 @@ static int setEncodeType(EncodeCompContex *p, VideoEncodeConfig* config)
 
         //value = 1;
         //VideoEncSetParameter(pVideoEnc, VENC_IndexParamH264FastEnc, &value);
+    }
+    else if(p->mEncodeType == VENC_CODEC_H265)
+    {
+        int value;
+        VencH265Param h265Param;
+        memset(&h265Param, 0, sizeof(VencH265Param));
+
+	h265Param.nBitrate = 4*1024*1024;//8Mbps
+        h265Param.sProfileLevel.nProfile  = VENC_H265ProfileMain;
+        h265Param.sProfileLevel.nLevel    = VENC_H265Level41;
+        h265Param.sQPRange.nMinqp = 10;
+        h265Param.sQPRange.nMaxqp = 52;
+#if MPP_ENC_API
+	h265Param.sQPRange.nMinPqp = 10;
+	h265Param.sQPRange.nMaxPqp = 50;
+	h265Param.sQPRange.nQpInit = 30;
+#endif
+        h265Param.nQPInit = 30;
+        h265Param.idr_period = 64;
+        h265Param.nGopSize = 16;
+	h265Param.nIntraPeriod = 32;
+
+        if(p->mFrameRate > 0)
+        {
+            h265Param.nFramerate = p->mFrameRate;
+        }
+        else
+        {
+            h265Param.nFramerate = 30;
+        }
+#if MPP_ENC_API
+        VencSetParameter(p->pEncoder, VENC_IndexParamH265Param, &h265Param);
+#else
+        VideoEncSetParameter(p->pEncoder, VENC_IndexParamH265Param, &h265Param);
+#endif
+
+        value = 0; //degree
+#if MPP_ENC_API
+        VencSetParameter(p->pEncoder, VENC_IndexParamRotation, &value);
+#else
+        VideoEncSetParameter(p->pEncoder, VENC_IndexParamRotation, &value);
+#endif
+        value = 1;
+#if MPP_ENC_API
+	VencSetParameter(p->pEncoder, VENC_IndexParamChannelNum, &value);
+#endif
+
+
     }
 
     // set vbvSize in c500
@@ -680,28 +869,55 @@ static int setEncodeType(EncodeCompContex *p, VideoEncodeConfig* config)
     }
     logd("baseConfig.nDstWidth = %d,vbv size = %d",baseConfig.nDstWidth,vbvSize);
 
+#if MPP_ENC_API
+    VencSetParameter(p->pEncoder, VENC_IndexParamSetVbvSize, &vbvSize);
+#else
     VideoEncSetParameter(p->pEncoder, VENC_IndexParamSetVbvSize, &vbvSize);
+#endif
 
     if(p->mEncodeType == VENC_CODEC_H264){
         int vbvThreshold = (baseConfig.nDstWidth*baseConfig.nDstHeight)/4;
+#if MPP_ENC_API
+        VencSetParameter(p->pEncoder, VENC_IndexParamSetFrameLenThreshold, &vbvThreshold);
+#else
         VideoEncSetParameter(p->pEncoder, VENC_IndexParamSetFrameLenThreshold, &vbvThreshold);
+#endif
     }
 
+#if MPP_ENC_API
+    VencInit(p->pEncoder, &baseConfig);
+#else
     VideoEncInit(p->pEncoder, &baseConfig);
+#endif
     if(p->mEncodeType == VENC_CODEC_H264)
     {
+#if MPP_ENC_API
+         VencGetParameter(p->pEncoder, VENC_IndexParamH264SPSPPS, &p->mPpsInfo);
+#else
          VideoEncGetParameter(p->pEncoder, VENC_IndexParamH264SPSPPS, &p->mPpsInfo);
-    }
-
-    if(config->bUsePhyBuf)
-    {
-        p->mUseAllocInputBuffer = 0;
+#endif
     }
 
     if(p->mUseAllocInputBuffer)
     {
+
+#if !MPP_ENC_API
         AllocInputBuffer(p->pEncoder, &bufferParam);
+#else
+    for(int i = 0; i < MPP_INPUT_BUFFER_NUM; i++)
+    {
+        VencAllocateInputBuf(p->pEncoder, &bufferParam, &p->mInputBufMgr.buffer_node[i].inputbuffer);
+        enqueue(&p->mInputBufMgr.valid_quene, &p->mInputBufMgr.buffer_node[i]);
     }
+#endif
+
+    }
+
+#if MPP_ENC_API
+        p->vencCallBack.EventHandler = NULL;
+        p->vencCallBack.InputBufferDone = InputBufferDone;
+        VencSetCallbacks(p->pEncoder, &p->vencCallBack, p);
+#endif
 
     return 0;
 }
@@ -729,7 +945,6 @@ VideoEncodeComp* VideoEncodeCompCreate()
 
     // use the buffer malloc in video decoder as default
     p->mUseAllocInputBuffer = 1;
-
     p->memops = MemAdapterGetOpsS();
     if(p->memops == NULL)
     {
@@ -807,8 +1022,15 @@ void VideoEncodeCompDestory(VideoEncodeComp* v)
 
     if(p->pEncoder)
     {
+#if !MPP_ENC_API
         VideoEncUnInit(p->pEncoder);
+#endif
+
+#if MPP_ENC_API
+        VencDestroy(p->pEncoder);
+#else
         VideoEncDestroy(p->pEncoder);
+#endif
         p->pEncoder = NULL;
     }
 
@@ -843,9 +1065,20 @@ int VideoEncodeCompGetExtradata(VideoEncodeComp *v, unsigned char** buf, unsigne
     *length = 0;
     if(p->mEncodeType == VENC_CODEC_H264)
     {
+#if MPP_ENC_API
+         VencGetParameter(p->pEncoder, VENC_IndexParamH264SPSPPS, &p->mPpsInfo);
+#else
          VideoEncGetParameter(p->pEncoder, VENC_IndexParamH264SPSPPS, &p->mPpsInfo);
+#endif
         *length = p->mPpsInfo.nLength;
         *buf = p->mPpsInfo.pBuffer;
+    }else if(p->mEncodeType == VENC_CODEC_H265)
+    {
+#if MPP_ENC_API
+	VencGetParameter(p->pEncoder, VENC_IndexParamH265Header, &p->mPpsInfo);
+	*length = p->mPpsInfo.nLength;
+        *buf = p->mPpsInfo.pBuffer;
+#endif
     }
 
     return 0;
@@ -861,7 +1094,11 @@ int VideoEncodeCompSetFrameRate(VideoEncodeComp* v,int32_t framerate)
     p->mFrameRate = framerate;
     if (p->pEncoder != NULL)
     {
+#if MPP_ENC_API
+        ret = VencSetParameter(p->pEncoder, VENC_IndexParamFramerate, (void*)&framerate);
+#else
         ret = VideoEncSetParameter(p->pEncoder, VENC_IndexParamFramerate, (void*)&framerate);
+#endif
         if (ret != 0)
         {
             loge("VideoEncSetParameter :set VENC_IndexParamFramerate failed ");
@@ -892,7 +1129,11 @@ int VideoEncodeCompSetBitRate(VideoEncodeComp* v, int32_t bitrate)
     p->mBitRate = bitrate;
     if (p->pEncoder != NULL)
     {
+#if MPP_ENC_API
+        ret = VencSetParameter(p->pEncoder, VENC_IndexParamBitrate, (void*)&bitrate);
+#else
         ret = VideoEncSetParameter(p->pEncoder, VENC_IndexParamBitrate, (void*)&bitrate);
+#endif
         if (ret != 0)
         {
             loge("VideoEncSetParameter :set VENC_IndexParamBitrate failed ");
@@ -908,7 +1149,11 @@ int VideoEncodeCompScaleDownRatio(VideoEncodeComp* v, int32_t ratio)
     int ret = -1;
     if (p->pEncoder != NULL)
     {
+#if MPP_ENC_API
+        ret = VencSetParameter(p->pEncoder, VENC_IndexParamSetThumbScaler, (void*)&ratio);
+#else
         ret = VideoEncSetParameter(p->pEncoder, VENC_IndexParamSetThumbScaler, (void*)&ratio);
+#endif
         if (ret != 0)
         {
             loge("VideoEncSetParameter :set VENC_IndexParamBitrate failed ");
@@ -964,6 +1209,10 @@ int VideoEncodeCompStart(VideoEncodeComp* v)
     msg.params[0] = (uintptr_t)&p->mSemStart;
     msg.params[1] = (uintptr_t)&p->mStartReply;
     msg.params[2] = msg.params[3] = 0;
+
+#if MPP_ENC_API
+    VencStart(p->pEncoder);
+#endif
 
     AwMessageQueuePostMessage(p->mMessageQueue, &msg);
     SemTimedWait(&p->mSemStart, -1);
@@ -1034,8 +1283,10 @@ int VideoEncodeCompReset(VideoEncodeComp* v)
 int VideoEncodeCompInputBuffer(VideoEncodeComp* v, VideoInputBuffer *buf)
 {
     EncodeCompContex* p;
-    int ret;
+    int ret = 0;
     p = (EncodeCompContex*)v;
+    VencInputBuffer *pInputBuf = NULL;
+    InputBufferInfo *pInputBufInfo = NULL;
 
     if(buf != NULL )
     {
@@ -1048,10 +1299,13 @@ int VideoEncodeCompInputBuffer(VideoEncodeComp* v, VideoInputBuffer *buf)
 
         int sizeY = p->mInputBufSizeY;
         int sizeC = p->mInputBufSizeC;
-        VencInputBuffer inputBuffer, inputBufferReturn;
 
+        VencInputBuffer inputBuffer;
         memset(&inputBuffer, 0x00, sizeof(VencInputBuffer));
 
+#if !MPP_ENC_API
+        VencInputBuffer inputBufferReturn;
+#endif
         if(p->mUseAllocInputBuffer)//the input buf is allocated by video decoder
         {
             if(buf->nLen!= (p->mInputBufSizeY+p->mInputBufSizeC))
@@ -1059,8 +1313,8 @@ int VideoEncodeCompInputBuffer(VideoEncodeComp* v, VideoInputBuffer *buf)
                 loge("input buf length not right,buf->nLen = %d",buf->nLen);
                 return -1;
             }
-
-            //* check used buffer, return it
+#if !MPP_ENC_API
+	    //* check used buffer, return it
             if(0==AlreadyUsedInputBuffer(p->pEncoder, &inputBufferReturn))
             {
                 ReturnOneAllocInputBuffer(p->pEncoder, &inputBufferReturn);
@@ -1072,6 +1326,16 @@ int VideoEncodeCompInputBuffer(VideoEncodeComp* v, VideoInputBuffer *buf)
                 loge("GetOneAllocInputBuffer failed");
                 return -1;
             }
+#else
+        pInputBufInfo = dequeue(&p->mInputBufMgr.valid_quene);
+        while(pInputBufInfo == NULL)
+        {
+            logv(" get input buffer failed");
+            usleep(10*1000);
+        }
+        logd("get input buf, pInputBufInfo = %p", pInputBufInfo);
+        pInputBuf = &pInputBufInfo->inputbuffer;
+#endif
 
             inputBuffer.nPts = buf->nPts;
             inputBuffer.nFlag = 0;
@@ -1089,7 +1353,11 @@ int VideoEncodeCompInputBuffer(VideoEncodeComp* v, VideoInputBuffer *buf)
             yu12_nv12(p->mInputWidth, p->mInputHeight, inputBuffer.pAddrVirC, p->uv_tmp_buffer);
 #endif
 
+#if !MPP_ENC_API
             FlushCacheAllocInputBuffer(p->pEncoder, &inputBuffer);
+#else
+            inputBuffer.bNeedFlushCache   = 1;
+#endif
         }
         else
         {
@@ -1104,9 +1372,20 @@ int VideoEncodeCompInputBuffer(VideoEncodeComp* v, VideoInputBuffer *buf)
             inputBuffer.sCropInfo.nTop  =  240;
             inputBuffer.sCropInfo.nWidth  =  240;
             inputBuffer.sCropInfo.nHeight =  240;
+
         }
 
+#if !MPP_ENC_API
         ret = AddOneInputBuffer(p->pEncoder, &inputBuffer);
+#else
+        if(pInputBuf)
+            memcpy(pInputBuf, &inputBuffer, sizeof(inputBuffer));
+        else
+            pInputBuf = &inputBuffer;
+        ret = VencQueueInputBuf(p->pEncoder, pInputBuf);
+        if(p->mUseAllocInputBuffer)
+            enqueue(&p->mInputBufMgr.empty_quene, pInputBufInfo);
+#endif
         if(ret < 0)
         {
             loge(" AddOneInputBuffer failed");
@@ -1130,13 +1409,22 @@ int VideoEncodeCompRequestVideoFrame(VideoEncodeComp *v, VencOutputBuffer* outpu
     int ret;
     p = (EncodeCompContex*)v;
 
-    if(ValidBitstreamFrameNum(p->pEncoder) == 0)
+#if MPP_ENC_API
+    if(VencGetValidOutputBufNum(p->pEncoder) == 0)
     {
         //logw("valid frame num: 0, cannot get video frame");
         return -1;
     }
 
+    ret = VencDequeueOutputBuf(p->pEncoder, outputBuffer);
+#else
+    if(ValidBitstreamFrameNum(p->pEncoder) == 0)
+    {
+        //logw("valid frame num: 0, cannot get video frame");
+        return -1;
+    }
     ret = GetOneBitstreamFrame(p->pEncoder, outputBuffer);
+#endif
     if(ret < 0)
     {
         loge("+++ GetOneBitstreamFrame failed");
@@ -1156,7 +1444,11 @@ int VideoEncodeCompReturnVideoFrame(VideoEncodeComp *v, VencOutputBuffer* output
     int ret;
 
     p = (EncodeCompContex*)v;
+#if MPP_ENC_API
+    ret = VencQueueOutputBuf(p->pEncoder, outputBuffer);
+#else
     ret = FreeOneBitStreamFrame(p->pEncoder, outputBuffer);
+#endif
     if(ret < 0)
     {
         loge("FreeOneBitStreamFrame fail");

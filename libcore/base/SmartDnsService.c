@@ -88,10 +88,15 @@ static struct addrinfo *SDSNetSearch(const char *hostname, int port)
     struct addrinfo *retAddr = NULL;
     int ret;
     cdx_char strPort[10] = {0};
+    struct addrinfo hints;
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET; // AF_INET / AF_INET6
+    hints.ai_socktype = SOCK_STREAM;
 
     sprintf(strPort, "%d", port);
 
-    ret = getaddrinfo(hostname, strPort, NULL, &retAddr);
+    ret = getaddrinfo(hostname, strPort, &hints, &retAddr);
     if (ret != 0)
     {
         CDX_LOGE("get host failed, host:%s, port:%s, err:%s", hostname,

@@ -13,6 +13,7 @@
 #include <CdxStream.h>
 #include <CdxMemory.h>
 #include <CdxFlacParser.h>
+#include "CdxMetaData.h"
 
 cdx_uint8 const FLAC__crc8_table_[256] = {
     0x00, 0x07, 0x0E, 0x09, 0x1C, 0x1B, 0x12, 0x15,
@@ -455,6 +456,7 @@ cdx_bool read_frame_header_(cdx_uint8 *src,FlacParserImplS *impl)
             CDX_LOGV("Sync head error at variable blocksize uft64!");
             return CDX_FALSE;
         }
+        impl->orgSampleNum = x;
     }
     else
     {
@@ -467,6 +469,7 @@ cdx_bool read_frame_header_(cdx_uint8 *src,FlacParserImplS *impl)
             CDX_LOGV("Sync head error at fixed blocksize uft32!");
             return CDX_FALSE;
         }
+        impl->orgFrameNum = x;
     }
 
     if(blocksize_hint)
@@ -526,6 +529,26 @@ cdx_bool read_frame_header_(cdx_uint8 *src,FlacParserImplS *impl)
     /* calculate the sample number from the frame number if needed
 
     */
+    impl->nextFixedBlockSize = 0;
+    if(impl->orgFrameNum > 0) {
+         cdx_uint32 x = impl->orgFrameNum;
+         if(impl->fixedBlockSize)
+             impl->orgSampleNum = (cdx_uint64)impl->fixedBlockSize * (cdx_uint64)x;
+         else if(impl->hasStreamInfo == CDX_TRUE)  {
+             if(impl->minBlocksize == impl->maxBlocksize) {
+                 impl->orgSampleNum = (cdx_uint64)impl->minBlocksize * (cdx_uint64)x;
+                 impl->nextFixedBlockSize = impl->maxBlocksize;
+             } else {
+                 is_unparseable = CDX_TRUE;
+                 CDX_LOGW("########### is_unparseable ########");
+             }
+         } else if (x == 0) {
+             impl->orgSampleNum = 0;
+             impl->nextFixedBlockSize = impl->orgSampsPerFrm;
+         }
+         CDX_LOGV("######[parse] get orgSampleNum = %llu",impl->orgSampleNum);
+    }
+
     if(is_unparseable) {
         CDX_LOGV("Sync head error at unparseable");
         return CDX_FALSE;
@@ -534,33 +557,239 @@ cdx_bool read_frame_header_(cdx_uint8 *src,FlacParserImplS *impl)
     return CDX_TRUE;
 }
 
-cdx_int32    Flac_GetInfo_GetBsInByte(cdx_int32    ByteLen, CdxStreamT *cdxStream)
+static cdx_int64 Flac_GetInfo_GetBsInByte(cdx_int32    ByteLen, CdxStreamT *cdxStream)
 {
-    cdx_int32 RetVal = 0;
+    cdx_int64 RetVal = 0;
     cdx_int32 ret = 0;
     cdx_int32 i;
     cdx_uint8 data;
-    cdx_uint8 buf[4] = {0};
 
-    for    (i=0;i<ByteLen;i++)
-    {
-        ret = CdxStreamRead(cdxStream, buf, 1);
-        data= buf[0];
-        if(ret!=1)
+    for (i = 0; i < ByteLen; i++){
+        ret = CdxStreamRead(cdxStream, &data, 1);
+        if(ret != 1)
             return -1;
-
-        RetVal = (RetVal<<8)|(data&0xff);
+        RetVal = (RetVal << 8) | (data & 0xff);
     }
-    return    RetVal;
+    return RetVal;
+}
+
+static char *findString(char *content, const char *str, unsigned int len, int mode)
+{
+	int i;
+	int str_i = 0;
+	char *pos = NULL;
+	int contion;
+	char str_c;
+
+	for(i=0; i < len; i++){
+		if((len - i) < (strlen(str)-str_i)){
+			//CDX_LOGD("%d %d %d %d",len,i,strlen(str),str_i);
+			goto NOTFOUND;
+		}
+		// 是否区分大小写: mode = 0 不区分大小
+		str_c = str[str_i] >= 0x61 ? str[str_i] - 0x20 : str[str_i] + 0x20;
+		contion = mode ? (content[i] == str[str_i]) : (content[i] == str[str_i] || content[i] == str_c);
+		//CDX_LOGD("%c %c, %c %d",str[str_i], str_c, content[i], contion);
+		if(contion){
+			if(str_i == 0){
+				pos = &content[i];
+			}
+			str_i++;
+		}else{
+			str_i = 0;
+			pos = NULL;
+			continue;
+		}
+		if(str_i == strlen(str)){
+			break;
+		}
+	}
+	return pos;
+NOTFOUND:
+	return NULL;
+}
+
+static cdx_int8 FlacGetId3v2(FlacParserImplS *impl, CdxMediaInfoT *mediaInfo)
+{
+	char string[10][16]={"Title=", "Artist=", "Album=", "ALBUMARTIST="};
+	META_IDX IDX[] = {TITLE, ARTIST, ALBUM, ALBUM_ARTIST} ;
+	char content[128];
+	int i;
+	char *p;
+
+	for(i=0; i < 4; i++){
+		memset(content, '\0', sizeof(content));
+		p = findString((char *)impl->vorbis, (const char *)string[i], impl->vorbis_size, 0);
+		if(p == NULL){
+			CDX_LOGW("don't found %s",string[i]);
+			continue;
+		}
+	//	memcpy(content, p, strlen(p));
+		memcpy(content, p + strlen(string[i]), strlen(p) - strlen(string[i]));
+		SetMetaData(mediaInfo, IDX[i], content, ENCODE_UTF_8);
+	}
+
+	return 0;
+}
+
+static cdx_int8 FlacGetStreamInfo(FlacParserImplS *impl)
+{
+	cdx_int32 data;
+
+	impl->minBlocksize = (impl->streaminfo[0] << 8) | impl->streaminfo[1];
+	impl->maxBlocksize = (impl->streaminfo[2] << 8) | impl->streaminfo[3];
+	impl->minFramesize = (impl->streaminfo[4] << 16) | (impl->streaminfo[5] << 8) | impl->streaminfo[6];
+	impl->maxFramesize = (impl->streaminfo[7] << 16) | (impl->streaminfo[8] << 8) | impl->streaminfo[9];
+	impl->maxFramesize *= 3;
+
+	data = (impl->streaminfo[10] << 24 ) | (impl->streaminfo[11] << 16 ) |
+			(impl->streaminfo[12] << 8) | impl->streaminfo[13];
+
+	impl->ulSampleRate = (data >> 12) & 0xfffff;
+	impl->ulChannels = ((data >> 9) & 0x7) + 1;
+	impl->ulChannels = impl->ulChannels > 2 ? 2 : impl->ulChannels;
+	impl->ulBitsSample = ((data >> 4) & 0x1f) + 1;
+	impl->totalsamples = data & 0xf;  //  32
+	impl->totalsamples <<= 32;
+
+	data = (impl->streaminfo[14] << 24 ) | (impl->streaminfo[15] << 16)
+			| (impl->streaminfo[16] << 8) | impl->streaminfo[17];
+
+	impl->totalsamples |= data;
+	if(impl->ulSampleRate != 0){
+		impl->ulDuration = (cdx_int32)(impl->totalsamples * 1000 / impl->ulSampleRate);
+		impl->ulBitRate = (unsigned int)((double)impl->fileSize * 8/
+		((double)impl->totalsamples / (double)impl->ulSampleRate));
+	}else{
+		return -1;
+	}
+
+	return 0;
+}
+
+static void FlacReleaseBlockInfo(FlacParserImplS *impl){
+	if(impl->vorbis){
+		free(impl->vorbis);
+		impl->vorbis = NULL;
+	}
+	if(impl->streaminfo){
+		free(impl->streaminfo);
+		impl->streaminfo = NULL;
+	}
+	if(impl->picture){
+		free(impl->picture);
+		impl->picture = NULL;
+	}
+	if(impl->seektable){
+		free(impl->seektable);
+		impl->seektable = NULL;
+	}
+	if(impl->extradata){
+		free(impl->extradata);
+		impl->extradata = NULL;
+	}
+}
+
+cdx_int32 FlacGetBlockInfo(FlacParserImplS *impl)
+{
+	flac_header header;
+	cdx_int32 ret = 0;
+	cdx_int32 lastblock=0;
+
+	impl->file_offset = 0;
+	ret = CdxStreamRead(impl->stream, header.id, 4);
+	if(ret != 4){
+		goto FAILED;
+	}
+
+	if(memcmp(header.id, "fLaC", 4) != 0){
+		goto FAILED;
+	}
+
+	impl->file_offset += 4;
+
+	while(!lastblock){
+		header.block_type = Flac_GetInfo_GetBsInByte(1, impl->stream);
+		header.block_size = Flac_GetInfo_GetBsInByte(3, impl->stream);
+
+		impl->file_offset += 4;
+		impl->file_offset += header.block_size;
+
+		lastblock = header.block_type >> 7 ;
+		header.block_type &= 0x7f;
+		//CDX_LOGD("blocktype 0x%x blocklen=%d \n",header.block_type, header.block_size);
+		switch(header.block_type){
+			case 0:
+				impl->streaminfo = malloc(header.block_size);
+				if(impl->streaminfo == NULL){
+					goto FAILED;
+				}
+				ret = CdxStreamRead(impl->stream, impl->streaminfo, header.block_size);
+				if(ret != header.block_size){
+					CDX_LOGE("streaminfo read failed ret = %d ",ret);
+					goto FAILED;
+				}
+				impl->streaminfo_size = header.block_size;
+
+                impl->extradata = malloc(12 + header.block_size + INPUT_BUFFER_GUARD_SIZE);
+				if(impl->extradata == NULL){
+					goto FAILED;
+				}
+				memset(impl->extradata, 0, 12 + header.block_size + INPUT_BUFFER_GUARD_SIZE);
+				CdxStreamSeek(impl->stream, 0, SEEK_SET);
+                CdxStreamRead(impl->stream, impl->extradata, header.block_size + 8);
+				impl->extradata[8 + header.block_size] = 0x81;
+				impl->extradata_size = header.block_size + 12;
+				if(FlacGetStreamInfo(impl) < 0){
+					CDX_LOGE("streaminfo get failed");
+					goto FAILED;
+				}
+				impl->hasStreamInfo = CDX_TRUE;
+				break;
+			case 4:
+				impl->vorbis = malloc(header.block_size + 1);
+				memset(impl->vorbis, 0, header.block_size + 1);
+				if(impl->vorbis == NULL){
+					goto FAILED;
+				}
+				ret = CdxStreamRead(impl->stream, impl->vorbis, header.block_size);
+				if(ret != header.block_size){
+					goto FAILED;
+				}
+				impl->vorbis_size = header.block_size;
+				break;
+			case 3:
+				impl->seektable = malloc(header.block_size);
+				ret = CdxStreamRead(impl->stream, impl->seektable, header.block_size);
+				if(ret != header.block_size){
+					goto FAILED;
+				}
+				impl->seektable_size = header.block_size;
+				break;
+			case 6:
+				impl->picture = malloc(header.block_size);
+				ret = CdxStreamRead(impl->stream, impl->picture, header.block_size);
+				if(ret != header.block_size){
+					goto FAILED;
+				}
+
+				impl->picture_size = header.block_size;
+				break;
+			default:
+				CdxStreamSeek(impl->stream, header.block_size, SEEK_CUR);
+				break;
+		}
+	}
+	return 0;
+FAILED:
+	FlacReleaseBlockInfo(impl);
+	return -1;
 }
 
 static int FlacInit(CdxParserT *flac_impl)
 {
     cdx_int32  retval= 0;
     cdx_uint8 *  buffer = NULL;
-    cdx_uint8    buffer_head8[8] = {0x66, 0x4c, 0x61, 0x43,
-                                    0x00, 0x00, 0x00, 0x00};
-    cdx_int64    metadata_off = 0;
     cdx_int32 buf_end  = 0, readlen = 0;
     cdx_int32 buf_ptr  = 0;
     cdx_int64 syncoff  = 0;
@@ -574,143 +803,10 @@ static int FlacInit(CdxParserT *flac_impl)
         goto OPENFAILURE;
     }
 
-    retval = Flac_GetInfo_GetBsInByte(4,cdxStream);
-    impl->file_offset += 4;
-    if(retval < 0)
-    {
-        goto OPENFAILURE;
-    }
-    if(retval == 0x664c6143)
-    {
-        cdx_int32  blocktype,blocklen;
-        cdx_int32  lastblock=0;
-        cdx_int32  data;
-        cdx_int32  headlen = 4;
-        cdx_int64  totalsamples = 0;
-        cdx_int64  TempData;
+	if(FlacGetBlockInfo(impl) < 0){
+		goto OPENFAILURE;
+	}
 
-        while(!lastblock)
-        {
-            blocktype = Flac_GetInfo_GetBsInByte(1,cdxStream);
-            impl->file_offset += 1;
-            if(blocktype < 0)
-            {
-                goto OPENFAILURE;
-            }
-            blocklen = Flac_GetInfo_GetBsInByte(3,cdxStream);
-            impl->file_offset += 3;
-            if(blocklen < 0)
-            {
-                goto OPENFAILURE;
-            }
-            lastblock = (blocktype&0x80)?1:0;
-            blocktype &=0x7f;
-            headlen += (blocklen+4);
-            switch(blocktype)
-            {
-                case 0:  //METADATA_BLOCK_STREAMINFO
-                    buffer_head8[4] = (blocktype&0xFF);
-                    buffer_head8[5] = ((blocklen>>16)&0xFF);
-                    buffer_head8[6] = ((blocklen>>8)&0xFF);
-                    buffer_head8[7] = ((blocklen)&0xFF);
-                    buffer = malloc(12 + blocklen + INPUT_BUFFER_GUARD_SIZE);
-                    memset(buffer,0,12 + blocklen + INPUT_BUFFER_GUARD_SIZE);
-                    metadata_off = CdxStreamTell(impl->stream);
-                    CdxStreamRead(impl->stream, buffer + 8, blocklen);
-                    memcpy(buffer, buffer_head8, 8);
-                    buffer[8 + blocklen] = 0x81;
-                    CdxStreamSeek(impl->stream, metadata_off, SEEK_SET);
-                    impl->extradata = buffer;
-                    impl->extradata_size = 12 + blocklen;
-
-                    data = Flac_GetInfo_GetBsInByte(2,cdxStream);//16bit
-                    if(data < 0)
-                    {
-                        goto OPENFAILURE;
-                    }
-                    impl->minBlocksize = data&0xffff;
-                    impl->file_offset += 2;
-                    data = Flac_GetInfo_GetBsInByte(2,cdxStream);//16bit
-                    if(data < 0)
-                    {
-                        goto OPENFAILURE;
-                    }
-                    impl->maxBlocksize = data&0xffff;
-                    impl->file_offset += 2;
-                    data = Flac_GetInfo_GetBsInByte(3,cdxStream);//24bit   24
-                    if(data < 0)
-                    {
-                        goto OPENFAILURE;
-                    }
-                    impl->minFramesize = data&0xffffff;
-                    impl->file_offset += 3;
-
-                    data = Flac_GetInfo_GetBsInByte(3,cdxStream);//24bit  24
-                    if(data < 0)
-                    {
-                        goto OPENFAILURE;
-                    }
-                    impl->maxFramesize = data&0xffffff;
-                    if(impl->maxFramesize <= 64)
-                    {
-                        impl->maxFramesize = (20*1024);//for fix some bad flac stream
-                    }
-                    impl->maxFramesize *= 3;//for fetch a frame
-                    impl->file_offset += 3;
-
-                    //GetInfo_SkipBsInByte(10,AIF);
-                    data = Flac_GetInfo_GetBsInByte(4,cdxStream);//32bit     20  3  5   4
-                    impl->file_offset += 4;
-                    if(data < 0)
-                    {
-                        goto OPENFAILURE;
-                    }
-                    impl->ulSampleRate = (data>>12)&0xfffff;
-                    impl->ulChannels = ((data>>9)&0x7)+1;
-                    impl->ulChannels = impl->ulChannels>2?2 : impl->ulChannels;
-                    impl->ulBitsSample = ((data>>4)&0x1f)+1;
-                    totalsamples = data&0xf;  //  32
-                    totalsamples <<=32;
-                    retval = Flac_GetInfo_GetBsInByte(4,cdxStream);
-                    if(retval<0)
-                    {
-                        goto OPENFAILURE;
-                    }
-                    impl->file_offset += 4;
-                    totalsamples |= retval;
-                    impl->totalsamples = totalsamples;
-                    TempData = totalsamples*1000 ;
-                    impl->ulDuration = (cdx_int32)(TempData/impl->ulSampleRate);
-                    //AIF->ulBitRate = (filelen/(AIF->ulDuration/1000))*8;
-                    CdxStreamSeek(cdxStream,blocklen-18,SEEK_CUR);
-                    impl->file_offset += blocklen-18;
-                    //GetInfo_SkipBsInByte(blocklen - 18,AIF);
-                    break;
-                case 4: //VORBIS_COMMENT
-                    //do not apply GetInfo_oggStandardTag(impl);
-                    CdxStreamSeek(cdxStream,blocklen,SEEK_CUR);
-                    impl->file_offset += blocklen;
-                    break;
-                default:
-                    CdxStreamSeek(cdxStream,blocklen,SEEK_CUR);
-                    impl->file_offset += blocklen;
-                    //GetInfo_SkipBsInByte(blocklen,AIF);
-                    break;
-                }
-        }
-        impl->ulBitRate = (unsigned int)((double)impl->fileSize*8/
-            ((double)totalsamples/(double)impl->ulSampleRate));
-        /*if(0)//impl->InforBufLeftLength>=4)
-        {
-            impl->ulAudio_name_sz = 4;
-            impl->ulAudio_name = impl->InforBuf;
-            impl->InforBuf +=impl->ulAudio_name_sz;
-            impl->InforBufLeftLength -=impl->ulAudio_name_sz;
-            memcpy(impl->ulAudio_name,flaccodecInfo[0],impl->ulAudio_name_sz);
-
-        }*/
-
-    }
     impl->pktbuf=malloc(impl->maxFramesize+INPUT_BUFFER_PADDING_SIZE+INPUT_BUFFER_GUARD_SIZE);
     memset(impl->pktbuf,0,impl->maxFramesize+INPUT_BUFFER_PADDING_SIZE+INPUT_BUFFER_GUARD_SIZE);
 
@@ -758,8 +854,9 @@ static int FlacInit(CdxParserT *flac_impl)
     }
 
 SUCESS:
+
     impl->data_offset = impl->file_offset;
-    CdxStreamSeek(cdxStream, impl->data_offset,SEEK_SET);
+    CdxStreamSeek(cdxStream, impl->data_offset, SEEK_SET);
     CDX_LOGD("impl->extradata_size : %d, impl->extradata : %p, impl->file_offset :%lld",
             impl->extradata_size, impl->extradata, impl->file_offset);
 
@@ -939,6 +1036,8 @@ static cdx_int32 __FlacParserRead(CdxParserT *parser, CdxPacketT *pkt)
     pkt->length = read_length;
     impl->file_offset += read_length;
     impl->nowsamples += impl->orgSampsPerFrm;
+    if(impl->nextFixedBlockSize)
+        impl->fixedBlockSize = impl->nextFixedBlockSize;
     // TODO: fill pkt
     return CDX_SUCCESS;
 }
@@ -963,12 +1062,15 @@ static cdx_int32 __FlacParserGetMediaInfo(CdxParserT *parser, CdxMediaInfoT *med
     memset(cdxProgram, 0, sizeof(struct CdxProgramS));
     cdxProgram->id = 0;
     cdxProgram->audioNum = 1;
+#ifndef ONLY_ENABLE_AUDIO
     cdxProgram->videoNum = 0;//
     cdxProgram->subtitleNum = 0;
+#endif
     cdxProgram->audioIndex = 0;
+#ifndef ONLY_ENABLE_AUDIO
     cdxProgram->videoIndex = 0;
     cdxProgram->subtitleIndex = 0;
-
+#endif
     mediaInfo->bSeekable = CdxStreamSeekAble(impl->stream);
     mediaInfo->fileSize = impl->fileSize;
 
@@ -980,7 +1082,174 @@ static cdx_int32 __FlacParserGetMediaInfo(CdxParserT *parser, CdxMediaInfoT *med
     cdxProgram->audio[0].nSampleRate     = impl->ulSampleRate;
     cdxProgram->audio[0].nCodecSpecificDataLen = impl->extradata_size;
     cdxProgram->audio[0].pCodecSpecificData = (char *)impl->extradata;
+	FlacGetId3v2(impl, mediaInfo);
+
     return CDX_SUCCESS;
+}
+
+static cdx_bool FlacGetSeekPostion(CdxParserT *parser,cdx_uint32 target_sample,cdx_int64 *pos) {
+    struct FlacParserImplS *impl = NULL;
+    impl = CdxContainerOf(parser, struct FlacParserImplS, base);
+
+    cdx_int64 first_frame_offset = impl->data_offset, lower_bound, upper_bound, lower_bound_sample, upper_bound_sample, this_frame_sample;
+    cdx_int32 approx_bytes_per_frame;
+    cdx_int32 buf_end = 0;
+    cdx_int32 buf_ptr  = 0;
+    cdx_int64 syncoff  = 0;
+    cdx_bool first_seek = CDX_TRUE;
+    cdx_int32 ret = 0;
+    const cdx_int32 total_samples = impl->totalsamples;
+    const cdx_int32 min_blocksize = impl->minBlocksize;
+    const cdx_int32 max_blocksize = impl->minBlocksize;
+    const cdx_int32 max_framesize = impl->minBlocksize;
+    const cdx_int32 min_framesize = impl->minBlocksize;
+    cdx_int32 channels = impl->ulChannels;
+    cdx_int32 bps = impl->ulBitsSample;
+
+    /* we are just guessing here */
+    if(max_framesize > 0)
+        approx_bytes_per_frame = (max_framesize + min_framesize) / 2 + 1;
+    /*
+    * Check if it's a known fixed-blocksize stream.  Note that though
+    * the spec doesn't allow zeroes in the STREAMINFO block, we may
+    * never get a STREAMINFO block when decoding so the value of
+    * min_blocksize might be zero.
+    */
+    else if(min_blocksize == max_blocksize && min_blocksize > 0) {
+        /* note there are no () around 'bps/8' to keep precision up since it's an integer calulation */
+        approx_bytes_per_frame = min_blocksize * channels * bps/8 + 64;
+    }
+    else
+        approx_bytes_per_frame = 4096 * channels * bps/8 + 64;
+
+    /*
+    * First, we set an upper and lower bound on where in the
+    * stream we will search.  For now we assume the worst case
+    * scenario, which is our best guess at the beginning of
+    * the first frame and end of the stream.
+    */
+    lower_bound = first_frame_offset;
+    lower_bound_sample = 0;
+    upper_bound = impl->fileSize;
+    upper_bound_sample = total_samples > 0 ? total_samples : target_sample /*estimate it*/;
+
+    /* there are 2 insidious ways that the following equality occurs, which
+    * we need to fix:
+    *  1) total_samples is 0 (unknown) and target_sample is 0
+    *  2) total_samples is 0 (unknown) and target_sample happens to be
+    *     exactly equal to the last seek point in the seek table; this
+    *     means there is no seek point above it, and upper_bound_samples
+    *     remains equal to the estimate (of target_samples) we made above
+    * in either case it does not hurt to move upper_bound_sample up by 1
+    */
+    if(upper_bound_sample == lower_bound_sample)
+        upper_bound_sample++;
+
+    while(1) {
+        /* check if the bounds are still ok */
+        if (lower_bound_sample >= upper_bound_sample || lower_bound > upper_bound) {
+            return CDX_FALSE;
+        }
+        *pos = (cdx_int64)lower_bound + (cdx_int64)((double)(target_sample - lower_bound_sample) / (double)(upper_bound_sample - lower_bound_sample) * (double)(upper_bound - lower_bound)) - approx_bytes_per_frame;
+
+        if(*pos >= (cdx_int64)upper_bound)
+            *pos = (cdx_int64)upper_bound - 1;
+        if(*pos < (cdx_int64)lower_bound)
+            *pos = (cdx_int64)lower_bound;
+
+        /* seek to postion we guess */
+        CdxStreamSeek(impl->stream,*pos, SEEK_SET);
+
+        /* try to sync frame header */
+        buf_end = ret = CdxStreamRead(impl->stream, impl->pktbuf,
+                                    impl->maxFramesize+INPUT_BUFFER_PADDING_SIZE);
+        if(ret == 0)
+        {
+            CDX_LOGE("Not enough data!");
+            return CDX_FALSE;
+        }
+
+        /* reset syncoff and buf_prt index */
+        buf_ptr  = 0;
+        syncoff  = 0;
+        if ((AV_RB16(impl->pktbuf) & 0xFFFE) != 0xFFF8) {
+            CDX_LOGW("Start sync frame header");
+            while (buf_ptr+2 < buf_end && (AV_RB16(impl->pktbuf+buf_ptr) & 0xFFFE) != 0xFFF8)
+            {
+                buf_ptr++;
+                syncoff ++;
+            }
+        }
+
+        /* recheck header we had found */
+        if(!read_frame_header_(&impl->pktbuf[buf_ptr],impl)) {
+            CDX_LOGW("After seek is not right header,we need resync!");
+            while(1)
+            {
+                buf_ptr ++;
+                syncoff ++;
+                while (buf_ptr+2 < buf_end && (AV_RB16(impl->pktbuf+buf_ptr) & 0xFFFE) != 0xFFF8)
+                {
+                    buf_ptr++;
+                    syncoff++;
+                }
+                if(buf_ptr+2 >= buf_end)
+                {
+                    CDX_LOGE("Sync out of range while find 2nd frame");
+                    return CDX_FALSE;
+                }
+                if(read_frame_header_(&impl->pktbuf[buf_ptr],impl))
+                {
+                    CDX_LOGE("find a valid frameheader, break out ");
+                    break;
+                }
+            }
+        }
+
+        /* if frame header was found try to read frame */
+        *pos += syncoff;
+        this_frame_sample = impl->orgSampleNum;
+        CDX_LOGV("########[seek] get this frame samples = %lld", this_frame_sample);
+        if(this_frame_sample <= target_sample && target_sample <= (this_frame_sample + impl->orgSampsPerFrm)) {
+            impl->isSeeking = CDX_FALSE;
+            CDX_LOGD("#########[seek] we had found a perfect postion for seeking = %lld",*pos);
+            break;
+        }
+        if (0 == impl->nowsamples || (this_frame_sample + impl->orgSampsPerFrm >= upper_bound_sample && !first_seek)) {
+            if (*pos == (cdx_int64)lower_bound) {
+                /* can't move back any more than the first frame, something is fatally wrong */
+                return CDX_FALSE;
+            }
+            /* our last move backwards wasn't big enough, try again */
+            approx_bytes_per_frame = approx_bytes_per_frame? approx_bytes_per_frame * 2 : 16;
+            continue;
+        }
+        /* allow one seek over upper bound, so we can get a correct upper_bound_sample for streams with unknown total_samples */
+        first_seek = CDX_FALSE;
+        /* make sure we are not seeking in corrupted stream */
+        if (this_frame_sample < lower_bound_sample) {
+            CDX_LOGW("current sample is invalid!");
+            return CDX_FALSE;
+        }
+
+        /* we need to narrow the search */
+        if(target_sample < this_frame_sample) {
+            upper_bound_sample = this_frame_sample + impl->orgSampsPerFrm;
+            upper_bound = *pos;
+            if(upper_bound >= impl->fileSize) {
+                return CDX_FALSE;
+            }
+            approx_bytes_per_frame = (unsigned)(2 * (upper_bound - *pos) / 3 + 16);
+        } else { /* target_sample >= this_frame_sample + this frame's blocksize */
+            lower_bound_sample = this_frame_sample + impl->orgSampsPerFrm;
+            lower_bound = *pos;
+            if(lower_bound >= impl->fileSize) {
+                return CDX_FALSE;
+            }
+            approx_bytes_per_frame = (unsigned)(2 * (lower_bound - *pos) / 3 + 16);
+        }
+    }
+    return CDX_TRUE;
 }
 
 static cdx_int32 __FlacParserSeekTo(CdxParserT *parser, cdx_int64 timeUs, SeekModeType seekModeType)
@@ -991,10 +1260,17 @@ static cdx_int32 __FlacParserSeekTo(CdxParserT *parser, cdx_int64 timeUs, SeekMo
     cdx_int64 offset = 0;
     cdx_int32 times = 0;
     impl = CdxContainerOf(parser, struct FlacParserImplS, base);
+    impl->isSeeking = CDX_TRUE;
+
     samples=(timeUs*impl->ulSampleRate)/1000000ll;
-    offset = (cdx_int64)impl->data_offset + (cdx_int64)samples*
-        impl->fileSize/(cdx_int64)impl->totalsamples;
-    if(offset!= impl->file_offset)
+    times = samples/impl->orgSampsPerFrm;
+    samples = impl->orgSampsPerFrm*(times+1);
+    impl->nowsamples = samples;
+    if(!FlacGetSeekPostion(parser,samples,&offset)) {
+        CDX_LOGE("CdxStreamSeek fail to get target position!");
+        return CDX_FAILURE;
+    }
+    if(offset!=impl->file_offset)
     {
         if(offset > impl->fileSize)
         {
@@ -1007,12 +1283,10 @@ static cdx_int32 __FlacParserSeekTo(CdxParserT *parser, cdx_int64 timeUs, SeekMo
         }
     }
     impl->file_offset = offset;
-    times = samples/impl->orgSampsPerFrm;
-    samples = impl->orgSampsPerFrm*(times+1);
-    impl->nowsamples = samples;
     CdxStreamSeek(impl->stream,impl->file_offset,SEEK_SET);
     pthread_cond_signal(&impl->cond);
     return CDX_SUCCESS;
+
 }
 
 static cdx_uint32 __FlacParserAttribute(CdxParserT *parser)
@@ -1049,11 +1323,14 @@ static cdx_int32 __FlacParserClose(CdxParserT *parser)
         free(impl->pktbuf);
         impl->pktbuf = NULL;
     }
-    if(impl->extradata)
-    {
-        free(impl->extradata);
-        impl->extradata = NULL;
-    }
+	if(impl->extradata)
+	{
+		free(impl->extradata);
+		impl->extradata = NULL;
+	}
+
+	FlacReleaseBlockInfo(impl);
+
     CdxStreamClose(impl->stream);
     pthread_cond_destroy(&impl->cond);
     CdxFree(impl);

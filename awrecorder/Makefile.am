@@ -15,6 +15,7 @@ LOCAL_INCLUDE = -I$(top_srcdir) \
 		-I$(top_srcdir)/libcore/base/include \
 		-I$(top_srcdir)/libcore/muxer/include \
 		-I$(top_srcdir)/external/include/aencoder \
+		-I$(top_srcdir)/../mpp_libcedarc/include \
 		-I$(top_srcdir)/../libcedarc/include
 
 libawrecorder_la_CFLAGS += $(LOCAL_INCLUDE)

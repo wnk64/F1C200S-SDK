@@ -3,6 +3,9 @@
 #############################################################################
 
 ########## configure CONF_ANDROID_VERSION ##########
+
+$(warning !!!$(LIB_CEDARM_PATH)/config/$(TARGET_BOARD_PLATFORM))
+
 CONF_ANDROID_VERSION = $(shell echo $(PLATFORM_VERSION) | cut -c 1-3)
 HAS_ANDROID_SELF_CUSTOMIZATION = 0
 

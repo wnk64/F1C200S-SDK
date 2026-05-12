@@ -17,9 +17,13 @@
 #include <CdxTypes.h>
 #include <cdx_log.h>
 #include <CdxStream.h>
+#ifndef ONLY_ENABLE_AUDIO
 #include <vdecoder.h>
+#endif
 #include <adecoder.h>
+#ifndef ONLY_ENABLE_AUDIO
 #include <sdecoder.h>
+#endif
 #include <CdxEnumCommon.h>
 
 #ifdef __ANDROID__
@@ -141,6 +145,7 @@ enum EPARSERNOTIFY  //* notify.
     PARSER_NOTIFY_TIMESHIFT_END_INFO,
     PARSER_NOTIFY_META_DATA,
     PARSER_NOTIFY_HLS_DISCONTINUITY,
+    PARSER_NOTIFY_HLS_GET_STREAM_CACHE_UNDERFLOW_FLAG,
     PARSER_NOTIFY_MAX,
 };
 CHECK_PARSER_NOTIFY_MAX_VALID(PARSER_NOTIFY_MAX)
@@ -210,24 +215,30 @@ enum CdxParserStatusE
 #define VIDEO_STREAM_LIMIT 1
 #define SUBTITLE_STREAM_LIMIT 32
 
+#ifndef ONLY_ENABLE_AUDIO
 struct VideoInfo
 {
     cdx_atomic_t ref;
     cdx_int32 videoNum;
     VideoStreamInfo    video[VIDEO_STREAM_LIMIT];
 };
+#endif
+
 struct AudioInfo
 {
     cdx_atomic_t ref;
     cdx_int32 audioNum;
     AudioStreamInfo    audio[AUDIO_STREAM_LIMIT];
 };
+
+#ifndef ONLY_ENABLE_AUDIO
 struct SubtitleInfo
 {
     cdx_atomic_t ref;
     cdx_int32 subtitleNum;
     SubtitleStreamInfo subtitle[SUBTITLE_STREAM_LIMIT];
 };
+#endif
 
 struct CdxProgramS
 {
@@ -235,15 +246,25 @@ struct CdxProgramS
     cdx_uint32 flags;
     cdx_uint32 duration; //unit: ms
     cdx_int32 audioNum, audioIndex;
+#ifndef ONLY_ENABLE_AUDIO
     cdx_int32 videoNum, videoIndex;
     cdx_int32 subtitleNum, subtitleIndex;
+#endif
     cdx_int64 firstPts;
 
     AudioStreamInfo    audio[AUDIO_STREAM_LIMIT];
+
+#ifndef ONLY_ENABLE_AUDIO
     VideoStreamInfo    video[VIDEO_STREAM_LIMIT];
     SubtitleStreamInfo subtitle[SUBTITLE_STREAM_LIMIT];
+#endif
+
     cdx_uint64 audioIndexMask;
+
+#ifndef ONLY_ENABLE_AUDIO
     cdx_uint64 videoIndexMask;
+#endif
+
     cdx_int32 metadataNum;
 };
 
@@ -470,15 +491,24 @@ static void PrintMediaInfo(CdxMediaInfoT *mediaInfo)
             "bSeekable = %d, "
             "duration = %d, "
             "audioNum = %d, "
+#ifndef ONLY_ENABLE_AUDIO
             "videoNum = %d, "
-            "subtitleNum = %d ",
+            "subtitleNum = %d "
+#endif
+            ,
             mediaInfo->fileSize,
             mediaInfo->bSeekable,
             program->duration,
-            program->audioNum,
+            program->audioNum
+#ifndef ONLY_ENABLE_AUDIO
+            ,
             program->videoNum,
-            program->subtitleNum);
+            program->subtitleNum
+#endif
+            );
     int i;
+
+#ifndef ONLY_ENABLE_AUDIO
     for (i = 0; i < VIDEO_STREAM_LIMIT && i < program->videoNum; i++)
     {
         VideoStreamInfo *video = program->video + i;
@@ -498,6 +528,7 @@ static void PrintMediaInfo(CdxMediaInfoT *mediaInfo)
                 video->bIs3DStream);
 
     }
+#endif
 
     for (i = 0; i < AUDIO_STREAM_LIMIT && i < program->audioNum; i++)
     {
@@ -516,7 +547,7 @@ static void PrintMediaInfo(CdxMediaInfoT *mediaInfo)
                 audio->nSampleRate);
 
     }
-
+#ifndef ONLY_ENABLE_AUDIO
     for (i = 0; i < SUBTITLE_STREAM_LIMIT && i < program->subtitleNum; i++)
     {
         SubtitleStreamInfo *subtitle = program->subtitle + i;
@@ -528,7 +559,7 @@ static void PrintMediaInfo(CdxMediaInfoT *mediaInfo)
                 subtitle->eCodecFormat,
                 subtitle->strLang);
     }
-
+#endif
     CDX_LOGD("*********PrintMediaInfo end*********");
 }
 
@@ -700,10 +731,11 @@ enum {
     PROBE_SPECIFIC_DATA_UNCOMPELETE = -1,
     PROBE_SPECIFIC_DATA_SUCCESS  = 1,
 };
+#ifndef ONLY_ENABLE_AUDIO
 cdx_int32 ProbeVideoSpecificData(VideoStreamInfo* pVideoInfo, cdx_uint8* pDataBuf,
     cdx_uint32 dataLen, cdx_uint32 eVideoCodecFormat, enum CdxParserTypeE type);
 cdx_int32 probeH265RefPictureNumber(cdx_uint8* pDataBuf, cdx_uint32 nDataLen);
-
+#endif
 #ifdef __cplusplus
 }
 #endif

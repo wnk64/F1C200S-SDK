@@ -294,6 +294,7 @@ static int ParserCallbackProcess(void* pUserData, int eMessageId, void* param)
 
     switch(eMessageId)
     {
+#ifndef ONLY_ENABLE_AUDIO
         case PARSER_NOTIFY_VIDEO_STREAM_CHANGE:
         {
             CdxMediaInfoT parserMediaInfo;
@@ -323,6 +324,7 @@ static int ParserCallbackProcess(void* pUserData, int eMessageId, void* param)
             }
             break;
         }
+#endif
         case PARSER_NOTIFY_AUDIO_STREAM_CHANGE:
         {
             CdxMediaInfoT parserMediaInfo;
@@ -338,6 +340,7 @@ static int ParserCallbackProcess(void* pUserData, int eMessageId, void* param)
                 AwMessage msg1;
                 msg1.messageId = DEMUX_COMMAND_AUDIO_STREAM_CHANGE;
                 msg1.params[0] = (uintptr_t)&demux->semStreamChange;
+		msg1.params[1] = 0;
                 AwMessageQueuePostMessage(demux->mq, &msg1);
 
                 SemTimedWait(&demux->semStreamChange, -1);
@@ -448,6 +451,34 @@ static int ParserCallbackProcess(void* pUserData, int eMessageId, void* param)
             demux->bDiscontinue = 1;
             break;
         }
+	case PARSER_NOTIFY_HLS_GET_STREAM_CACHE_UNDERFLOW_FLAG:
+	{
+	    int *dataUnderflowFlag = (int *)param;
+	    *dataUnderflowFlag = StreamCacheUnderflow(demux->pCache);
+
+	    if(demux->bNeedPausePlayerNotified == 1 && *dataUnderflowFlag == 0)
+	    {
+		logd("when the audio stream changes, detect data remains, notify BUFFER_END.");
+		demux->bBufferring = 0;
+		if(demux->bBufferStartNotified == 1)
+		{
+		    unsigned char url[1024];
+		    if(demux->pParser)
+		    {
+			if(CdxParserControl(demux->pParser,
+						CDX_PSR_CMD_GET_URL, (void*)url))
+			{
+				loge("get  url failed");
+			}
+		    }
+		    demux->callback(demux->pUserData, DEMUX_NOTIFY_BUFFER_END, (void*)url);
+		    demux->bBufferStartNotified = 0;
+		}
+		demux->callback(demux->pUserData, DEMUX_NOTIFY_RESUME_PLAYER, NULL);
+		demux->bNeedPausePlayerNotified = 0;
+	    }
+	    break;
+	}
         default:
         {
             logw("ignore demux callback message, eMessageId = 0x%x.", eMessageId);
@@ -805,21 +836,25 @@ int DemuxCompCancelPrepare(DemuxComp* d)
     SemTimedWait(&demux->semCancelPrepare, -1);
     return 0;
 }
-
+#ifndef ONLY_ENABLE_AUDIO
 int DemuxProbeH265RefPictureNumber(char* pDataBuf, int nDataLen)
 {
     return probeH265RefPictureNumber((cdx_uint8 *)pDataBuf, (cdx_uint32)nDataLen);
 }
-
+#endif
 MediaInfo* DemuxCompGetMediaInfo(DemuxComp* d)
 {
     DemuxCompContext*   demux;
     MediaInfo*          mi;
     MediaInfo*          myMediaInfo;
     int                 i;
+#ifndef ONLY_ENABLE_AUDIO
     VideoStreamInfo*    pVideoStreamInfo;
+#endif
     AudioStreamInfo*    pAudioStreamInfo;
+#ifndef ONLY_ENABLE_AUDIO
     SubtitleStreamInfo* pSubtitleStreamInfo;
+#endif
     int                 nCodecSpecificDataLen;
     char*               pCodecSpecificData;
 
@@ -839,8 +874,9 @@ MediaInfo* DemuxCompGetMediaInfo(DemuxComp* d)
     mi->eContainerType = myMediaInfo->eContainerType;
     mi->bSeekable      = myMediaInfo->bSeekable;
     mi->nFirstPts      = myMediaInfo->nFirstPts;
+    mi->Id3Info	       = myMediaInfo->Id3Info;
     memcpy(mi->cRotation,myMediaInfo->cRotation,4*sizeof(unsigned char));
-
+#ifndef ONLY_ENABLE_AUDIO
     logv("video stream num = %d, video stream info = %p",
             myMediaInfo->nVideoStreamNum, myMediaInfo->pVideoStreamInfo);
 
@@ -900,7 +936,7 @@ MediaInfo* DemuxCompGetMediaInfo(DemuxComp* d)
 
     logv("video stream num = %d, video stream info = %p",
                 mi->nVideoStreamNum, mi->pVideoStreamInfo);
-
+#endif
     if(myMediaInfo->nAudioStreamNum > 0)
     {
         pAudioStreamInfo = (AudioStreamInfo*)malloc(
@@ -942,7 +978,7 @@ MediaInfo* DemuxCompGetMediaInfo(DemuxComp* d)
 
         mi->nAudioStreamNum = myMediaInfo->nAudioStreamNum;
     }
-
+#ifndef ONLY_ENABLE_AUDIO
     if(myMediaInfo->nSubtitleStreamNum > 0)
     {
         pSubtitleStreamInfo = (SubtitleStreamInfo*)malloc
@@ -970,7 +1006,7 @@ MediaInfo* DemuxCompGetMediaInfo(DemuxComp* d)
 
         mi->nSubtitleStreamNum = myMediaInfo->nSubtitleStreamNum;
     }
-
+#endif
     return mi;
 }
 
@@ -1371,10 +1407,14 @@ static void AdjustCacheParams(DemuxCompContext* demux)
         return;
 
     nBitrate = demux->mediaInfo.nBitrate;
-    if (nBitrate <= 0)
-        nBitrate = PlayerGetVideoBitrate(demux->pPlayer) +
-            PlayerGetAudioBitrate(demux->pPlayer);
-
+    if (nBitrate <= 0) {
+#ifndef ONLY_ENABLE_AUDIO
+        nBitrate = PlayerGetVideoBitrate(demux->pPlayer);
+#endif
+#ifndef ONLY_DISABLE_AUDIO
+        nBitrate += PlayerGetAudioBitrate(demux->pPlayer);
+#endif
+    }
     logd("bitrate = %d", nBitrate);
     if(nBitrate > 0)
     {
@@ -1421,7 +1461,7 @@ static int DemuxCompAdjustCacheParamsWithBitrate(DemuxCompContext* demux, int nB
     StreamCacheSetSize(demux->pCache, nStartPlaySize, nMaxBufferSize);
     return 0;
 }
-
+#ifndef ONLY_ENABLE_AUDIO
 static int setVideoStreamDataInfo(MediaStreamDataInfo *streamDataInfo, struct VideoInfo* pVideoinfo)
 {
     logv("****pVideoinfo = %p, pVideoinfo->videoNum = %d",pVideoinfo, pVideoinfo->videoNum);
@@ -1470,7 +1510,7 @@ static int setVideoStreamDataInfo(MediaStreamDataInfo *streamDataInfo, struct Vi
 
     return 0;
 }
-
+#endif
 static int setAudioStreamDataInfo(MediaStreamDataInfo *streamDataInfo, struct AudioInfo* pAudioinfo)
 {
     size_t size = sizeof(AudioStreamInfo)*pAudioinfo->audioNum;
@@ -1518,7 +1558,7 @@ static int setAudioStreamDataInfo(MediaStreamDataInfo *streamDataInfo, struct Au
 
     return 0;
 }
-
+#ifndef ONLY_ENABLE_AUDIO
 static int setCacheNodeVideo(CdxPacketT *packet, CacheNode *node)
 {
     struct VideoInfo *info = (struct VideoInfo *)calloc(1, sizeof(*info));
@@ -1563,7 +1603,7 @@ static int setCacheNodeVideo(CdxPacketT *packet, CacheNode *node)
 
     return 0;
 }
-
+#endif
 static int setCacheNodeAudio(CdxPacketT *packet, CacheNode *node)
 {
     struct AudioInfo *info = (struct AudioInfo *)calloc(1, sizeof(*info));
@@ -1622,8 +1662,10 @@ static void* DemuxThread(void* arg)
     int64_t           nLastBufferingStartTimeUs;
     int64_t           nCacheStartPlaySizeIntervalUs;
     int64_t           nCurTimeUs;
+#ifndef ONLY_ENABLE_AUDIO
     int               bVideoFirstFrameShowed;
     int               nVideoInfoVersion = 0;
+#endif
     int               nAudioInfoVersion = 0;
 
     //* Declares below is to avoid stack overflow by goto statement.
@@ -1636,7 +1678,9 @@ static void* DemuxThread(void* arg)
     nLastCacheStateNotifyTimeUs         = 0;
     nLastBufferingStartTimeUs           = 0;
     nCacheStartPlaySizeIntervalUs       = 2000000;   //* adjust start play size every 2 seconds.
+#ifndef ONLY_ENABLE_AUDIO
     bVideoFirstFrameShowed              = 0;
+#endif
     demux->timeShiftLastSeqNum          =-1;
 
     while(1)
@@ -1805,7 +1849,7 @@ __prepareBegin:
 #if AWPLAYER_CONFIG_DISABLE_SUBTITLE
             flags |= DISABLE_SUBTITLE;
 #endif
-#if AWPLAYER_CONFIG_DISABLE_AUDIO
+#ifdef ONLY_DISABLE_AUDIO
             flags |= DISABLE_AUDIO;
 #endif
 #if AWPLAYER_CONFIG_DISABLE_VIDEO
@@ -1895,6 +1939,7 @@ __prepareBegin:
 
             {
                 // record playmode, duration info.
+                int mediaFormat[2];
                 char cmccLog[4096];
                 memset(cmccLog, 0, 4096);
                 if(demux->mLivemode == 1 || demux->mLivemode == 2)
@@ -1907,6 +1952,7 @@ __prepareBegin:
 
                 // record width, height info.
                 memset(cmccLog, 0, 4096);
+#ifndef ONLY_ENABLE_AUDIO
                 if(parserMediaInfo.program[0].videoNum > 0)
                 {
                     sprintf(cmccLog, "[info][%s %s %d]Video frame width: %d, height: %d",
@@ -1915,19 +1961,35 @@ __prepareBegin:
                             demux->mediaInfo.pVideoStreamInfo[0].nHeight);
                     demux->callback(demux->pUserData, DEMUX_NOTIFY_LOG_RECORDER, (void*)cmccLog);
                 }
-
+#endif
                 // record Video codec, Audio codec info.
                 memset(cmccLog, 0, 4096);
+#ifndef ONLY_ENABLE_AUDIO
                 if(parserMediaInfo.program[0].audioNum > 0 &&
                     parserMediaInfo.program[0].videoNum > 0)
                 {
+                     mediaFormat[0] = demux->mediaInfo.pVideoStreamInfo[0].eCodecFormat;
+                     mediaFormat[1] = demux->mediaInfo.pAudioStreamInfo[0].eCodecFormat;
+                     demux->callback(demux->pUserData, DEMUX_NOTIFY_MEDIA_FORMAT, (void*)mediaFormat);
+
                     sprintf(cmccLog, "[info][%s %s %d]Video codec: %d\n"
                         "       Audio codec: %d", LOG_TAG, __FUNCTION__, __LINE__,
-                        demux->mediaInfo.pVideoStreamInfo[0].eCodecFormat,
-                        demux->mediaInfo.pAudioStreamInfo[0].eCodecFormat);
+                        mediaFormat[0], mediaFormat[1]);
                     demux->callback(demux->pUserData, DEMUX_NOTIFY_LOG_RECORDER, (void*)cmccLog);
                 }
+#else
+                if(parserMediaInfo.program[0].audioNum > 0)
+                {
+                    mediaFormat[0] = 0;
+                    mediaFormat[1] = demux->mediaInfo.pAudioStreamInfo[0].eCodecFormat;
+                    demux->callback(demux->pUserData, DEMUX_NOTIFY_MEDIA_FORMAT, (void*)mediaFormat);
 
+                    sprintf(cmccLog, "[info][%s %s %d]\n"
+                        "       Audio codec: %d", LOG_TAG, __FUNCTION__, __LINE__,
+                        mediaFormat[1]);
+                    demux->callback(demux->pUserData, DEMUX_NOTIFY_LOG_RECORDER, (void*)cmccLog);
+                }
+#endif
                 // record start decoder info.
                 memset(cmccLog, 0, 4096);
                 sprintf(cmccLog, "[info][%s %s %d]start decoder", LOG_TAG, __FUNCTION__, __LINE__);
@@ -1957,6 +2019,7 @@ __prepareBegin:
             //* because wvm need secure buffer.
             if(demux->bFileStream == 0 && demux->pParser->type != CDX_PARSER_WVM )
             {
+#ifndef ONLY_ENABLE_AUDIO
                 if((demux->mediaInfo.nVideoStreamNum > 0 && !(demux->mediaInfo.pVideoStreamInfo->bSecureStreamFlag))
                   ||(demux->mediaInfo.nVideoStreamNum <= 0 && demux->mediaInfo.nAudioStreamNum > 0))
                 {
@@ -1969,19 +2032,38 @@ __prepareBegin:
                     else
                         demux->cacheThreadId = 0;
                 }
+#else
+                if(demux->mediaInfo.nAudioStreamNum > 0)
+                {
+                    if(pthread_create(&demux->cacheThreadId, NULL, CacheThread, (void*)demux) == 0){
+                        //* send a fetch message to start the cache loop.
+                        memset(&newMsg, 0, sizeof(AwMessage));
+                        newMsg.messageId = DEMUX_COMMAND_START;
+                        AwMessageQueuePostMessage(demux->mqCache, &newMsg);
+                    }
+                    else
+                        demux->cacheThreadId = 0;
+                }
+#endif
             }
 
             //* set player and media format info to cache for seek processing.
             StreamCacheSetPlayer(demux->pCache, demux->pPlayer);
+ #ifndef ONLY_ENABLE_AUDIO
             if(demux->mediaInfo.nVideoStreamNum > 0)
                 StreamCacheSetMediaFormat(demux->pCache,
                        demux->pParser->type,
                        (enum EVIDEOCODECFORMAT)demux->mediaInfo.pVideoStreamInfo->eCodecFormat,
                        demux->mediaInfo.nBitrate);
             else
+#endif
                 StreamCacheSetMediaFormat(demux->pCache,
                                           demux->pParser->type,
+ #ifndef ONLY_ENABLE_AUDIO
                                           VIDEO_CODEC_FORMAT_UNKNOWN,
+#else
+                                          0,
+#endif
                                           demux->mediaInfo.nBitrate);
             demux->eStatus = DEMUX_STATUS_PREPARED;
             if(!demux->pBuffering && demux->bFileStream == 0)
@@ -2077,13 +2159,13 @@ _endTask:
                     sem_post(pReplySem);
                 continue;
             }
-
+#ifndef ONLY_ENABLE_AUDIO
             //* in case of bVideoFirstFrameShowed == 0, demux will continue to send data to player
             //* until video first frame showed.
             //* here we set this flag to let the demux don't send data at buffering status.
             if(demux->pPlayer == NULL || PlayerHasVideo(demux->pPlayer) == 0)
                 bVideoFirstFrameShowed = 1;
-
+#endif
             demux->eStatus = DEMUX_STATUS_STARTED;
             //* send a read message to start the read loop.
             PostReadMessage(demux->mq);
@@ -2128,8 +2210,9 @@ _endTask:
                 CdxStreamClose(demux->pStream);
                 demux->pStream = NULL;
             }
-
+#ifndef ONLY_ENABLE_AUDIO
             bVideoFirstFrameShowed = 0;
+#endif
             demux->eStatus = DEMUX_STATUS_STOPPED;
             demux->bStopping = 0;
             if(pReplyValue != NULL)
@@ -2188,8 +2271,9 @@ _endTask:
             clearDataSourceFields(&demux->source);
             demux->eStatus = DEMUX_STATUS_IDLE;
             demux->bStopping = 0;
+#ifndef ONLY_ENABLE_AUDIO
             bVideoFirstFrameShowed = 0;
-
+#endif
             if(pReplyValue != NULL)
                 *pReplyValue = 0;
             if(pReplySem != NULL)
@@ -2206,8 +2290,9 @@ _endTask:
             int params[3];
 
             logd("process message DEMUX_COMMAND_SEEK.");
+#ifndef ONLY_ENABLE_AUDIO
             bVideoFirstFrameShowed = 0;
-
+#endif
             nSeekTimeMs = msg.params[2];
             if(demux->pParser != NULL)
             {
@@ -2432,8 +2517,9 @@ _endTask:
             startTime = tv.tv_sec * 1000000ll + tv.tv_usec;
 
             logd("process message DEMUX_COMMAND_RESET_URL.");
+#ifndef ONLY_ENABLE_AUDIO
             bVideoFirstFrameShowed = 0;
-
+#endif
             nSeekTimeMs = msg.params[2];
 
             char *pLiveModeType = NULL;
@@ -2462,7 +2548,7 @@ _endTask:
                 {
                     char tmpShiftedTimeUrl[4096];
                     snprintf(tmpShiftedTimeUrl,sizeof(tmpShiftedTimeUrl), "%s",demux->shiftedTimeUrl);
-                    snprintf(demux->shiftedTimeUrl,sizeof(demux->shiftedTimeUrl), "%s&starttime=%s",tmpShiftedTimeUrl, TimeStr);
+                    snprintf(demux->shiftedTimeUrl,sizeof(demux->shiftedTimeUrl), "%s&starttime=%s",tmpShiftedTimeUrl, TimeStr) < 0 ? abort() : (void)0;
                 }
             }
             else
@@ -2664,7 +2750,9 @@ _endTask:
         }
         else if(msg.messageId == DEMUX_COMMAND_NOTIFY_FIRST_FRAME_SHOWED)
         {
+#ifndef ONLY_ENABLE_AUDIO
             bVideoFirstFrameShowed = 1;
+#endif
             if(demux->eStatus == DEMUX_STATUS_STARTED)
                 PostReadMessage(demux->mq);
 
@@ -2674,6 +2762,7 @@ _endTask:
                 sem_post(pReplySem);
             continue;
         }
+#ifndef ONLY_ENABLE_AUDIO
         else if(msg.messageId == DEMUX_COMMAND_VIDEO_STREAM_CHANGE)
         {
             logv("process message DEMUX_COMMAND_VIDEO_STREAM_CHANGE!");
@@ -2693,6 +2782,7 @@ _endTask:
 
             continue;
         } //* end DEMUX_COMMAND_VIDEO_STREAM_CHANGE.
+#endif
         else if(msg.messageId == DEMUX_COMMAND_AUDIO_STREAM_CHANGE)
         {
             logv("process message DEMUX_COMMAND_AUDIO_STREAM_CHANGE!");
@@ -2717,10 +2807,10 @@ _endTask:
                 logw("demux component not in started status, ignore read message.");
                 continue;
             }
-
+#ifndef ONLY_ENABLE_AUDIO
             if (GetConfigParamterInt("show_1th_frame_quick", 0) != 1)
                 bVideoFirstFrameShowed = 1;//* cmcc not show first frame immediately
-
+#endif
             if(demux->cacheThreadId != 0)
             {
                 if(demux->bFileStream == 0)
@@ -2793,7 +2883,7 @@ _endTask:
                                 demux->bBufferStartNotified = 1;
                             }
                         }
-
+#ifndef ONLY_ENABLE_AUDIO
                         if(bVideoFirstFrameShowed == 1)
                         {
                             //* wait some time for caching.
@@ -2805,6 +2895,7 @@ _endTask:
                             PostReadMessage(demux->mq);
                             continue;
                         }
+#endif
                     }
                 }
 
@@ -2852,7 +2943,11 @@ _endTask:
                         //* more data for player.
                         // in cmcc, we should skip the next code PlayerBufferUnderflow
                         if(PlayerBufferUnderflow(demux->pPlayer) &&
-                            demux->bNeedPausePlayerNotified == 0 && bVideoFirstFrameShowed == 1)
+                            demux->bNeedPausePlayerNotified == 0
+#ifndef ONLY_ENABLE_AUDIO
+                            && bVideoFirstFrameShowed == 1
+#endif
+                            )
                         {
                             logd("detect player data underflow, notify PAUSE_PLAYER. ");
                             if(demux->bDiscontinue)
@@ -2930,21 +3025,26 @@ _endTask:
                         //********************************
                         //* 2. request buffer from player.
                         //********************************
+#ifndef ONLY_ENABLE_AUDIO
                         if(node->eMediaType == CDX_MEDIA_VIDEO)
                         {
                             ePlayerMediaType = MEDIA_TYPE_VIDEO;
                             nStreamIndex     = (node->nFlags&MINOR_STREAM)==0 ? 0 : 1;
                         }
-                        else if(node->eMediaType == CDX_MEDIA_AUDIO)
+                        else
+#endif
+                        if(node->eMediaType == CDX_MEDIA_AUDIO)
                         {
                             ePlayerMediaType = MEDIA_TYPE_AUDIO;
                             nStreamIndex     = node->nStreamIndex;
                         }
+#ifndef ONLY_ENABLE_AUDIO
                         else if(node->eMediaType == CDX_MEDIA_SUBTITLE)
                         {
                             ePlayerMediaType = MEDIA_TYPE_SUBTITLE;
                             nStreamIndex     = node->nStreamIndex;
                         }
+#endif
                         else if(node->eMediaType == CDX_MEDIA_METADATA)
                         {
                             ePlayerMediaType = MEDIA_TYPE_METADATA;
@@ -3015,7 +3115,9 @@ _endTask:
                         if (ret < 0)
                         {
                             logd("don't wait for stream buffer in paused status");
+#ifndef ONLY_ENABLE_AUDIO
                             bVideoFirstFrameShowed = 1;
+#endif
                             PostReadMessage(demux->mq);
                             continue;
                         }
@@ -3043,7 +3145,7 @@ _endTask:
                             streamDataInfo.pStreamInfo  = NULL;
                             streamDataInfo.nStreamChangeFlag = 0;
                             streamDataInfo.nStreamChangeNum = 0;
-
+#ifndef ONLY_ENABLE_AUDIO
                             if(ePlayerMediaType == MEDIA_TYPE_VIDEO && node->infoVersion == 1)
                             {
                                 logd(" demux -- video stream info change: node->info = %p",node->info);
@@ -3060,7 +3162,9 @@ _endTask:
                                 }
                                 nVideoInfoVersion = node->infoVersion;
                             }
-                            else if(ePlayerMediaType == MEDIA_TYPE_AUDIO && node->infoVersion == 1)
+                            else
+#endif
+                            if(ePlayerMediaType == MEDIA_TYPE_AUDIO && node->infoVersion == 1)
                             {
                                 logd(" demux -- audio stream info change: node->info = %p",node->info);
                                 if(node->info)
@@ -3139,6 +3243,7 @@ _endTask:
                         else
                         {
                             demux->bEOS = 1;
+                            demux->callback(demux->pUserData, DEMUX_NOTIFY_PRE_EOS, 0);
                             demux->callback(demux->pUserData, DEMUX_NOTIFY_EOS, 0);
                             demux->eStatus = DEMUX_STATUS_COMPLETE;
                         }
@@ -3146,23 +3251,27 @@ _endTask:
 
                     continue;
                 }
-
+#ifndef ONLY_ENABLE_AUDIO
                 //* 2. request buffer from player.
                 if(packet.type == CDX_MEDIA_VIDEO)
                 {
                     ePlayerMediaType = MEDIA_TYPE_VIDEO;
                     nStreamIndex     = (packet.flags&MINOR_STREAM)==0 ? 0 : 1;
                 }
-                else if(packet.type == CDX_MEDIA_AUDIO)
+                else
+#endif
+                if(packet.type == CDX_MEDIA_AUDIO)
                 {
                     ePlayerMediaType = MEDIA_TYPE_AUDIO;
                     nStreamIndex     = packet.streamIndex;
                 }
+#ifndef ONLY_ENABLE_AUDIO
                 else if(packet.type == CDX_MEDIA_SUBTITLE)
                 {
                     ePlayerMediaType = MEDIA_TYPE_SUBTITLE;
                     nStreamIndex     = packet.streamIndex;
                 }
+#endif
                 else if(packet.type == CDX_MEDIA_METADATA)
                 {
                     ePlayerMediaType = MEDIA_TYPE_METADATA;
@@ -3176,10 +3285,17 @@ _endTask:
 
                 while(1)
                 {
-                    if((!AWPLAYER_CONFIG_DISABLE_VIDEO && ePlayerMediaType == MEDIA_TYPE_VIDEO) ||
-                       (!AWPLAYER_CONFIG_DISABLE_AUDIO && ePlayerMediaType == MEDIA_TYPE_AUDIO) ||
-                       (!AWPLAYER_CONFIG_DISABLE_SUBTITLE &&
-                       ePlayerMediaType == MEDIA_TYPE_SUBTITLE))
+                    if (
+#ifndef ONLY_ENABLE_AUDIO
+						(!AWPLAYER_CONFIG_DISABLE_VIDEO && ePlayerMediaType == MEDIA_TYPE_VIDEO) || (!AWPLAYER_CONFIG_DISABLE_SUBTITLE &&ePlayerMediaType == MEDIA_TYPE_SUBTITLE)
+#ifndef ONLY_DISABLE_AUDIO
+||
+#endif
+#endif
+#ifndef ONLY_DISABLE_AUDIO
+						(ePlayerMediaType == MEDIA_TYPE_AUDIO)
+#endif
+                       )
                     {
                         ret = PlayerRequestStreamBuffer(demux->pPlayer,
                                                         packet.length,
@@ -3225,10 +3341,17 @@ _endTask:
                 ret = CdxParserRead(demux->pParser, &packet);
                 if(ret == 0)
                 {
-                    if((!AWPLAYER_CONFIG_DISABLE_VIDEO && ePlayerMediaType == MEDIA_TYPE_VIDEO) ||
-                       (!AWPLAYER_CONFIG_DISABLE_AUDIO && ePlayerMediaType == MEDIA_TYPE_AUDIO) ||
-                       (!AWPLAYER_CONFIG_DISABLE_SUBTITLE &&
-                        ePlayerMediaType == MEDIA_TYPE_SUBTITLE))
+                    if(
+#ifndef ONLY_ENABLE_AUDIO
+						   (!AWPLAYER_CONFIG_DISABLE_VIDEO && ePlayerMediaType == MEDIA_TYPE_VIDEO) || (!AWPLAYER_CONFIG_DISABLE_SUBTITLE &&ePlayerMediaType == MEDIA_TYPE_SUBTITLE)
+#ifndef ONLY_DISABLE_AUDIO
+||
+#endif
+#endif
+#ifndef ONLY_DISABLE_AUDIO
+						   (ePlayerMediaType == MEDIA_TYPE_AUDIO)
+#endif
+                     )
                     {
                         streamDataInfo.pData        = (char*)packet.buf;
                         streamDataInfo.nLength      = packet.length;
@@ -3240,6 +3363,7 @@ _endTask:
                         streamDataInfo.pStreamInfo  = NULL;
                         streamDataInfo.nStreamChangeFlag = 0;
                         streamDataInfo.nStreamChangeNum = 0;
+#ifndef ONLY_ENABLE_AUDIO
                         if(ePlayerMediaType == MEDIA_TYPE_VIDEO &&
                                 packet.infoVersion != nVideoInfoVersion)
                         {
@@ -3257,7 +3381,9 @@ _endTask:
                             nVideoInfoVersion = packet.infoVersion;
 
                         }
-                        else if(ePlayerMediaType == MEDIA_TYPE_AUDIO &&
+                        else
+#endif
+                        if(ePlayerMediaType == MEDIA_TYPE_AUDIO &&
                                 packet.infoVersion != nAudioInfoVersion)
                         {
                             if(packet.info)
@@ -3305,6 +3431,7 @@ _endTask:
                         else
                         {
                             demux->bEOS = 1;
+                            demux->callback(demux->pUserData, DEMUX_NOTIFY_PRE_EOS, 0);
                             demux->callback(demux->pUserData, DEMUX_NOTIFY_EOS, 0);
                             demux->eStatus = DEMUX_STATUS_COMPLETE;
                         }
@@ -3332,7 +3459,9 @@ static void* CacheThread(void* arg)
     int*              pReplyValue;
     DemuxCompContext* demux;
     int               eCacheStatus;
+#ifndef ONLY_ENABLE_AUDIO
     int               nVideoInfoVersion = 0;
+#endif
     int               nAudioInfoVersion = 0;
 
     demux = (DemuxCompContext*)arg;
@@ -3675,7 +3804,7 @@ reopen:
                     node.nDuration    = packet.duration;
                     node.info          = NULL;
                     node.infoVersion  = -1;
-
+#ifndef ONLY_ENABLE_AUDIO
                     if(packet.type == CDX_MEDIA_VIDEO)
                     {
                         if(packet.infoVersion != nVideoInfoVersion && packet.info)
@@ -3693,7 +3822,9 @@ reopen:
                         }
                         nVideoInfoVersion = packet.infoVersion;
                     }
-                    else if(packet.type == CDX_MEDIA_AUDIO)
+                    else
+#endif
+                    if(packet.type == CDX_MEDIA_AUDIO)
                     {
                         if(packet.infoVersion != nAudioInfoVersion && packet.info)
                         {
@@ -3943,14 +4074,19 @@ static int setMediaInfo(MediaInfo* pMediaInfo, CdxMediaInfoT* pInfoFromParser)
 {
     int                 i;
     int                 nStreamCount;
+#ifndef ONLY_ENABLE_AUDIO
     VideoStreamInfo*    pVideoStreamInfo = NULL;
+#endif
     AudioStreamInfo*    pAudioStreamInfo = NULL;
+#ifndef ONLY_ENABLE_AUDIO
     SubtitleStreamInfo* pSubtitleStreamInfo = NULL;
+#endif
     int                 nCodecSpecificDataLen;
     char*               pCodecSpecificData = NULL;
 
     clearMediaInfo(pMediaInfo);
 
+    pMediaInfo->Id3Info = pInfoFromParser;
     pMediaInfo->nDurationMs = pInfoFromParser->program[0].duration;
     pMediaInfo->nFileSize   = pInfoFromParser->fileSize;
     pMediaInfo->nFirstPts   = pInfoFromParser->program[0].firstPts;
@@ -3964,7 +4100,7 @@ static int setMediaInfo(MediaInfo* pMediaInfo, CdxMediaInfoT* pInfoFromParser)
     pMediaInfo->bSeekable   = pInfoFromParser->bSeekable;
 
     memcpy(pMediaInfo->cRotation,pInfoFromParser->rotate,4*sizeof(unsigned char));
-
+#ifndef ONLY_ENABLE_AUDIO
     nStreamCount = pInfoFromParser->program[0].videoNum;
     logv("video stream count = %d", nStreamCount);
     if(nStreamCount > 0)
@@ -4020,7 +4156,7 @@ static int setMediaInfo(MediaInfo* pMediaInfo, CdxMediaInfoT* pInfoFromParser)
 
         pMediaInfo->nVideoStreamNum = nStreamCount;
     }
-
+#endif
     //* copy audio stream info.
     nStreamCount = pInfoFromParser->program[0].audioNum;
     if(nStreamCount > 0)
@@ -4065,6 +4201,7 @@ static int setMediaInfo(MediaInfo* pMediaInfo, CdxMediaInfoT* pInfoFromParser)
         pMediaInfo->nAudioStreamNum = nStreamCount;
     }
 
+#ifndef ONLY_ENABLE_AUDIO
     //* copy subtitle stream info.
     nStreamCount = pInfoFromParser->program[0].subtitleNum;
     if(nStreamCount > 0)
@@ -4092,7 +4229,7 @@ static int setMediaInfo(MediaInfo* pMediaInfo, CdxMediaInfoT* pInfoFromParser)
 
         pMediaInfo->nSubtitleStreamNum = nStreamCount;
     }
-
+#endif
     return 0;
 }
 
@@ -4100,9 +4237,11 @@ static int setMediaInfo(MediaInfo* pMediaInfo, CdxMediaInfoT* pInfoFromParser)
 static void clearMediaInfo(MediaInfo* pMediaInfo)
 {
     int                 i;
+#ifndef ONLY_ENABLE_AUDIO
     VideoStreamInfo*    pVideoStreamInfo;
+#endif
     AudioStreamInfo*    pAudioStreamInfo;
-
+#ifndef ONLY_ENABLE_AUDIO
     if(pMediaInfo->nVideoStreamNum > 0)
     {
         for(i=0; i<pMediaInfo->nVideoStreamNum; i++)
@@ -4121,7 +4260,7 @@ static void clearMediaInfo(MediaInfo* pMediaInfo)
         pMediaInfo->pVideoStreamInfo = NULL;
         pMediaInfo->nVideoStreamNum = 0;
     }
-
+#endif
 
     if(pMediaInfo->nAudioStreamNum > 0)
     {
@@ -4142,14 +4281,14 @@ static void clearMediaInfo(MediaInfo* pMediaInfo)
         pMediaInfo->nAudioStreamNum = 0;
     }
 
-
+#ifndef ONLY_ENABLE_AUDIO
     if(pMediaInfo->nSubtitleStreamNum > 0)
     {
         free(pMediaInfo->pSubtitleStreamInfo);
         pMediaInfo->pSubtitleStreamInfo = NULL;
         pMediaInfo->nSubtitleStreamNum = 0;
     }
-
+#endif
     pMediaInfo->nFileSize      = 0;
     pMediaInfo->nDurationMs    = 0;
     pMediaInfo->eContainerType = CONTAINER_TYPE_UNKNOWN;
@@ -4161,11 +4300,14 @@ static void clearMediaInfo(MediaInfo* pMediaInfo)
 
 static int PlayerBufferOverflow(Player* p)
 {
+#ifndef ONLY_ENABLE_AUDIO
     int bVideoOverflow;
+#endif
     int bAudioOverflow;
-
+#ifndef ONLY_ENABLE_AUDIO
     int     nPictureNum;
     int     nFrameDuration;
+#endif
     int     nPcmDataSize;
     int     nSampleRate;
     int     nChannelCount;
@@ -4173,12 +4315,16 @@ static int PlayerBufferOverflow(Player* p)
     int     nStreamDataSize;
     int     nStreamBufferSize;
     int     nBitrate;
+#ifndef ONLY_ENABLE_AUDIO
     int64_t nVideoCacheTime;
+#endif
     int64_t nAudioCacheTime;
-
+#ifndef ONLY_ENABLE_AUDIO
     bVideoOverflow = 1;
+#endif
     bAudioOverflow = 1;
 
+#ifndef ONLY_ENABLE_AUDIO
     if(PlayerHasVideo(p))
     {
         nPictureNum     = PlayerGetValidPictureNum(p);
@@ -4201,7 +4347,9 @@ static int PlayerBufferOverflow(Player* p)
             nPictureNum, nFrameDuration, nStreamDataSize, nBitrate,
             bVideoOverflow,nStreamDataSize,nStreamBufferSize);
     }
+#endif
 
+#ifndef ONLY_DISABLE_AUDIO
     if(PlayerHasAudio(p))
     {
         nPcmDataSize    = PlayerGetAudioPcmDataSize(p);
@@ -4227,19 +4375,26 @@ static int PlayerBufferOverflow(Player* p)
             nBitrate = %d, nAudioCacheTime = %lld, bAudioOverflow = %d",
             nPcmDataSize, nStreamDataSize, nBitrate, nAudioCacheTime, bAudioOverflow);
     }
-
+#endif
+#ifndef ONLY_ENABLE_AUDIO
     return bVideoOverflow && bAudioOverflow;
+#else
+    return bAudioOverflow;
+#endif
 }
 
 
 static int PlayerBufferUnderflow(Player* p)
 {
+#ifndef ONLY_ENABLE_AUDIO
     int bVideoUnderflow;
+#endif
     int bAudioUnderFlow;
-
+#ifndef ONLY_ENABLE_AUDIO
     bVideoUnderflow = 0;
+#endif
     bAudioUnderFlow = 0;
-
+#ifndef ONLY_ENABLE_AUDIO
     if(PlayerHasVideo(p))
     {
         int nPictureNum;
@@ -4253,7 +4408,8 @@ static int PlayerBufferUnderflow(Player* p)
         logv("nPictureNum = %d, nStreamFrameNum = %d, bVideoUnderflow = %d",
             nPictureNum, nStreamFrameNum, bVideoUnderflow);
     }
-
+#endif
+#ifndef ONLY_DISABLE_AUDIO
     if(PlayerHasAudio(p))
     {
         int nStreamDataSize;
@@ -4269,8 +4425,13 @@ static int PlayerBufferUnderflow(Player* p)
         logv("nStreamDataSize = %d, nPcmDataSize = %d, nCacheTime = %d, bAudioUnderFlow = %d",
             nStreamDataSize, nPcmDataSize, nCacheTime, bAudioUnderFlow);
     }
-
+#endif
+#ifndef ONLY_ENABLE_AUDIO
     return bVideoUnderflow | bAudioUnderFlow;
+#else
+    return bAudioUnderFlow;
+#endif
+
 }
 
 

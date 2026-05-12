@@ -64,10 +64,11 @@ CDX_S32 CdxMovOpen(struct CdxMovParser *p, CdxStreamT *stream)
         c->streams[c->nb_streams-1] = st;
 
         c->is_fragment = 1;
+#ifndef ONLY_ENABLE_AUDIO
         c->has_video = 1;
         c->video_stream_num = 1;
         c->video_stream_idx = 0;
-
+#endif
         c->streams[0]->time_scale = 10000000; //* sms     / scale
         return 0;
     }
@@ -87,13 +88,19 @@ CDX_S32 CdxMovOpen(struct CdxMovParser *p, CdxStreamT *stream)
         return -1;
     }
 
+#ifndef ONLY_ENABLE_AUDIO
     if(c->video_stream_num > 1)
     {
         CDX_LOGW("---  video stream number <%d>, only support one video stream",
             c->video_stream_num);
     }
+#endif
 
-    if(!c->has_audio && !c->has_video)
+    if(!c->has_audio
+#ifndef ONLY_ENABLE_AUDIO
+      && !c->has_video
+#endif
+      )
     {
         CDX_LOGW("Neither audio nor video is recognized!\n");
         return -1;
@@ -136,6 +143,7 @@ CDX_S16 CdxMovClose(struct CdxMovParser *p)
             free(c->senc_data);
             c->senc_data = NULL;
         }
+#ifndef ONLY_ENABLE_AUDIO
         if(c->Vsamples)
         {
             //Sample* sample = aw_list_last(c->samples);
@@ -153,6 +161,7 @@ CDX_S16 CdxMovClose(struct CdxMovParser *p)
             aw_list_del(c->Vsamples);
             c->Vsamples = NULL;
         }
+#endif
         if(c->Asamples)
         {
             //Sample* sample = aw_list_last(c->samples);
@@ -362,7 +371,9 @@ struct CdxMovParser* CdxMovInit(CDX_S32 *ret)
     p->privData = (void *)s;
 
     s->ptr_fpsr = p;
+#ifndef ONLY_ENABLE_AUDIO
     s->Vsamples = aw_list_new();
+#endif
     s->Asamples = aw_list_new();
 
     p->vc = (VirCacheContext *)malloc(sizeof(VirCacheContext));
@@ -389,17 +400,20 @@ CDX_S32 CdxMovSetStream(struct CdxMovParser *p)
     c = (MOVContext*)p->privData;
 
     vc = p->vc;
-
+#ifndef ONLY_ENABLE_AUDIO
     c->streams[c->video_stream_idx]->real_stss_size = c->streams[c->video_stream_idx]->stss_size;
     if(c->streams[c->video_stream_idx]->stss_size == 1)
         c->streams[c->video_stream_idx]->stss_size +=
         c->streams[c->video_stream_idx]->rap_seek_count;
     logd("== stss_size: %d", c->streams[c->video_stream_idx]->stss_size);
-
+#endif
+#ifndef ONLY_ENABLE_AUDIO
     c->basetime[0] = c->streams[c->video_stream_idx]->basetime;
+#endif
     c->basetime[1] = c->streams[c->audio_stream_idx]->basetime;
+#ifndef ONLY_ENABLE_AUDIO
     c->basetime[2] = c->streams[c->subtitle_stream_idx]->basetime;
-
+#endif
     if(c->has_audio && c->totaltime < c->streams[c->audio_stream_idx]->totaltime)
         c->totaltime = c->streams[c->audio_stream_idx]->totaltime;
     //p->total_time = c->totaltime * 1000;
@@ -415,6 +429,7 @@ CDX_S32 CdxMovSetStream(struct CdxMovParser *p)
     }
     CDX_LOGD("mvhd = %d, ", c->mvhd_total_time);
 
+#ifndef ONLY_ENABLE_AUDIO
     if(c->streams[c->video_stream_idx]->stss_size<1)
     {
         //not support ff or rev
@@ -429,6 +444,7 @@ CDX_S32 CdxMovSetStream(struct CdxMovParser *p)
     {
         p->hasIdx = 1;
     }
+#endif
 
     return 0;
 }

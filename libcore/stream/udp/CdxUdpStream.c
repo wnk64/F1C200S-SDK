@@ -451,6 +451,7 @@ _err:
 int UdpDownloadData(CdxUdpStream *udpStream, cdx_uint32 *downloadSize)
 {
     int ret, endPos;
+    ret = 0;
     *downloadSize = 0;
     pthread_mutex_lock(&udpStream->bufferMutex);
     while(1)

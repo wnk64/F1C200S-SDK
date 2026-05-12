@@ -250,6 +250,8 @@ int VideoDecCompSetVideoStreamInfo(VideoDecComp* p, VideoStreamInfo* pStreamInfo
     int ret;
     pVconfig->nAlignStride = p->nGpuAlignStride;
     pVconfig->bGpuBufValid = 1;
+    pVconfig->veOpsS = NULL;
+    pVconfig->pVeOpsSelf = NULL;
 
     logd("++++++++ pVconfig->bGpuBufValid = %d,nGpuAlignStride = %d ",
          pVconfig->bGpuBufValid,p->nGpuAlignStride);
@@ -622,7 +624,7 @@ VideoPicture*  VideoDecCompReturnRelasePicture(VideoDecComp* p,
         VideoPicture* pVpicture, int bForbidUseFlag)
 {
     if(p->pDecoder != NULL)
-        return ReturnRelasePicture(p->pDecoder,pVpicture, bForbidUseFlag);
+        return ReturnReleasePicture(p->pDecoder,pVpicture, bForbidUseFlag);
 
     loge("the pDecoder is null when call VideoDecCompReturnRelasePicture()");
     return NULL;

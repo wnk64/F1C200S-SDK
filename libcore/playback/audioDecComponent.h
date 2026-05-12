@@ -11,6 +11,8 @@
 #ifndef AUDIO_DECODE_COMPONENT
 #define AUDIO_DECODE_COMPONENT
 
+#include <stdint.h>
+#include "CdxTypes.h"
 #include "player_i.h"
 #include "avtimer.h"
 #include "adecoder.h"

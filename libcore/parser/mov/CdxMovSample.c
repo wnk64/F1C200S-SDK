@@ -215,7 +215,7 @@ static CDX_S32 locatingStts(struct CdxMovParser *p,MOVStreamContext* st)
 
     return 0;
 }
-
+#ifndef ONLY_ENABLE_AUDIO
 static CDX_S32 locatingStsc(StscParameter *stsc_parameter,struct CdxMovParser *p,
                    MOVStreamContext* st)
 {
@@ -268,7 +268,7 @@ static CDX_S32 locatingStsc(StscParameter *stsc_parameter,struct CdxMovParser *p
 
     return 0;
 }
-
+#endif
 /*
 *  fragment MP4
 *  find 'moof' and get the sample from it ,then store it to a list
@@ -359,6 +359,7 @@ static CDX_S32 movReadSampleList(struct CdxMovParser *p)
     return 1;
 }
 
+#ifndef ONLY_ENABLE_AUDIO
 //only support video track time to sample
 static CDX_S32 movTimeToSample(struct CdxMovParser *p, cdx_int64 seconds)
 {
@@ -374,7 +375,6 @@ static CDX_S32 movTimeToSample(struct CdxMovParser *p, cdx_int64 seconds)
     CDX_U32   stts_idx;
 
     c = (MOVContext*)p->privData;
-
     stream_idx = c->video_stream_idx;
     time_scale = c->streams[stream_idx]->time_scale;
     duration_seek = (CDX_U64)time_scale * seconds/1000;
@@ -414,6 +414,7 @@ static CDX_S32 movTimeToSample(struct CdxMovParser *p, cdx_int64 seconds)
 
     return sample_idx;
 }
+#endif
 
 static CDX_S32 movTimeToSampleSidx(struct CdxMovParser *p, int seconds, int stream_index,
                                int type)
@@ -520,6 +521,7 @@ CDX_U64 calcCurrentTime(struct CdxMovParser *p,MOVStreamContext* st,CDX_U32 curr
     return current_time;
 }
 
+#ifndef ONLY_ENABLE_AUDIO
 /************************************************************************/
 /*  Find from current pos's nearest keyframe index                      */
 /************************************************************************/
@@ -756,7 +758,9 @@ key_frame_process:
 
     return (keyframe_num-1);
 }
+#endif
 
+#ifndef ONLY_ENABLE_AUDIO
 static CDX_S32 seekVideoSample(struct CdxMovParser *p,MOVContext *c,
                          MOVStreamContext *st,CDX_U32 sample_num)
 {
@@ -827,6 +831,7 @@ static CDX_S32 seekVideoSample(struct CdxMovParser *p,MOVContext *c,
 
     return 0;
 }
+#endif
 
 //load the first sample to chunk and time to sample
 static CDX_S32 loadFirstStscAndStts(struct CdxMovParser *p,MOVStreamContext* st,
@@ -883,7 +888,9 @@ static CDX_S32 loadFirstStscAndStts(struct CdxMovParser *p,MOVStreamContext* st,
             calc_sample_parameter->stts_sample_duration = readStts(c, st, idx+4);
 
             // for recoding 3gpp file
+#ifndef ONLY_ENABLE_AUDIO
             if(!c->has_video)
+#endif
             {
                 int i;
                 CDX_U32 duration = st->mov_idx_curr.stts_duration_acc;
@@ -1161,14 +1168,15 @@ static CDX_S32 seekAudioSample(struct CdxMovParser *p,MOVStreamContext* st,MOVCo
 
     //search audio stco > video stco
     st->mov_idx_curr.stco_idx = 0;
-
+#ifndef ONLY_ENABLE_AUDIO
     if(c->has_video)
     {
         calc_sample_parameter.seek_dts = c->streams[c->video_stream_idx]->mov_idx_curr.current_dts *
             st->time_scale/c->streams[c->video_stream_idx]->time_scale;
     }
     else
-        calc_sample_parameter.seek_dts = (CDX_U64)st->time_scale * seconds/1000;
+#endif
+    calc_sample_parameter.seek_dts = (CDX_U64)st->time_scale * seconds/1000;
 
     ret = loadFirstStscAndStts(p,st,&calc_sample_parameter);
     if(ret < 0)
@@ -1392,13 +1400,18 @@ static CDX_S16 movSeekKeySample(struct CdxMovParser *p, CDX_U32 sample_num, CDX_
     MOVContext      *c;
     CDX_S32         ret;
     CDX_S32         i;
-    CDX_U64         video_time = 0,audio_time = 0;
+#ifndef ONLY_ENABLE_AUDIO
+    CDX_U64         video_time = 0;
+#endif
+    CDX_U64  audio_time = 0;
 
     c = (MOVContext*)p->privData;
     MOVStreamContext* st;
 
     // we should seek the video firstly, then seek audio and subtitle,
     // because they are depending on video current dts after seek
+
+#ifndef ONLY_ENABLE_AUDIO
     if(c->has_video)
     {
         st = c->streams[c->video_stream_idx];
@@ -1412,6 +1425,7 @@ static CDX_S16 movSeekKeySample(struct CdxMovParser *p, CDX_U32 sample_num, CDX_
         }
         video_time = st->mov_idx_curr.current_dts * 1000 / st->time_scale;
     }
+#endif
 
     for(i=0; i<c->nb_streams; i++)
     {
@@ -1421,6 +1435,7 @@ static CDX_S16 movSeekKeySample(struct CdxMovParser *p, CDX_U32 sample_num, CDX_
         //----------------------------------------------------
         if(st->stsd_type == 2)
         {
+#ifndef ONLY_ENABLE_AUDIO
             if(c->has_video)
             {
                 if(seconds == 0 || video_time == 0)
@@ -1433,6 +1448,7 @@ static CDX_S16 movSeekKeySample(struct CdxMovParser *p, CDX_U32 sample_num, CDX_
                     st->mov_idx_curr.sample_idx = 0;
                 }
             }
+#endif
             ret = seekAudioSample(p,st,c,seconds);
             if(ret < 0)
             {
@@ -1443,6 +1459,7 @@ static CDX_S16 movSeekKeySample(struct CdxMovParser *p, CDX_U32 sample_num, CDX_
         //----------------------------------------------------
         //      we should update subtitle offsets also
         //----------------------------------------------------
+#ifndef ONLY_ENABLE_AUDIO
         else if(st->stsd_type == 3)
         {
             ret = seekSubtitleSample(p,st,c);
@@ -1451,9 +1468,11 @@ static CDX_S16 movSeekKeySample(struct CdxMovParser *p, CDX_U32 sample_num, CDX_
                 return ret;
             }
         }
+#endif
     }
+#ifndef ONLY_ENABLE_AUDIO
     CDX_LOGD("--- +++++video_time:%lld audio_time:%lld\n",video_time,audio_time);
-
+#endif
     return 0;
 }
 
@@ -1615,6 +1634,7 @@ static CDX_S32 calcStts(struct CdxMovParser *p,MOVContext *c,MOVStreamContext* s
                     (CDX_U64)st->mov_idx_curr.stts_sample_duration *
                     (st->mov_idx_curr.stts_samples_acc - st->mov_idx_curr.sample_idx);
     }
+#ifndef ONLY_ENABLE_AUDIO
     // only video sample need add cts
     if(st->stsd_type == 1 && !c->is_fragment && st->eCodecFormat != VIDEO_CODEC_FORMAT_H265)
     {
@@ -1638,6 +1658,7 @@ static CDX_S32 calcStts(struct CdxMovParser *p,MOVContext *c,MOVStreamContext* s
         st->mov_idx_curr.current_duration = (CDX_U64)st->mov_idx_curr.stts_sample_duration;
     }
     else
+#endif
     {
         st->mov_idx_curr.current_duration =
                         (CDX_U64)st->mov_idx_curr.stts_sample_duration *
@@ -1714,12 +1735,15 @@ CDX_S16 MovReadSampleFragment(struct CdxMovParser *p)
 {
     int ret;
     MOVContext*         s = (MOVContext*)p->privData;
+#ifndef ONLY_ENABLE_AUDIO
     AW_List* Vsamples = s->Vsamples;
+#endif
     AW_List* Asamples = s->Asamples;
     MOV_CHUNK* chunk_info = &s->chunk_info;
     int a_end = 0, v_end = 0;
-
+#ifndef ONLY_ENABLE_AUDIO
     if(!s->has_audio)
+#endif
     {
         a_end = 1;
     }
@@ -1745,6 +1769,7 @@ CDX_S16 MovReadSampleFragment(struct CdxMovParser *p)
             }
         }
     }
+#ifndef ONLY_ENABLE_AUDIO
     if(s->has_video && !v_end)
     {
         while(!aw_list_count(Vsamples) )
@@ -1761,14 +1786,18 @@ CDX_S16 MovReadSampleFragment(struct CdxMovParser *p)
             }
         }
     }
+#endif
 
     CDX_U64 apts = 0xFFFFFFFF, vpts = 0xFFFFFFFF;
-    Sample* Vsample = NULL;
     Sample* Asample = NULL;
+#ifndef ONLY_ENABLE_AUDIO
+    Sample* Vsample = NULL;
     CDX_U64 voffset = 0xFFFFFFFF;
-    CDX_U64 aoffset = 0xFFFFFFFF;
     CDX_U64 vNum = aw_list_count(Vsamples);
+#endif
+    CDX_U64 aoffset = 0xFFFFFFFF;
     //CDX_LOGD("lin vNum = %llu, s->video_stream_idx = %d", vNum, s->video_stream_idx);
+#ifndef ONLY_ENABLE_AUDIO
     if(s->has_video && vNum)
     {
         // get the video sample
@@ -1798,7 +1827,7 @@ CDX_S16 MovReadSampleFragment(struct CdxMovParser *p)
            s->video_stream_idx, s->streams[s->video_stream_idx]->time_scale,
            s->basetime[0], voffset);
     }
-
+#endif
     if(s->has_audio && aw_list_count(Asamples))
     {
         //get the audio sample and the sample pts
@@ -1820,6 +1849,7 @@ CDX_S16 MovReadSampleFragment(struct CdxMovParser *p)
     // how to select the sample( audio or video ) to show, there were two methods to deal with it
     // @ 1.compare with their pts, the sample with the smaller pts would be show in first
     // @ 2.compare with their sample offset. this method should be used in network
+#ifndef ONLY_ENABLE_AUDIO
     if( (vpts < apts) && s->has_video && !v_end)
     {
         s->streams[s->video_stream_idx]->mov_idx_curr.current_dts += (CDX_U64)Vsample->duration;
@@ -1837,7 +1867,9 @@ CDX_S16 MovReadSampleFragment(struct CdxMovParser *p)
             return -1;
         }
     }
-    else if((vpts >= apts) && s->has_audio && !a_end)
+    else
+#endif
+    if((vpts >= apts) && s->has_audio && !a_end)
     {
         s->streams[s->audio_stream_idx]->mov_idx_curr.current_dts += (CDX_U64)Asample->duration;
         s->streams[s->audio_stream_idx]->mov_idx_curr.current_duration =
@@ -1972,6 +2004,7 @@ CDX_S32 MovSeekSampleFragment(struct CdxMovParser *p,MOVContext *c,cdx_int64  ti
     CDX_S32    result;
 
     // need to clean up Vsamples and Asamples
+#ifndef ONLY_ENABLE_AUDIO
     while(aw_list_count(c->Vsamples))
     {
         void* item = aw_list_last(c->Vsamples);
@@ -1982,6 +2015,7 @@ CDX_S32 MovSeekSampleFragment(struct CdxMovParser *p,MOVContext *c,cdx_int64  ti
             item = NULL;
         }
     }
+#endif
     while(aw_list_count(c->Asamples))
     {
         void* item = aw_list_last(c->Asamples);
@@ -1996,7 +2030,7 @@ CDX_S32 MovSeekSampleFragment(struct CdxMovParser *p,MOVContext *c,cdx_int64  ti
     //sidx mode for single url in DASH
     if(!p->bDashSegment && !p->bSmsSegment) //* for sms
     {
-
+#ifndef ONLY_ENABLE_AUDIO
         if(c->has_video)
         {
             result = movTimeToSampleSidx(p, timeUs/1000, c->video_stream_idx, 0);
@@ -2005,6 +2039,7 @@ CDX_S32 MovSeekSampleFragment(struct CdxMovParser *p,MOVContext *c,cdx_int64  ti
                 return -1;
             }
         }
+#endif
         if(c->has_audio)
         {
             result = movTimeToSampleSidx(p, timeUs/1000, c->audio_stream_idx, 1);
@@ -2019,6 +2054,7 @@ CDX_S32 MovSeekSampleFragment(struct CdxMovParser *p,MOVContext *c,cdx_int64  ti
     else  //mutil url in DASH
     {
         result = MovReadSampleFragment(p);
+#ifndef ONLY_ENABLE_AUDIO
         if(c->has_video)
         {
             result = movTimeToSampleSidx(p, timeUs/1000, c->video_stream_idx, 0);
@@ -2027,6 +2063,7 @@ CDX_S32 MovSeekSampleFragment(struct CdxMovParser *p,MOVContext *c,cdx_int64  ti
                 return -1;
             }
         }
+#endif
         if(c->has_audio)
         {
             result = movTimeToSampleSidx(p, timeUs/1000, c->audio_stream_idx, 1);
@@ -2054,7 +2091,7 @@ CDX_S32 MovSeekSample(struct CdxMovParser *p,MOVContext *c,cdx_int64 seekTime,
     {
        c->isReadEnd = 0;
     }
-
+#ifndef ONLY_ENABLE_AUDIO
     if (c->has_video)
     {
         //find the video sample nearest seekTime
@@ -2096,6 +2133,7 @@ CDX_S32 MovSeekSample(struct CdxMovParser *p,MOVContext *c,cdx_int64 seekTime,
             }
         }
     }
+#endif
     result = movSeekKeySample(p, frmidx, seekTime);
     if(result < 0)
     {

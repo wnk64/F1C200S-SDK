@@ -257,7 +257,7 @@ static cdx_int32 __FileStreamSeek(CdxStreamT *stream, cdx_int64 offset, cdx_int3
         if (offset < 0 || offset > impl->size)
         {
             CDX_LOGE("invalid arguments, offset(%lld), size(%lld)", offset, impl->size);
-            CdxDumpThreadStack((pthread_t)gettid_sunxi());
+            CdxDumpThreadStack((pthread_t)gettid());
             CdxAtomicSet(&impl->state, FILE_STREAM_IDLE);
             return -1;
         }
@@ -271,7 +271,7 @@ static cdx_int32 __FileStreamSeek(CdxStreamT *stream, cdx_int64 offset, cdx_int3
         {
             CDX_LOGE("invalid arguments, offset(%lld), size(%lld), curPos(%lld)",
                      offset, impl->size, curPos);
-            CdxDumpThreadStack((pthread_t)gettid_sunxi());
+            CdxDumpThreadStack((pthread_t)gettid());
             CdxAtomicSet(&impl->state, FILE_STREAM_IDLE);
             return -1;
         }
@@ -285,7 +285,7 @@ static cdx_int32 __FileStreamSeek(CdxStreamT *stream, cdx_int64 offset, cdx_int3
         {
             CDX_LOGE("invalid arguments, offset(%lld), size(%lld)",
                      absOffset, impl->offset + impl->size);
-            CdxDumpThreadStack((pthread_t)gettid_sunxi());
+            CdxDumpThreadStack((pthread_t)gettid());
             CdxAtomicSet(&impl->state, FILE_STREAM_IDLE);
             return -1;
         }
@@ -371,7 +371,7 @@ static cdx_int32 __FileStreamGetMetaData(CdxStreamT *stream, const cdx_char *key
 
 cdx_int32 __FileStreamConnect(CdxStreamT *stream)
 {
-    cdx_int32 ret = 0;
+	cdx_int32 flags = 0, ret = 0;
     struct CdxFileStreamImplS *impl;
 
     CDX_CHECK(stream);
@@ -386,6 +386,9 @@ cdx_int32 __FileStreamConnect(CdxStreamT *stream)
             ret = -1;
             goto failure;
         }
+		flags = fcntl(impl->fd, F_GETFD, NULL);
+		flags |= FD_CLOEXEC;
+		fcntl(impl->fd, F_SETFD, flags);
 
         impl->offset = 0;
         impl->size = cdxfseek64(impl->fd, 0, SEEK_END);

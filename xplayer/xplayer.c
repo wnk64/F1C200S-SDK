@@ -22,10 +22,15 @@
 #include "player.h"
 #include "demuxComponent.h"
 #include "AwMessageQueue.h"
+#ifndef ONLY_ENABLE_AUDIO
 #include "layerControl.h"
+#endif
 #include "soundControl.h"
+
+#ifndef ONLY_ENABLE_AUDIO
 #include "subtitleControl.h"
 #include "deinterlace.h"
+#endif
 #include "CdxParser.h"
 #include <sys/time.h>
 #include "CdxTime.h"
@@ -46,21 +51,23 @@ static const int XPLAYER_STATUS_COMPLETE    = 1<<6;
 static const int XPLAYER_STATUS_ERROR       = 1<<7;
 
 //* command id.
-static const int XPLAYER_COMMAND_SET_SOURCE    = 0x101;
-static const int XPLAYER_COMMAND_SET_SURFACE   = 0x102;
-static const int XPLAYER_COMMAND_SET_AUDIOSINK = 0x103;
-static const int XPLAYER_COMMAND_PREPARE       = 0x104;
-static const int XPLAYER_COMMAND_START         = 0x105;
-static const int XPLAYER_COMMAND_STOP          = 0x106;
-static const int XPLAYER_COMMAND_PAUSE         = 0x107;
-static const int XPLAYER_COMMAND_RESET         = 0x108;
-static const int XPLAYER_COMMAND_QUIT          = 0x109;
-static const int XPLAYER_COMMAND_SEEK          = 0x10a;
-static const int XPLAYER_COMMAND_RESETURL      = 0x10b;
-static const int XPLAYER_COMMAND_SETSPEED      = 0x10c;
-static const int XPLAYER_COMMAND_SET_SUBCTRL   = 0x10d;
-static const int XPLAYER_COMMAND_SET_DI        = 0x10e;
-static const int XPLAYER_COMMAND_SET_PLAYRATE  = 0x10f;
+typedef enum {
+	XPLAYER_COMMAND_SET_SOURCE = 0x101,
+	XPLAYER_COMMAND_SET_SURFACE,
+	XPLAYER_COMMAND_SET_AUDIOSINK,
+	XPLAYER_COMMAND_PREPARE,
+	XPLAYER_COMMAND_START,
+	XPLAYER_COMMAND_STOP,
+	XPLAYER_COMMAND_PAUSE,
+	XPLAYER_COMMAND_RESET,
+	XPLAYER_COMMAND_QUIT,
+	XPLAYER_COMMAND_SEEK,
+	XPLAYER_COMMAND_RESETURL,
+	XPLAYER_COMMAND_SETSPEED,
+	XPLAYER_COMMAND_SET_SUBCTRL,
+	XPLAYER_COMMAND_SET_DI,
+	XPLAYER_COMMAND_SET_PLAYRATE
+} xplayer_command_t;
 
 typedef struct PlayerContext
 {
@@ -78,31 +85,32 @@ typedef struct PlayerContext
     int                 mSourceFd;        //* file descriptor.
     int64_t             mSourceFdOffset;
     int64_t             mSourceFdLength;
-
+#ifndef ONLY_ENABLE_AUDIO
     //for setting scale down
     //* bSetScaleDown = 0 means do not set scale down.
     //* bSetScaleDown = 1 means scaling when the resolution is larger than 2k.
     //* here the case of the VR9 call bSetScaleDown = 1.
     //* bSetScaleDown = 2 means scaling at any resolution.
     int                 bSetScaleDown;
-
+#endif
     //* media information.
     MediaInfo*          mMediaInfo;
-
+#ifndef ONLY_ENABLE_AUDIO
     //* text codec format of the subtitle, used to transform subtitle text to
     //* utf8 when the subtitle text codec format is unknown.
     char                mDefaultTextFormat[32];
 
     //* whether enable subtitle show.
     int                 mIsSubtitleDisable;
-
+#endif
     //* file descriptor of .idx file of index+sub subtitle.
     //* we save the .idx file's fd here because application set .idx file and .sub file
     //* seperately, we need to wait for the .sub file's fd, see
     //* INVOKE_ID_ADD_EXTERNAL_SOURCE_FD command in invoke() method.
     int                 mIndexFileHasBeenSet;
+#ifndef ONLY_ENABLE_AUDIO
     int                 mIndexFileFdOfIndexSubtitle;
-
+#endif
     //* for status and synchronize control.
     int                 mStatus;
     pthread_mutex_t     mMutexMediaInfo;    //* for media info protection.
@@ -116,12 +124,16 @@ typedef struct PlayerContext
     sem_t               mSemQuit;
     sem_t               mSemReset;
     sem_t               mSemSeek;
+#ifndef ONLY_ENABLE_AUDIO
     sem_t               mSemSetSurface;
+#endif
     sem_t               mSemSetAudioSink;
     sem_t               mSemPrepareFinish;//* for signal prepare finish, used in prepare().
+#ifndef ONLY_ENABLE_AUDIO
     sem_t               mSemSetSpeed;
     sem_t               mSemSetSubCtrl;
     sem_t               mSemSetDeinterlace;
+#endif
     sem_t               mSemSetPlayBackSettings;
 
     //* status control.
@@ -132,12 +144,16 @@ typedef struct PlayerContext
     int                 mPauseReply;
     int                 mResetReply;
     int                 mSeekReply;
+#ifndef ONLY_ENABLE_AUDIO
     int                 mSetSurfaceReply;
+#endif
     int                 mSetAudioSinkReply;
     int                 mPrepareFinishResult;   //* save the prepare result for prepare().
+#ifndef ONLY_ENABLE_AUDIO
     int                 mSetSpeedReply;
     int                 mSetSubCtrlReply;
     int                 mSetDeinterlaceReply;
+#endif
     int                 mSetPlayBackSettingsReply;
 
     int                 mPrepareSync;   //* synchroized prarare() call, don't call back to user.
@@ -149,19 +165,20 @@ typedef struct PlayerContext
     SeekModeType        mSeekModeType;
     int                 mSeekSync;  //* internal seek, don't call back to user.
     int                 mLoop;
+#ifndef ONLY_ENABLE_AUDIO
     int                 mKeepLastFrame;
     int                 mVideoSizeWidth;  //* use to record videoSize which had send to app
     int                 mVideoSizeHeight;
-
+#endif
     enum AwApplicationType mApplicationType;
 
     void*               mHTTPService;
-
+#ifndef ONLY_ENABLE_AUDIO
     //* record the id of subtitle which is displaying
     //* we set the Nums to 64 .(32 may be not enough)
     unsigned int        mSubtitleDisplayIds[64];
     int                 mSubtitleDisplayIdsUpdateIndex;
-
+#endif
     //* save the currentSelectTrackIndex;
     int                 mCurrentSelectTrackIndex;
     int                 mRawOccupyFlag;
@@ -171,7 +188,9 @@ typedef struct PlayerContext
     int                 mbIsDiagnose;
     int64_t             mPauseTimeStamp;    //us
     int64_t             mShiftTimeStamp;    //us
+#ifndef ONLY_ENABLE_AUDIO
     int                 mDisplayRatio;
+#endif
     int64_t             mCurShiftTimeStamp; //us
     int64_t             mTimeShiftDuration; //ms
 
@@ -185,7 +204,7 @@ typedef struct PlayerContext
 
     int                 mPreSeekTimeMs;
     int                 mTimeMsBeforeStop;  //softdetector
-
+#ifndef ONLY_ENABLE_AUDIO
     int                 mSpeed;
     int                 mbFast;
     int                 mFastTime;
@@ -198,10 +217,13 @@ typedef struct PlayerContext
     int                 mHeightScaledownRatio;
 
     int                 mVideoRotateDegree;
-
+#endif
     XPlayerNotifyCallback mCallback;
     void*                  pUser;
     AwBufferingSettings* pBuffering;
+    int                  mVideoLbcMode;
+	int					mBreakPointFlag;
+	int					mBreakPointTime;
 }PlayerContext;
 
 static void* XPlayerThread(void* arg);
@@ -233,14 +255,17 @@ XPlayer* XPlayerCreate()
     mPriData->mSeekByInner    = 0;
     mPriData->mSeekSync       = 0;
     mPriData->mLoop           = 0;
+#ifndef ONLY_ENABLE_AUDIO
     mPriData->mKeepLastFrame  = 0;
-    mPriData->mMediaInfo      = NULL;
-    mPriData->mMessageQueue   = NULL;
     mPriData->mVideoSizeWidth = 0;
     mPriData->mVideoSizeHeight= 0;
     mPriData->mScaledownFlag =0;
     mPriData->mWidthScaledownRatio = 0;
     mPriData->mHeightScaledownRatio = 0;
+    mPriData->mVideoLbcMode = 0;
+#endif
+    mPriData->mMediaInfo      = NULL;
+    mPriData->mMessageQueue   = NULL;
     mPriData->mCurrentSelectTrackIndex = -1;
 
     mPriData->mDemuxNotifyPause = 0;
@@ -259,13 +284,14 @@ XPlayer* XPlayerCreate()
     sem_init(&mPriData->mSemReset, 0, 0);
     sem_init(&mPriData->mSemQuit, 0, 0);
     sem_init(&mPriData->mSemSeek, 0, 0);
+#ifndef ONLY_ENABLE_AUDIO
     sem_init(&mPriData->mSemSetSurface, 0, 0);
-    sem_init(&mPriData->mSemSetAudioSink, 0, 0);
     sem_init(&mPriData->mSemSetSubCtrl, 0, 0);
     sem_init(&mPriData->mSemSetDeinterlace, 0, 0);
-
-    sem_init(&mPriData->mSemPrepareFinish, 0, 0); //* for signal prepare finish, used in prepare().
     sem_init(&mPriData->mSemSetSpeed, 0, 0);
+#endif
+    sem_init(&mPriData->mSemSetAudioSink, 0, 0);
+    sem_init(&mPriData->mSemPrepareFinish, 0, 0); //* for signal prepare finish, used in prepare().
     sem_init(&mPriData->mSemSetPlayBackSettings, 0, 0);
 
     mPriData->mMessageQueue = AwMessageQueueCreate(64, "XPlayer");
@@ -285,21 +311,19 @@ XPlayer* XPlayerCreate()
         mPriData->mThreadCreated = 1;
     else
         mPriData->mThreadCreated = 0;
-
+#ifndef ONLY_ENABLE_AUDIO
     strcpy(mPriData->mDefaultTextFormat, "GBK");
-
     mPriData->mIndexFileFdOfIndexSubtitle = -1;
-    mPriData->mIndexFileHasBeenSet = 0;
     memset(mPriData->mSubtitleDisplayIds,0xff,64*sizeof(unsigned int));
     mPriData->mSubtitleDisplayIdsUpdateIndex = 0;
-    mPriData->mApplicationType = APP_DEFAULT;
-    mPriData->mRawOccupyFlag = 0;
-
     mPriData->mSpeed = 1;
     mPriData->mbFast = 0;
     mPriData->mFastTime = 0;
     mPriData->mSpeedThreadRuning = 0;
-
+#endif
+    mPriData->mIndexFileHasBeenSet = 0;
+    mPriData->mApplicationType = APP_DEFAULT;
+    mPriData->mRawOccupyFlag = 0;
     return mPriData;
 }
 
@@ -327,14 +351,14 @@ void XPlayerDestroy(XPlayer* p)
         SemTimedWait(&mPriData->mSemQuit, -1);
         pthread_join(mPriData->mThreadId, &status);
     }
-
+#ifndef ONLY_ENABLE_AUDIO
     if (mPriData->mSpeedThreadRuning == 1)
     {
         void* status;
         mPriData->mSpeedThreadRuning = 0;
         pthread_join(mPriData->mSpeedThreadId,&status);
     }
-
+#endif
     if(mPriData->mDemux != NULL)
         DemuxCompDestroy(mPriData->mDemux);
 
@@ -357,12 +381,14 @@ void XPlayerDestroy(XPlayer* p)
     sem_destroy(&mPriData->mSemReset);
     sem_destroy(&mPriData->mSemQuit);
     sem_destroy(&mPriData->mSemSeek);
+#ifndef ONLY_ENABLE_AUDIO
     sem_destroy(&mPriData->mSemSetSurface);
-    sem_destroy(&mPriData->mSemSetAudioSink);
-    sem_destroy(&mPriData->mSemPrepareFinish);
     sem_destroy(&mPriData->mSemSetSpeed);
     sem_destroy(&mPriData->mSemSetSubCtrl);
     sem_destroy(&mPriData->mSemSetDeinterlace);
+#endif
+    sem_destroy(&mPriData->mSemSetAudioSink);
+    sem_destroy(&mPriData->mSemPrepareFinish);
     sem_destroy(&mPriData->mSemSetPlayBackSettings);
 
     if(mPriData->mMediaInfo != NULL)
@@ -374,8 +400,10 @@ void XPlayerDestroy(XPlayer* p)
     if(mPriData->mSourceFd != -1)
         close(mPriData->mSourceFd);
 
+#ifndef ONLY_ENABLE_AUDIO
     if(mPriData->mIndexFileFdOfIndexSubtitle != -1)
         close(mPriData->mIndexFileFdOfIndexSubtitle);
+#endif
 
     free(mPriData);
 }
@@ -426,6 +454,7 @@ int XPlayerSetHdcpOps(XPlayer* p, struct HdcpOpsS* pHdcp)
     return 0;
 }
 
+#ifndef ONLY_ENABLE_AUDIO
 int XPlayerSetScaleDown(XPlayer* p,int bSetScaleDown)
 {
     if(p != NULL)
@@ -440,6 +469,7 @@ int XPlayerSetScaleDown(XPlayer* p,int bSetScaleDown)
         return -1;
     }
 }
+#endif
 
 int XPlayerSetDataSourceUrl(XPlayer* p,
                             const char* pUrl,
@@ -461,7 +491,10 @@ int XPlayerSetDataSourceUrl(XPlayer* p,
     DemuxCompSetLiveMode(mPriData->mDemux, p->mLivemode);
 
     mPriData->mHTTPService = httpService;
+
+#ifndef ONLY_ENABLE_AUDIO
     PlayerConfigDispErrorFrame(mPriData->mPlayer, 0);
+#endif
 
     //* send a set data source message.
     memset(&msg, 0, sizeof(AwMessage));
@@ -510,8 +543,9 @@ int XPlayerSetDataSourceFd(XPlayer* p, int fd, int64_t offset, int64_t length)
     int ret = 0;
     PlayerContext* mPriData = (PlayerContext*)p;
     logv("setDataSource(fd), fd=%d", fd);
-
+#ifndef ONLY_ENABLE_AUDIO
     PlayerConfigDispErrorFrame(mPriData->mPlayer, 0);
+#endif
     //* send a set data source message.
     memset(&msg, 0, sizeof(AwMessage));
     msg.messageId = XPLAYER_COMMAND_SET_SOURCE;
@@ -548,9 +582,9 @@ int XPlayerSetDataSourceStream(XPlayer* p, const char* streamStr)
     logd("setDataSource(IStreamSource)");
 
     PlayerContext* mPriData = (PlayerContext*)p;
-
+#ifndef ONLY_ENABLE_AUDIO
     PlayerConfigDispErrorFrame(mPriData->mPlayer, 1);
-
+#endif
     //* send a set data source message.
     memset(&msg, 0, sizeof(AwMessage));
     msg.messageId = XPLAYER_COMMAND_SET_SOURCE;
@@ -569,9 +603,9 @@ int XPlayerSetMediaDataSource(XPlayer* p, const char* streamStr)
     logd("setDataSource(MediaDataSource)");
 
     PlayerContext* mPriData = (PlayerContext*)p;
-
+#ifndef ONLY_ENABLE_AUDIO
     PlayerConfigDispErrorFrame(mPriData->mPlayer, 1);
-
+#endif
     //* send a set data source message.
     memset(&msg, 0, sizeof(AwMessage));
     msg.messageId = XPLAYER_COMMAND_SET_SOURCE;
@@ -584,7 +618,7 @@ int XPlayerSetMediaDataSource(XPlayer* p, const char* streamStr)
     return mPriData->mSetDataSourceReply;
 }
 
-
+#ifndef ONLY_ENABLE_AUDIO
 //* set video layer control ops
 int XPlayerSetVideoSurfaceTexture(XPlayer* p, const LayerCtrl* surfaceTexture)
 {
@@ -604,7 +638,8 @@ int XPlayerSetVideoSurfaceTexture(XPlayer* p, const LayerCtrl* surfaceTexture)
 
     return mPriData->mSetSurfaceReply;
 }
-
+#endif
+#ifndef ONLY_DISABLE_AUDIO
 void XPlayerSetAudioSink(XPlayer* p, const SoundCtrl* audioSink)
 {
     AwMessage msg;
@@ -668,7 +703,9 @@ int XPlayerGetPlaybackSettings(XPlayer* p,XAudioPlaybackRate *rate)
     }
     return ret;
 }
-
+#endif
+#ifndef ONLY_ENABLE_AUDIO
+#if !AWPLAYER_CONFIG_DISABLE_SUBTITLE
 void XPlayerSetSubCtrl(XPlayer* p, const SubCtrl* subctrl)
 {
     AwMessage msg;
@@ -686,7 +723,7 @@ void XPlayerSetSubCtrl(XPlayer* p, const SubCtrl* subctrl)
 
     return;
 }
-
+#endif
 void XPlayerSetDeinterlace(XPlayer* p, const Deinterlace* di)
 {
     AwMessage msg;
@@ -704,6 +741,7 @@ void XPlayerSetDeinterlace(XPlayer* p, const Deinterlace* di)
 
     return;
 }
+#endif
 
 int XPlayerSetNotifyCallback(XPlayer* p,
                                     XPlayerNotifyCallback notifier,
@@ -797,6 +835,11 @@ int XPlayerStart(XPlayer* p)
     }
 #endif
 
+	if(mPriData->mBreakPointTime > 0 && mPriData->mBreakPointFlag == 1)
+	{
+		XPlayerSeekTo(p, mPriData->mBreakPointTime, mPriData->mSeekModeType);
+		mPriData->mBreakPointFlag = 0;
+	}
     //* send a start message.
     memset(&msg, 0, sizeof(AwMessage));
     msg.messageId = XPLAYER_COMMAND_START;
@@ -959,6 +1002,7 @@ int XPlayerReset(XPlayer* p)
     return mPriData->mResetReply;
 }
 
+#ifndef ONLY_ENABLE_AUDIO
 int XPlayerSetSpeed(XPlayer* p, int nSpeed)
 {
     AwMessage msg;
@@ -974,7 +1018,9 @@ int XPlayerSetSpeed(XPlayer* p, int nSpeed)
         mPriData->mSpeed = 1;
         mPriData->mFastTime = 0;
         XPlayerStart(p);
+#ifndef ONLY_DISABLE_AUDIO
         PlayerSetDiscardAudio(mPriData->mPlayer, 0);
+#endif
         return 0;
     }
 
@@ -990,10 +1036,11 @@ int XPlayerSetSpeed(XPlayer* p, int nSpeed)
 
     return mPriData->mSetSpeedReply;
 }
+#endif
 
 int XPlayerIsPlaying(XPlayer* p)
 {
-    logi("isPlaying");
+  //  logi("isPlaying");
     PlayerContext* mPriData = (PlayerContext*)p;
     if(mPriData->mStatus == XPLAYER_STATUS_STARTED ||
         (mPriData->mStatus == XPLAYER_STATUS_COMPLETE && mPriData->mLoop != 0))
@@ -1169,6 +1216,7 @@ int XPlayerSetLooping(XPlayer* p, int loop)
     return 0;
 }
 
+#ifndef ONLY_ENABLE_AUDIO
 int updateVideoInfo(XPlayer* p)
 {
     //* get media information.
@@ -1208,6 +1256,7 @@ int updateVideoInfo(XPlayer* p)
     pthread_mutex_unlock(&mPriData->mMutexMediaInfo);
     return 0;
 }
+#endif
 
 int updateAudioInfo(XPlayer* p)
 {
@@ -1229,7 +1278,7 @@ int updateAudioInfo(XPlayer* p)
     clearMediaInfo(p);
     mPriData->mMediaInfo = mi;
 
-#if !AWPLAYER_CONFIG_DISABLE_AUDIO
+#ifndef ONLY_DISABLE_AUDIO
     if(mi->pAudioStreamInfo != NULL)
     {
         int                 i;
@@ -1266,7 +1315,7 @@ int updateAudioInfo(XPlayer* p)
     return 0;
 }
 
-
+#ifndef ONLY_ENABLE_AUDIO
 /*
  *ret 1 means need to scale down
  *    0 is do nothing
@@ -1297,13 +1346,13 @@ int getScaledownFlag(const MediaInfo *mi,int bSetScaleDown)
     {
         if (mi->pVideoStreamInfo->eCodecFormat == VIDEO_CODEC_FORMAT_H265)
         {
-#if !defined(CONF_H265_4K_P2P) /* only H3/H5 support H.265 p2p */
+#if !defined(CONF_H265_4K_P2P) && !defined(CONF_H265_4K) /* only H3/H5 support H.265 p2p */
             ret = 1;
 #endif
         }
         else if (mi->pVideoStreamInfo->eCodecFormat == VIDEO_CODEC_FORMAT_H264)
         {
-#if !defined(CONF_H264_4K_P2P)  /* only A80 support H.264 p2p */
+#if !defined(CONF_H264_4K_P2P) && !defined(CONF_H264_4K)  /* only A80 support H.264 p2p */
             ret = 1;
 #endif
         }
@@ -1324,7 +1373,7 @@ int XPlayerSetScaleDownRatio(XPlayer* p,int widthRatio,int heightRatio){
     PlayerContext* mPriData = (PlayerContext*)p;
     if((mPriData != NULL)&& (mPriData->mStatus==XPLAYER_STATUS_IDLE
         || mPriData->mStatus==XPLAYER_STATUS_INITIALIZED
-        || mPriData->mStatus==XPLAYER_STATUS_PREPARING) ){
+        || mPriData->mStatus==XPLAYER_STATUS_PREPARING)){
         mPriData->mWidthScaledownRatio = widthRatio;
         mPriData->mHeightScaledownRatio = heightRatio;
         return 0;
@@ -1378,17 +1427,24 @@ int checkVideoSupported(const MediaInfo *mi)
     logv("check video support ret = [%d]", ret);
     return ret;
 }
+#endif
 
 static int initializePlayer(XPlayer* p)
 {
     //* get media information.
     MediaInfo*          mi;
+#ifndef ONLY_ENABLE_AUDIO
     VideoStreamInfo*    vi;
+#endif
     AudioStreamInfo*    ai;
+#ifndef ONLY_ENABLE_AUDIO
     SubtitleStreamInfo* si;
+#endif
     int                 i;
     int                 nDefaultAudioIndex;
+#ifndef ONLY_ENABLE_AUDIO
     int                 nDefaultSubtitleIndex;
+#endif
     int                 ret;
     PlayerContext* mPriData = (PlayerContext*)p;
 
@@ -1401,12 +1457,13 @@ static int initializePlayer(XPlayer* p)
         pthread_mutex_unlock(&mPriData->mMutexMediaInfo);
         return -1;
     }
-
+#ifndef ONLY_ENABLE_AUDIO
     if(mi->nBitrate > 0)
         PlayerSetVideoAvgByteRate(mPriData->mPlayer, mi->nBitrate/8);
-
+#endif
     PlayerSetFirstPts(mPriData->mPlayer,mi->nFirstPts);
     mPriData->mMediaInfo = mi;
+#ifndef ONLY_ENABLE_AUDIO
     if(mi->pVideoStreamInfo != NULL)
     {
         /*detect if support*/
@@ -1415,19 +1472,17 @@ static int initializePlayer(XPlayer* p)
             loge("this video is outof specs, unsupported.");
             return -1;
         }
-        if(mPriData->mWidthScaledownRatio == 0 && mPriData->mHeightScaledownRatio == 0){
+        if((mPriData->mWidthScaledownRatio == 0) && (mPriData->mHeightScaledownRatio == 0) &&
+           (getScaledownFlag(mi,mPriData->bSetScaleDown)==1)){
             /*if the app not set scaledownRatio,use the default*/
 	        /*check if need scaledown*/
-	        if(getScaledownFlag(mi,mPriData->bSetScaleDown)==1) /*1 means need to scale down*/
-	        {
-	            ret = PlayerConfigVideoScaleDownRatio(mPriData->mPlayer, 1, 1);
-	            if(ret != 0)
-	            {
-	                logw("PlayerConfigVideoScaleDownRatio() fail, ret = %d",ret);
-	            }
-	            else
-	                mPriData->mScaledownFlag = 1;
-	        }
+	    ret = PlayerConfigVideoScaleDownRatio(mPriData->mPlayer, 1, 1);
+	    if(ret != 0)
+            {
+	        logw("PlayerConfigVideoScaleDownRatio() fail, ret = %d",ret);
+            }
+            else
+	        mPriData->mScaledownFlag = 1;
         }else{
             ret = PlayerConfigVideoScaleDownRatio(mPriData->mPlayer,mPriData->mWidthScaledownRatio,mPriData->mHeightScaledownRatio);
             if(ret != 0)
@@ -1478,6 +1533,13 @@ static int initializePlayer(XPlayer* p)
             logw("PlayerConfigVideoRotateDegree() fail, ret = %d",ret);
         }
 
+        //* set the lbc mode
+        ret = PlayerConfigVideoLbcLossyComMod(mPriData->mPlayer, mPriData->mVideoLbcMode);
+        if(ret != 0)
+        {
+            logw("PlayerConfigVideoLbcLossyComMod() fail, ret = %d",ret);
+        }
+
         //* set the video streamInfo
         ret = PlayerSetVideoStreamInfo(mPriData->mPlayer, mi->pVideoStreamInfo);
         if(ret != 0)
@@ -1494,7 +1556,9 @@ static int initializePlayer(XPlayer* p)
 
 #endif
 
-#if !AWPLAYER_CONFIG_DISABLE_AUDIO
+#endif
+
+#ifndef ONLY_DISABLE_AUDIO
     if(mi->pAudioStreamInfo != NULL)
     {
         nDefaultAudioIndex = -1;
@@ -1522,13 +1586,27 @@ static int initializePlayer(XPlayer* p)
     }
 #endif
 
-    if(PlayerHasVideo(mPriData->mPlayer) == 0 && PlayerHasAudio(mPriData->mPlayer) == 0)
+#ifndef ONLY_ENABLE_AUDIO
+    if(PlayerHasVideo(mPriData->mPlayer) == 0
+#ifndef ONLY_DISABLE_AUDIO
+		&& PlayerHasAudio(mPriData->mPlayer) == 0
+#endif
+		)
     {
         loge("neither video nor audio stream can be played.");
         pthread_mutex_unlock(&mPriData->mMutexMediaInfo);
         return -1;
     }
+#else
+    if(PlayerHasAudio(mPriData->mPlayer) == 0)
+    {
+        loge("audio stream can not be played.");
+        pthread_mutex_unlock(&mPriData->mMutexMediaInfo);
+        return -1;
+    }
+#endif
 
+#ifndef ONLY_ENABLE_AUDIO
 #if !AWPLAYER_CONFIG_DISABLE_SUBTITLE
     //* set subtitle stream to the text decoder.
     if(mi->pSubtitleStreamInfo != NULL)
@@ -1557,7 +1635,7 @@ static int initializePlayer(XPlayer* p)
         }
     }
 #endif
-
+#endif
     //* report not seekable.
     if(mi->bSeekable == 0)
         mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_INFO,
@@ -1571,13 +1649,18 @@ static int initializePlayer(XPlayer* p)
 static void clearMediaInfo(XPlayer* p)
 {
     int                 i;
+#ifndef ONLY_ENABLE_AUDIO
     VideoStreamInfo*    v;
+#endif
     AudioStreamInfo*    a;
+#ifndef ONLY_ENABLE_AUDIO
     SubtitleStreamInfo* s;
+#endif
     PlayerContext* mPriData = (PlayerContext*)p;
 
     if(mPriData->mMediaInfo != NULL)
     {
+#ifndef ONLY_ENABLE_AUDIO
         //* free video stream info.
         if(mPriData->mMediaInfo->pVideoStreamInfo != NULL)
         {
@@ -1590,7 +1673,7 @@ static void clearMediaInfo(XPlayer* p)
             free(mPriData->mMediaInfo->pVideoStreamInfo);
             mPriData->mMediaInfo->pVideoStreamInfo = NULL;
         }
-
+#endif
         //* free audio stream info.
         if(mPriData->mMediaInfo->pAudioStreamInfo != NULL)
         {
@@ -1603,7 +1686,8 @@ static void clearMediaInfo(XPlayer* p)
             free(mPriData->mMediaInfo->pAudioStreamInfo);
             mPriData->mMediaInfo->pAudioStreamInfo = NULL;
         }
-
+#ifndef ONLY_ENABLE_AUDIO
+#if !AWPLAYER_CONFIG_DISABLE_SUBTITLE
         //* free subtitle stream info.
         if(mPriData->mMediaInfo->pSubtitleStreamInfo != NULL)
         {
@@ -1629,7 +1713,8 @@ static void clearMediaInfo(XPlayer* p)
             free(mPriData->mMediaInfo->pSubtitleStreamInfo);
             mPriData->mMediaInfo->pSubtitleStreamInfo = NULL;
         }
-
+#endif
+#endif
         //* free the media info.
         free(mPriData->mMediaInfo);
         mPriData->mMediaInfo = NULL;
@@ -1638,6 +1723,7 @@ static void clearMediaInfo(XPlayer* p)
     return;
 }
 
+#ifndef ONLY_ENABLE_AUDIO
 static void* sendSpeedCmdThread(void* arg)
 {
     PlayerContext* mPriData = (PlayerContext*)arg;
@@ -1682,9 +1768,9 @@ static void* sendSpeedCmdThread(void* arg)
             {
                 mPriData->mFastTime = 0;
                 needPauseNext = 1;
-            }
-            else
+            } else {
                 needPauseNext = 0;
+            }
 
             if(mPriData->mFastTime >= 0 && mPriData->mbFast == 1 )
             {
@@ -1718,949 +1804,970 @@ static void* sendSpeedCmdThread(void* arg)
     }
     return 0;
 }
+#endif
 
 static void* XPlayerThread(void* arg)
 {
-    AwMessage            msg;
-    int                  ret;
-    sem_t*               pReplySem;
-    int*                 pReplyValue;
-    PlayerContext* mPriData = (PlayerContext*)arg;
-
-    while(1)
-    {
-        if(AwMessageQueueGetMessage(mPriData->mMessageQueue, &msg) < 0)
-        {
-            loge("get message fail.");
-            continue;
-        }
-
-        pReplySem   = (sem_t*)msg.params[0];
-        pReplyValue = (int*)msg.params[1];
-
-        if(msg.messageId == XPLAYER_COMMAND_SET_SOURCE)
-        {
-            logi("process message XPLAYER_COMMAND_SET_SOURCE.");
-            //* check status.
-            if(mPriData->mStatus != XPLAYER_STATUS_IDLE &&
-                    mPriData->mStatus != XPLAYER_STATUS_INITIALIZED)
-            {
-                loge("invalid setDataSource() operation, player not in IDLE or INITIALIZED status");
-                if(pReplyValue != NULL)
-                    *pReplyValue = -1;
-                if(pReplySem != NULL)
-                    sem_post(pReplySem);
-                continue;
-            }
-
-            if((int)msg.params[2] == SOURCE_TYPE_URL)
-            {
-                CdxKeyedVectorT* pHeaders;
-                //* data source is a url string.
-                if(mPriData->mSourceUrl != NULL)
-                    free(mPriData->mSourceUrl);
-                mPriData->mSourceUrl = strdup((char*)msg.params[3]);
-                pHeaders   = (CdxKeyedVectorT*) msg.params[4];
-
-                ret = DemuxCompSetUrlSource(mPriData->mDemux,
-                                (void*)msg.params[5], mPriData->mSourceUrl, pHeaders);
-                if(ret == 0)
-                {
-                    mPriData->mStatus = XPLAYER_STATUS_INITIALIZED;
-                    if(pReplyValue != NULL)
-                        *pReplyValue = 0;
-                }
-                else
-                {
-                    loge("DemuxCompSetUrlSource() return fail.");
-                    mPriData->mStatus = XPLAYER_STATUS_IDLE;
-                    free(mPriData->mSourceUrl);
-                    mPriData->mSourceUrl = NULL;
-                    if(pReplyValue != NULL)
-                        *pReplyValue = -1;
-                }
-            }
-            else if((int)msg.params[2] == SOURCE_TYPE_FD)
-            {
-                //* data source is a file descriptor.
-                int     fd;
-                int64_t nOffset;
-                int64_t nLength;
-
-                fd = msg.params[3];
-                nOffset = msg.params[4];
-                nOffset<<=32;
-                nOffset |= msg.params[5];
-                nLength = msg.params[6];
-                nLength<<=32;
-                nLength |= msg.params[7];
-
-                if(mPriData->mSourceFd != -1)
-                    close(mPriData->mSourceFd);
-
-                mPriData->mSourceFd       = dup(fd);
-                mPriData->mSourceFdOffset = nOffset;
-                mPriData->mSourceFdLength = nLength;
-                ret = DemuxCompSetFdSource(mPriData->mDemux,
-                                mPriData->mSourceFd, mPriData->mSourceFdOffset,
-                                mPriData->mSourceFdLength);
-                if(ret == 0)
-                {
-                    mPriData->mStatus = XPLAYER_STATUS_INITIALIZED;
-                    if(pReplyValue != NULL)
-                        *pReplyValue = (int)0;
-                }
-                else
-                {
-                    loge("DemuxCompSetFdSource() return fail.");
-                    mPriData->mStatus = XPLAYER_STATUS_IDLE;
-                    close(mPriData->mSourceFd);
-                    mPriData->mSourceFd = -1;
-                    mPriData->mSourceFdOffset = 0;
-                    mPriData->mSourceFdLength = 0;
-                    if(pReplyValue != NULL)
-                        *pReplyValue = (int)-1;
-                }
-            }
-            else if((int)msg.params[2] == SOURCE_TYPE_DATASOURCE)
-            {
-                //* data source is a mediadatasource interface.
-                char *uri = (char *)msg.params[3];
-                int ret;
-                void *handle;
-                ret = sscanf(uri, "datasource://%p", &handle);
-                if (ret != 1)
-                {
-                    CDX_LOGE("sscanf failure...(%s)", uri);
-                    mPriData->mSourceStream = NULL;
-                }
-                else
-                {
-                    mPriData->mSourceStream = (CdxStreamT *)handle;
-                }
-                ret = DemuxCompSetMediaDataSource(mPriData->mDemux, uri);
-                if(ret == 0)
-                {
-                    mPriData->mStatus = XPLAYER_STATUS_INITIALIZED;
-                    if(pReplyValue != NULL)
-                        *pReplyValue = (int)0;
-                }
-                else
-                {
-                    loge("DemuxCompSetStreamSource() return fail.");
-                    mPriData->mStatus = XPLAYER_STATUS_IDLE;
-                    if(mPriData->mSourceStream)
-                    {
-                        CdxStreamClose(mPriData->mSourceStream);
-                        mPriData->mSourceStream = NULL;
-                    }
-                    if(pReplyValue != NULL)
-                        *pReplyValue = (int)-1;
-                }
-            }
-            else
-            {
-                //* data source is a IStreamSource interface.
-                char *uri = (char *)msg.params[3];
-                int ret;
-                void *handle;
-                ret = sscanf(uri, "customer://%p", &handle);
-                if (ret != 1)
-                {
-                    CDX_LOGE("sscanf failure...(%s)", uri);
-                    mPriData->mSourceStream = NULL;
-                }
-                else
-                {
-                    mPriData->mSourceStream = (CdxStreamT *)handle;
-                }
-                ret = DemuxCompSetStreamSource(mPriData->mDemux, uri);
-                if(ret == 0)
-                {
-                    mPriData->mStatus = XPLAYER_STATUS_INITIALIZED;
-                    if(pReplyValue != NULL)
-                        *pReplyValue = (int)0;
-                }
-                else
-                {
-                    loge("DemuxCompSetStreamSource() return fail.");
-                    mPriData->mStatus = XPLAYER_STATUS_IDLE;
-                    if(mPriData->mSourceStream)
-                    {
-                        CdxStreamClose(mPriData->mSourceStream);
-                        mPriData->mSourceStream = NULL;
-                    }
-                    if(pReplyValue != NULL)
-                        *pReplyValue = (int)-1;
-                }
-            }
-
-            if(pReplySem != NULL)
-                sem_post(pReplySem);
-            continue;
-        } //* end XPLAYER_COMMAND_SET_SOURCE.
-        else if(msg.messageId == XPLAYER_COMMAND_SET_SURFACE)
-        {
-            LayerCtrl*   lc;
-
-            logd("process message XPLAYER_COMMAND_SET_SURFACE.");
-
-            //* set native window before delete the old one.
-            //* because the player's render thread may use the old surface
-            //* before it receive the new surface.
-            lc = (LayerCtrl*)msg.params[2];
-
-            ret = PlayerSetWindow(mPriData->mPlayer, lc);
-            if(ret == 0)
-            {
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)0;
-            }
-            else
-            {
-                loge("PlayerSetWindow() return fail.");
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)-1;
-            }
-
-            if(pReplySem != NULL)
-                sem_post(pReplySem);
-            continue;
-        } //* end XPLAYER_COMMAND_SET_SURFACE.
-        else if(msg.messageId == XPLAYER_COMMAND_SET_AUDIOSINK)
-        {
-            void* audioSink;
-
-            logv("process message XPLAYER_COMMAND_SET_AUDIOSINK.");
-
-            audioSink = (SoundCtrl*)msg.params[2];
-            PlayerSetAudioSink(mPriData->mPlayer, audioSink);
-
-            //* super class MediaPlayerInterface has mAudioSink.
-            //MediaPlayerInterface::setAudioSink(audioSink);
-
-            if(pReplyValue != NULL)
-                *pReplyValue = (int)0;
-            if(pReplySem != NULL)
-                sem_post(pReplySem);
-            continue;
-        } //* end XPLAYER_COMMAND_SET_AUDIOSINK.
-        else if (msg.messageId == XPLAYER_COMMAND_SET_PLAYRATE)
-        {
-            XAudioPlaybackRate *rate;
-            rate = (XAudioPlaybackRate*)msg.params[2];
-
-            //do set playback setting in playback
-            int ret = PlayerSetPlayBackSettings(mPriData->mPlayer,rate);
-
-            if(pReplyValue != NULL)
-                *pReplyValue = ret;
-            if(pReplySem != NULL)
-                sem_post(pReplySem);
-
-            continue;
-        }//* end XPLAYER_COMMAND_SET_PLAYRATE.
-        else if(msg.messageId == XPLAYER_COMMAND_SET_SUBCTRL)
-        {
-            SubCtrl* subctrl;
-
-            logd("==== process message XPLAYER_COMMAND_SET_SUBCTRL.");
-
-            subctrl = (SubCtrl*)msg.params[2];
-            PlayerSetSubCtrl(mPriData->mPlayer, subctrl);
-
-            if(pReplyValue != NULL)
-                *pReplyValue = (int)0;
-            if(pReplySem != NULL)
-                sem_post(pReplySem);
-            continue;
-        } //* end XPLAYER_COMMAND_SET_SUBCTRL.
-        else if(msg.messageId == XPLAYER_COMMAND_SET_DI)
-        {
-            Deinterlace* di;
-
-            logd("==== process message XPLAYER_COMMAND_SET_SUBCTRL.");
-
-            di = (Deinterlace*)msg.params[2];
-            PlayerSetDeinterlace(mPriData->mPlayer, di);
-
-            if(pReplyValue != NULL)
-                *pReplyValue = (int)0;
-            if(pReplySem != NULL)
-                sem_post(pReplySem);
-            continue;
-        } //* end XPLAYER_COMMAND_SET_DI
-        else if(msg.messageId == XPLAYER_COMMAND_PREPARE)
-        {
-            logd("process message XPLAYER_COMMAND_PREPARE. mPriData->mStatus: %d",
-                  mPriData->mStatus);
-            if(mPriData->mStatus == XPLAYER_STATUS_PREPARED)
-            {
-                //* for data source set by fd(file descriptor), the prepare() method
-                //* is called in setDataSource(), so the player is already in PREPARED
-                //* status, here we just notify a prepared message.
-
-                //* when app call prepareAsync(), we callback video-size to app here,
-                if(mPriData->mMediaInfo->pVideoStreamInfo != NULL)
-                {
-                    if(mPriData->mMediaInfo->pVideoStreamInfo->nWidth !=
-                                mPriData->mVideoSizeWidth
-                       && mPriData->mMediaInfo->pVideoStreamInfo->nHeight !=
-                                mPriData->mVideoSizeHeight)
-                    {
-                        int nRotation;
-
-                        nRotation = atoi((const char*)mPriData->mMediaInfo->cRotation);
-                        if((nRotation%180)==0)//* when the rotation is 0 and 180
-                        {
-                            mPriData->mVideoSizeWidth  =
-                                mPriData->mMediaInfo->pVideoStreamInfo->nWidth;
-                            mPriData->mVideoSizeHeight =
-                                mPriData->mMediaInfo->pVideoStreamInfo->nHeight;
-                        }
-                        else
-                        {
-                            //* when the rotation is 90 and 270,
-                            //* we should exchange nHeight and nwidth
-                            mPriData->mVideoSizeWidth  =
-                                mPriData->mMediaInfo->pVideoStreamInfo->nHeight;
-                            mPriData->mVideoSizeHeight =
-                                mPriData->mMediaInfo->pVideoStreamInfo->nWidth;
-                        }
-
-                        logi("xxxxxxxxxx video size: width = %d, height = %d",
-                                mPriData->mVideoSizeWidth, mPriData->mVideoSizeHeight);
-
-                        int size[2];
-                        size[0] = mPriData->mVideoSizeWidth;
-                        size[1] = mPriData->mVideoSizeHeight;
-                        mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_SET_VIDEO_SIZE,
-                                    0,
-                                    size);
-                    }
-                }
-
-                mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_PREPARED, 0, 0);
-
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)0;
-                if(pReplySem != NULL)
-                    sem_post(pReplySem);
-                if(1 == msg.params[2]){
-                    logd("let XPlayerPrepare return");
-                    mPriData->mPrepareFinishResult = 0;
-                    sem_post(&mPriData->mSemPrepareFinish);
-                }
-                continue;
-            }
-
-            if(mPriData->mStatus != XPLAYER_STATUS_INITIALIZED &&
-                    mPriData->mStatus != XPLAYER_STATUS_STOPPED)
-            {
-                logd("invalid prepareAsync() call, player not in initialized or stopped status.");
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)-1;
-                if(pReplySem != NULL)
-                    sem_post(pReplySem);
-                continue;
-            }
-
-            mPriData->mStatus = XPLAYER_STATUS_PREPARING;
-            mPriData->mPrepareSync = msg.params[2];
-            ret = DemuxCompPrepareAsync(mPriData->mDemux);
-            if(ret != 0)
-            {
-                loge("DemuxCompPrepareAsync return fail immediately.");
-                mPriData->mStatus = XPLAYER_STATUS_IDLE;
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)-1;
-            }
-            else
-            {
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)0;
-            }
-
-            if(pReplySem != NULL)
-                sem_post(pReplySem);
-            continue;
-        } //* end XPLAYER_COMMAND_PREPARE.
-        else if(msg.messageId == XPLAYER_COMMAND_SETSPEED)
-        {
-            logd("process message XPLAYER_COMMAND_SETSPEED.");
-            if(mPriData->mStatus != XPLAYER_STATUS_PREPARED &&
-               mPriData->mStatus != XPLAYER_STATUS_STARTED )
-            {
-                logd("invalid start() call, player not in prepared, \
-                        started, paused or complete status.");
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)-1;
-                if(pReplySem != NULL)
-                    sem_post(pReplySem);
-                continue;
-            }
-
-            if(mPriData->mMediaInfo == NULL || mPriData->mMediaInfo->bSeekable == 0)
-            {
-                if(mPriData->mMediaInfo == NULL)
-                {
-                    loge("setspeed fail because mMediaInfo == NULL.");
-                    if(pReplyValue != NULL)
-                        *pReplyValue = -1;
-                    if(pReplySem != NULL)
-                        sem_post(pReplySem);
-                    continue;
-                }
-                else
-                {
-                    loge("media not seekable. cannot fast");
-                    if(pReplyValue != NULL)
-                        *pReplyValue = 0;
-                    if(pReplySem != NULL)
-                        sem_post(pReplySem);
-                    continue;
-                }
-            }
-
-            if(mPriData->mSeeking)
-            {
-                DemuxCompCancelSeek(mPriData->mDemux);
-                mPriData->mSeeking = 0;
-            }
-
-            //* protect mSeeking and mSeekTime from being changed by the seek finish callback.
-            pthread_mutex_lock(&mPriData->mMutexStatus);
-
-            int curTime;
-            XPlayerGetCurrentPosition(mPriData, &curTime);
-
-            mPriData->mSeeking  = 1;
-            mPriData->mbFast = 1;
-            mPriData->mFastTime = curTime + mPriData->mSpeed*1000;
-            mPriData->mSeekTime = mPriData->mFastTime;
-            mPriData->mSeekSync = 0;
-            pthread_mutex_unlock(&mPriData->mMutexStatus);
-
-            //PlayerFastForeward(mPriData->mPlayer);
-            PlayerSetDiscardAudio(mPriData->mPlayer, 1);
-
-            if(PlayerGetStatus(mPriData->mPlayer) == PLAYER_STATUS_STOPPED)
-            {
-                //* if in prepared status, the player is in stopped status,
-                //* this will make the player not record the nSeekTime at PlayerReset() operation
-                //* called at seek finish callback.
-                PlayerStart(mPriData->mPlayer,0,0);
-            }
-
-            PlayerPause(mPriData->mPlayer);
-            DemuxCompSeekTo(mPriData->mDemux, mPriData->mSeekTime, mPriData->mSeekModeType);
-
-            if (mPriData->mSpeedThreadRuning == 0)
-            {
-                int ret = pthread_create(&mPriData->mSpeedThreadId, NULL,
-                    sendSpeedCmdThread, (void*)mPriData );
-                if (ret != 0)
-                {
-                    loge("create sendSpeedCmdThread error!");
-                    if(pReplyValue != NULL)
-                        *pReplyValue = 0;
-                    if(pReplySem != NULL)
-                        sem_post(pReplySem);
-                    continue;
-                }
-            }
-
-            if(pReplyValue != NULL)
-                *pReplyValue = (int)0;
-            if(pReplySem != NULL)
-                sem_post(pReplySem);
-            continue;
-        }//* end XPLAYER_COMMAND_SETSPEED.
-        else if(msg.messageId == XPLAYER_COMMAND_START)
-        {
-            logd("process message XPLAYER_COMMAND_START.");
-            if(mPriData->mStatus != XPLAYER_STATUS_PREPARED &&
-               mPriData->mStatus != XPLAYER_STATUS_STARTED  &&
-               mPriData->mStatus != XPLAYER_STATUS_PAUSED   &&
-               mPriData->mStatus != XPLAYER_STATUS_COMPLETE)
-            {
-                logd("invalid start() call, player not in prepared, \
-                    started, paused or complete status.");
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)-1;
-                if(pReplySem != NULL)
-                    sem_post(pReplySem);
-                continue;
-            }
-
-            if(mPriData->mbFast == 1)
-            {
-                PlayerSetDiscardAudio(mPriData->mPlayer, 0);
-                mPriData->mbFast = 0;
-                mPriData->mSpeed = 1;
-                mPriData->mFastTime = 0;
-            }
-
-            //* synchronize with the seek or complete callback and the status may be changed.
-            pthread_mutex_lock(&mPriData->mMutexStatus);
-
-            if(mPriData->mStatus == XPLAYER_STATUS_STARTED)
-            {
-                if(PlayerGetStatus(mPriData->mPlayer) == PLAYER_STATUS_PAUSED
-                        && mPriData->mSeeking == 0)
-                {
-                    //* player is paused for buffering, start it.
-                    //* see XPLAYER_MESSAGE_DEMUX_PAUSE_PLAYER callback message.
-                    PlayerStart(mPriData->mPlayer,0,0);
-                    DemuxCompStart(mPriData->mDemux);
-                }
-                pthread_mutex_unlock(&mPriData->mMutexStatus);
-                logv("player already in started status.");
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)0;
-                if(pReplySem != NULL)
-                    sem_post(pReplySem);
-                continue;
-            }
-
-            if(mPriData->mSeeking)
-            {
-                //* player and demux will be started at the seek callback.
-                mPriData->mStatus = XPLAYER_STATUS_STARTED;
-                pthread_mutex_unlock(&mPriData->mMutexStatus);
-
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)0;
-                if(pReplySem != NULL)
-                    sem_post(pReplySem);
-                continue;
-            }
-
-            //* for complete status, we seek to the begin of the file.
-            if(mPriData->mStatus == XPLAYER_STATUS_COMPLETE)
-            {
-                AwMessage newMsg;
-
-                if(mPriData->mMediaInfo->bSeekable)
-                {
-                    if(mPriData->mSeeking)
-                    {
-                        DemuxCompCancelSeek(mPriData->mDemux);
-                        mPriData->mSeeking = 0;
-                    }
-
-                    mPriData->mSeeking  = 1;
-                    mPriData->mSeekTime = 0;
-                    mPriData->mSeekSync = 0;
-                    mPriData->mSeekByInner = 1;
-                    logd("seekTo %.2f secs", mPriData->mSeekTime / 1E3);
-
-                    PlayerPause(mPriData->mPlayer);
-                    DemuxCompSeekTo(mPriData->mDemux, mPriData->mSeekTime, mPriData->mSeekModeType);
-
-                    //* player and demux will be started at the seek callback.
-                    mPriData->mStatus = XPLAYER_STATUS_STARTED;
-                    pthread_mutex_unlock(&mPriData->mMutexStatus);
-
-                    if(pReplyValue != NULL)
-                        *pReplyValue = (int)0;
-                    if(pReplySem != NULL)
-                        sem_post(pReplySem);
-                    continue;
-                }
-                else
-                {
-                    //* post a stop message.
-                    memset(&newMsg, 0, sizeof(AwMessage));
-                    newMsg.messageId = XPLAYER_COMMAND_STOP;
-                    AwMessageQueuePostMessage(mPriData->mMessageQueue, &newMsg);
-
-                    //* post a prepare message.
-                    memset(&newMsg, 0, sizeof(AwMessage));
-                    newMsg.messageId = XPLAYER_COMMAND_PREPARE;
-                    newMsg.params[0] = 0;
-                    newMsg.params[1] = 0;
-                    newMsg.params[2] = 1;   //* params[2] = mPrepareSync.
-                    AwMessageQueuePostMessage(mPriData->mMessageQueue, &newMsg);
-
-                    //* post a start message.
-                    memset(&newMsg, 0, sizeof(AwMessage));
-                    newMsg.messageId = XPLAYER_COMMAND_START;
-                    AwMessageQueuePostMessage(mPriData->mMessageQueue, &newMsg);
-
-                    //* should I reply 0 to the user at this moment?
-                    //* or just set the semaphore and reply variable to the start message to
-                    //* make it reply when start message done?
-                    pthread_mutex_unlock(&mPriData->mMutexStatus);
-                    if(pReplyValue != NULL)
-                        *pReplyValue = (int)0;
-                    if(pReplySem != NULL)
-                        sem_post(pReplySem);
-                    continue;
-                }
-            }
-
-            pthread_mutex_unlock(&mPriData->mMutexStatus);
-
-            if(mPriData->mApplicationType == APP_STREAMING)
-            {
-                PlayerFast(mPriData->mPlayer, 0);
-            }
-            else
-            {
-                PlayerStart(mPriData->mPlayer,0,0);
-            }
-
-            DemuxCompStart(mPriData->mDemux);
-            mPriData->mStatus = XPLAYER_STATUS_STARTED;
-            if(pReplyValue != NULL)
-                *pReplyValue = (int)0;
-            if(pReplySem != NULL)
-                sem_post(pReplySem);
-            continue;
-
-        } //* end XPLAYER_COMMAND_START.
-        else if(msg.messageId == XPLAYER_COMMAND_STOP)
-        {
-            logv("process message XPLAYER_COMMAND_STOP.");
-            if(mPriData->mStatus != XPLAYER_STATUS_PREPARED &&
-               mPriData->mStatus != XPLAYER_STATUS_STARTED  &&
-               mPriData->mStatus != XPLAYER_STATUS_PAUSED   &&
-               mPriData->mStatus != XPLAYER_STATUS_COMPLETE &&
-               mPriData->mStatus != XPLAYER_STATUS_STOPPED)
-            {
-                logd("invalid stop() call, player not in prepared, paused, \
-                        started, stopped or complete status.");
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)-1;
-                if(pReplySem != NULL)
-                    sem_post(pReplySem);
-                continue;
-            }
-
-            if(mPriData->mStatus == XPLAYER_STATUS_STOPPED)
-            {
-                logv("player already in stopped status.");
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)0;
-                if(pReplySem != NULL)
-                    sem_post(pReplySem);
-                continue;
-            }
-
-            //* the prepare callback may happen at this moment.
-            //* so the mStatus may be changed to PREPARED asynchronizely.
-            if(mPriData->mStatus == XPLAYER_STATUS_PREPARING)
-            {
-                logw("stop() called at preparing status, cancel demux prepare.");
-                DemuxCompCancelPrepare(mPriData->mDemux);
-            }
-
-            if(mPriData->mSeeking)
-            {
-                DemuxCompCancelSeek(mPriData->mDemux);
-                mPriData->mSeeking = 0;
-            }
-
-            DemuxCompStop(mPriData->mDemux);
-            PlayerStop(mPriData->mPlayer);
-            PlayerClear(mPriData->mPlayer);               //* clear all media information in player.
-
-            //*clear the mSubtitleDisplayIds
-            memset(mPriData->mSubtitleDisplayIds,0xff,64*sizeof(unsigned int));
-            mPriData->mSubtitleDisplayIdsUpdateIndex = 0;
-
-            mPriData->mStatus  = XPLAYER_STATUS_STOPPED;
-            if(pReplyValue != NULL)
-                *pReplyValue = (int)0;
-            if(pReplySem != NULL)
-                sem_post(pReplySem);
-            continue;
-        } //* end XPLAYER_COMMAND_STOP.
-        else if(msg.messageId == XPLAYER_COMMAND_PAUSE)
-        {
-            logv("process message XPLAYER_COMMAND_PAUSE.");
-            if(mPriData->mStatus != XPLAYER_STATUS_STARTED  &&
-               mPriData->mStatus != XPLAYER_STATUS_PAUSED   &&
-               mPriData->mStatus != XPLAYER_STATUS_COMPLETE)
-            {
-                logd("invalid pause() call, player not in started, paused or complete status.");
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)-1;
-                if(pReplySem != NULL)
-                    sem_post(pReplySem);
-                continue;
-            }
-
-            if(mPriData->mStatus == XPLAYER_STATUS_PAUSED)
-            {
-                logv("player already in paused or complete status.");
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)0;
-                if(pReplySem != NULL)
-                    sem_post(pReplySem);
-                continue;
-            }
-
-            //* sync with the seek, complete or pause_player/resume_player call back.
-            pthread_mutex_lock(&mPriData->mMutexStatus);
-
-            if(mPriData->mSeeking)
-            {
-                //* player and demux will be paused at the seek callback.
-                mPriData->mStatus = XPLAYER_STATUS_PAUSED;
-                pthread_mutex_unlock(&mPriData->mMutexStatus);
-
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)0;
-                if(pReplySem != NULL)
-                    sem_post(pReplySem);
-                continue;
-            }
-
-            PlayerPause(mPriData->mPlayer);
-            mPriData->mStatus = XPLAYER_STATUS_PAUSED;
-
-            //* sync with the seek, complete or pause_player/resume_player call back.
-            pthread_mutex_unlock(&mPriData->mMutexStatus);
-
-            if(pReplyValue != NULL)
-                *pReplyValue = (int)0;
-            if(pReplySem != NULL)
-                sem_post(pReplySem);
-            continue;
-        } //* end XPLAYER_COMMAND_PAUSE.
-        else if(msg.messageId == XPLAYER_COMMAND_RESET)
-        {
-            logv("process message XPLAYER_COMMAND_RESET.");
-             //* the prepare callback may happen at this moment.
-            //* so the mStatus may be changed to PREPARED asynchronizely.
-            if(mPriData->mStatus == XPLAYER_STATUS_PREPARING)
-            {
-                logw("reset() called at preparing status, cancel demux prepare.");
-                DemuxCompCancelPrepare(mPriData->mDemux);
-            }
-
-            if(mPriData->mSeeking)
-            {
-                DemuxCompCancelSeek(mPriData->mDemux);
-                mPriData->mSeeking = 0;
-            }
-
-            //* stop and clear the demux.
-            //* this will stop the seeking if demux is currently processing seeking message.
-            //* it will clear the data source keep inside, this is important for the IStreamSource.
-            DemuxCompStop(mPriData->mDemux);
-            DemuxCompClear(mPriData->mDemux);
-
-            //* stop and clear the player.
-            PlayerStop(mPriData->mPlayer);
-            PlayerClear(mPriData->mPlayer);   //* it will clear media info config to the player.
-
-            //* clear suface.
-            if(mPriData->mKeepLastFrame == 0)
-            {
-
-            }
-
-            //* clear data source.
-            if(mPriData->mSourceUrl != NULL)
-            {
-                free(mPriData->mSourceUrl);
-                mPriData->mSourceUrl = NULL;
-            }
-            if(mPriData->mSourceFd != -1)
-            {
-                close(mPriData->mSourceFd);
-                mPriData->mSourceFd = -1;
-                mPriData->mSourceFdOffset = 0;
-                mPriData->mSourceFdLength = 0;
-            }
-            mPriData->mSourceStream = NULL;
-
-            //* clear media info.
-            clearMediaInfo(mPriData);
-
-            //* clear loop setting.
-            mPriData->mLoop   = 0;
-
-            //* clear the mSubtitleDisplayIds
-            memset(mPriData->mSubtitleDisplayIds,0xff,64*sizeof(unsigned int));
-            mPriData->mSubtitleDisplayIdsUpdateIndex = 0;
-
-            //* set status to IDLE.
-            mPriData->mStatus = XPLAYER_STATUS_IDLE;
-
-            if(pReplyValue != NULL)
-                *pReplyValue = (int)0;
-            if(pReplySem != NULL)
-                sem_post(pReplySem);
-            continue;
-        }
-        else if(msg.messageId == XPLAYER_COMMAND_SEEK)
-        {
-            logd("process message XPLAYER_COMMAND_SEEK.");
-            if(mPriData->mStatus != XPLAYER_STATUS_PREPARED &&
-               mPriData->mStatus != XPLAYER_STATUS_STARTED  &&
-               mPriData->mStatus != XPLAYER_STATUS_PAUSED   &&
-               mPriData->mStatus != XPLAYER_STATUS_COMPLETE)
-            {
-                logd("invalid seekTo() call, player not in prepared, \
-                            started, paused or complete status.");
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)-1;
-                if(pReplySem != NULL)
-                    sem_post(pReplySem);
-                continue;
-            }
-
-            //* the application will call seekTo() when player is in complete status.
-            //* after seekTo(), the player should still stay on complete status until
-            //* application call start().
-            //* cts test requires this implement.
-            if(mPriData->mStatus == XPLAYER_STATUS_COMPLETE)
-            {
-                //* protect mSeeking and mSeekTime from being changed by the seek finish callback.
-                pthread_mutex_lock(&mPriData->mMutexStatus);
-                mPriData->mSeekTime = msg.params[2];
-                pthread_mutex_unlock(&mPriData->mMutexStatus);
-                mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_SEEK_COMPLETE, 0, 0);
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)0;
-                if(pReplySem != NULL)
-                    sem_post(pReplySem);
-                continue;
-            }
-
-            if(mPriData->mMediaInfo == NULL || mPriData->mMediaInfo->bSeekable == 0)
-            {
-                if(mPriData->mMediaInfo == NULL)
-                {
-                    loge("seekTo fail because mMediaInfo == NULL.");
-                    mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_SEEK_COMPLETE, 0, 0);
-                    if(pReplyValue != NULL)
-                        *pReplyValue = -1;
-                    if(pReplySem != NULL)
-                        sem_post(pReplySem);
-                    continue;
-                }
-                else
-                {
-                    loge("media not seekable.");
-                    mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_SEEK_COMPLETE, 0, 0);
-                    if(pReplyValue != NULL)
-                        *pReplyValue = 0;
-                    if(pReplySem != NULL)
-                        sem_post(pReplySem);
-                    continue;
-                }
-            }
-
-            if(mPriData->mSeeking)
-            {
-                DemuxCompCancelSeek(mPriData->mDemux);
-                mPriData->mSeeking = 0;
-            }
-
-            //* protect mSeeking and mSeekTime from being changed by the seek finish callback.
-            pthread_mutex_lock(&mPriData->mMutexStatus);
-            mPriData->mSeeking  = 1;
-            mPriData->mSeekTime = msg.params[2];
-            mPriData->mSeekSync = msg.params[3];
-            logv("seekTo %.2f secs", mPriData->mSeekTime / 1E3);
-            pthread_mutex_unlock(&mPriData->mMutexStatus);
-
-            if(PlayerGetStatus(mPriData->mPlayer) == PLAYER_STATUS_STOPPED)
-            {
-                //* if in prepared status, the player is in stopped status,
-                //* this will make the player not record the nSeekTime at PlayerReset() operation
-                //* called at seek finish callback.
-                PlayerStart(mPriData->mPlayer,0,0);
-            }
-            PlayerPause(mPriData->mPlayer);
-            DemuxCompSeekTo(mPriData->mDemux, mPriData->mSeekTime, mPriData->mSeekModeType);
-
-            if(pReplyValue != NULL)
-                *pReplyValue = (int)0;
-            if(pReplySem != NULL)
-                sem_post(pReplySem);
-            continue;
-        } //* end XPLAYER_COMMAND_SEEK.
-        else if(msg.messageId == XPLAYER_COMMAND_RESETURL)
-        {
-            logd("process message XPLAYER_COMMAND_RESETURL.");
-            if(mPriData->mStatus != XPLAYER_STATUS_PREPARED &&
-               mPriData->mStatus != XPLAYER_STATUS_STARTED  &&
-               mPriData->mStatus != XPLAYER_STATUS_PAUSED   &&
-               mPriData->mStatus != XPLAYER_STATUS_COMPLETE)
-            {
-                logd("invalid seekTo() call, player not in prepared, started, \
-                        paused or complete status.");
-                if(pReplyValue != NULL)
-                    *pReplyValue = (int)-1;
-                if(pReplySem != NULL)
-                    sem_post(pReplySem);
-                continue;
-            }
-
-            if(mPriData->mSeeking)
-            {
-                DemuxCompCancelSeek(mPriData->mDemux);
-                mPriData->mSeeking = 0;
-            }
-
-            //* protect mSeeking and mSeekTime from being changed by the seek finish callback.
-            pthread_mutex_lock(&mPriData->mMutexStatus);
-            mPriData->mSeeking  = 1;
-            mPriData->mSeekTime = msg.params[2];
-            mPriData->mSeekSync = msg.params[3];
-            logd("seekTo %.2f secs", mPriData->mSeekTime / 1E3);
-            pthread_mutex_unlock(&mPriData->mMutexStatus);
-
-            if(PlayerGetStatus(mPriData->mPlayer) == PLAYER_STATUS_STOPPED)
-            {
-                //* if in prepared status, the player is in stopped status,
-                //* this will make the player not record the nSeekTime at PlayerReset() operation
-                //* called at seek finish callback.
-                PlayerStart(mPriData->mPlayer,0,0);
-            }
-            PlayerPause(mPriData->mPlayer);
-            DemuxCompSeekToResetUrl(mPriData->mDemux, mPriData->mSeekTime);
-
-            if(pReplyValue != NULL)
-                *pReplyValue = (int)0;
-            if(pReplySem != NULL)
-                sem_post(pReplySem);
-            continue;
-        }
-        else if(msg.messageId == XPLAYER_COMMAND_QUIT)
-        {
-            if(pReplyValue != NULL)
-                *pReplyValue = (int)0;
-            if(pReplySem != NULL)
-                sem_post(pReplySem);
-            break;  //* break the thread.
-        } //* end XPLAYER_COMMAND_QUIT.
-        else
-        {
-            logw("unknow message with id %d, ignore.", msg.messageId);
-        }
-    }
-
-    return 0;
+	AwMessage            msg;
+	int                  ret;
+	sem_t*               pReplySem;
+	int*                 pReplyValue;
+	PlayerContext* mPriData = (PlayerContext*)arg;
+
+	while(1)
+	{
+		if(AwMessageQueueGetMessage(mPriData->mMessageQueue, &msg) < 0)
+		{
+		loge("get message fail.");
+		continue;
+		}
+
+		pReplySem   = (sem_t*)msg.params[0];
+		pReplyValue = (int*)msg.params[1];
+
+		switch(msg.messageId)
+		{
+			case XPLAYER_COMMAND_SET_SOURCE:
+			{
+				logi("process message XPLAYER_COMMAND_SET_SOURCE.");
+				//* check status.
+				if (mPriData->mStatus != XPLAYER_STATUS_IDLE &&
+					mPriData->mStatus != XPLAYER_STATUS_INITIALIZED)
+				{
+					loge("invalid setDataSource() operation, player not in IDLE or INITIALIZED status");
+					if (pReplyValue != NULL)
+						*pReplyValue = -1;
+					if (pReplySem != NULL)
+						sem_post(pReplySem);
+					continue;
+				}
+
+				switch((int)msg.params[2])
+				{
+					case SOURCE_TYPE_URL:
+					{
+						CdxKeyedVectorT* pHeaders;
+						//* data source is a url string.
+						if (mPriData->mSourceUrl != NULL)
+							free(mPriData->mSourceUrl);
+						mPriData->mSourceUrl = strdup((char*)msg.params[3]);
+						pHeaders   = (CdxKeyedVectorT*) msg.params[4];
+
+						ret = DemuxCompSetUrlSource(mPriData->mDemux,
+						(void*)msg.params[5], mPriData->mSourceUrl, pHeaders);
+						if (ret == 0)
+						{
+							mPriData->mStatus = XPLAYER_STATUS_INITIALIZED;
+							if (pReplyValue != NULL)
+								*pReplyValue = 0;
+						}
+						else
+						{
+							loge("DemuxCompSetUrlSource() return fail.");
+							mPriData->mStatus = XPLAYER_STATUS_IDLE;
+							free(mPriData->mSourceUrl);
+							mPriData->mSourceUrl = NULL;
+							if (pReplyValue != NULL)
+								*pReplyValue = -1;
+						}
+					} break;
+					case SOURCE_TYPE_FD:
+					{
+						//* data source is a file descriptor.
+						int     fd;
+						int64_t nOffset;
+						int64_t nLength;
+
+						fd = msg.params[3];
+						nOffset = msg.params[4];
+						nOffset<<=32;
+						nOffset |= msg.params[5];
+						nLength = msg.params[6];
+						nLength<<=32;
+						nLength |= msg.params[7];
+
+						if (mPriData->mSourceFd != -1)
+							close(mPriData->mSourceFd);
+
+						mPriData->mSourceFd       = dup(fd);
+						mPriData->mSourceFdOffset = nOffset;
+						mPriData->mSourceFdLength = nLength;
+						ret = DemuxCompSetFdSource(mPriData->mDemux,
+						mPriData->mSourceFd, mPriData->mSourceFdOffset,
+						mPriData->mSourceFdLength);
+						if (ret == 0)
+						{
+							mPriData->mStatus = XPLAYER_STATUS_INITIALIZED;
+							if(pReplyValue != NULL)
+								*pReplyValue = (int)0;
+						}
+						else
+						{
+							loge("DemuxCompSetFdSource() return fail.");
+							mPriData->mStatus = XPLAYER_STATUS_IDLE;
+							close(mPriData->mSourceFd);
+							mPriData->mSourceFd = -1;
+							mPriData->mSourceFdOffset = 0;
+							mPriData->mSourceFdLength = 0;
+							if (pReplyValue != NULL)
+								*pReplyValue = (int)-1;
+						}
+					} break;
+					case SOURCE_TYPE_DATASOURCE:
+					{
+						//* data source is a mediadatasource interface.
+						char *uri = (char *)msg.params[3];
+						int ret;
+						void *handle;
+						ret = sscanf(uri, "datasource://%p", &handle);
+						if (ret != 1)
+						{
+							CDX_LOGE("sscanf failure...(%s)", uri);
+							mPriData->mSourceStream = NULL;
+						}
+						else
+						{
+							mPriData->mSourceStream = (CdxStreamT *)handle;
+						}
+						ret = DemuxCompSetMediaDataSource(mPriData->mDemux, uri);
+						if (ret == 0)
+						{
+							mPriData->mStatus = XPLAYER_STATUS_INITIALIZED;
+							if (pReplyValue != NULL)
+								*pReplyValue = (int)0;
+						}
+						else
+						{
+							loge("DemuxCompSetStreamSource() return fail.");
+							mPriData->mStatus = XPLAYER_STATUS_IDLE;
+							if (mPriData->mSourceStream)
+							{
+								CdxStreamClose(mPriData->mSourceStream);
+								mPriData->mSourceStream = NULL;
+							}
+							if (pReplyValue != NULL)
+								*pReplyValue = (int)-1;
+						}
+					} break;
+					default:
+					{
+						//* data source is a IStreamSource interface.
+						char *uri = (char *)msg.params[3];
+						int ret;
+						void *handle;
+						ret = sscanf(uri, "customer://%p", &handle);
+						if (ret != 1)
+						{
+							CDX_LOGE("sscanf failure...(%s)", uri);
+							mPriData->mSourceStream = NULL;
+						}
+						else
+						{
+							mPriData->mSourceStream = (CdxStreamT *)handle;
+						}
+						ret = DemuxCompSetStreamSource(mPriData->mDemux, uri);
+						if (ret == 0)
+						{
+							mPriData->mStatus = XPLAYER_STATUS_INITIALIZED;
+							if (pReplyValue != NULL)
+								*pReplyValue = (int)0;
+						}
+						else
+						{
+							loge("DemuxCompSetStreamSource() return fail.");
+							mPriData->mStatus = XPLAYER_STATUS_IDLE;
+							if (mPriData->mSourceStream)
+							{
+								CdxStreamClose(mPriData->mSourceStream);
+								mPriData->mSourceStream = NULL;
+							}
+							if(pReplyValue != NULL)
+								*pReplyValue = (int)-1;
+						}
+					} break;
+				}
+				if (pReplySem != NULL)
+					sem_post(pReplySem);
+				continue;
+			} //* end XPLAYER_COMMAND_SET_SOURCE.
+#ifndef ONLY_ENABLE_AUDIO
+			case XPLAYER_COMMAND_SET_SURFACE:
+			{
+				LayerCtrl*   lc;
+				logd("process message XPLAYER_COMMAND_SET_SURFACE.");
+				printf("xplayer:process message XPLAYER_COMMAND_SET_SURFACE.\n");
+
+				//* set native window before delete the old one.
+				//* because the player's render thread may use the old surface
+				//* before it receive the new surface.
+				lc = (LayerCtrl*)msg.params[2];
+
+				ret = PlayerSetWindow(mPriData->mPlayer, lc);
+				if (ret == 0)
+				{
+					if(pReplyValue != NULL)
+						*pReplyValue = (int)0;
+				}
+				else
+				{
+					loge("PlayerSetWindow() return fail.");
+					if (pReplyValue != NULL)
+						*pReplyValue = (int)-1;
+				}
+
+				if (pReplySem != NULL)
+					sem_post(pReplySem);
+				continue;
+			} //* end XPLAYER_COMMAND_SET_SURFACE.
+#endif
+#ifndef ONLY_DISABLE_AUDIO
+			case XPLAYER_COMMAND_SET_AUDIOSINK:
+			{
+				void* audioSink;
+				logv("process message XPLAYER_COMMAND_SET_AUDIOSINK.");
+				printf("xplayer:process message XPLAYER_COMMAND_SET_AUDIOSINK.\n");
+
+				audioSink = (SoundCtrl*)msg.params[2];
+				PlayerSetAudioSink(mPriData->mPlayer, audioSink);
+
+				//* super class MediaPlayerInterface has mAudioSink.
+				//MediaPlayerInterface::setAudioSink(audioSink);
+
+				if (pReplyValue != NULL)
+					*pReplyValue = (int)0;
+				if (pReplySem != NULL)
+					sem_post(pReplySem);
+				continue;
+			} //* end XPLAYER_COMMAND_SET_AUDIOSINK.
+			case XPLAYER_COMMAND_SET_PLAYRATE:
+			{
+				XAudioPlaybackRate *rate;
+				rate = (XAudioPlaybackRate*)msg.params[2];
+
+				//do set playback setting in playback
+				int ret = PlayerSetPlayBackSettings(mPriData->mPlayer,rate);
+
+				if(pReplyValue != NULL)
+					*pReplyValue = ret;
+				if(pReplySem != NULL)
+					sem_post(pReplySem);
+
+				continue;
+			}//* end XPLAYER_COMMAND_SET_PLAYRATE.
+#endif
+
+#ifndef ONLY_ENABLE_AUDIO
+#if !AWPLAYER_CONFIG_DISABLE_SUBTITLE
+			case XPLAYER_COMMAND_SET_SUBCTRL:
+			{
+				SubCtrl* subctrl;
+
+				logd("==== process message XPLAYER_COMMAND_SET_SUBCTRL.");
+				printf("xplayer:process message XPLAYER_COMMAND_SET_SUBCTRL.\n");
+
+				subctrl = (SubCtrl*)msg.params[2];
+				PlayerSetSubCtrl(mPriData->mPlayer, subctrl);
+
+				if(pReplyValue != NULL)
+					*pReplyValue = (int)0;
+				if(pReplySem != NULL)
+					sem_post(pReplySem);
+				continue;
+			} //* end XPLAYER_COMMAND_SET_SUBCTRL.
+#endif
+			case XPLAYER_COMMAND_SET_DI:
+				{
+				Deinterlace* di;
+
+				logd("==== process message XPLAYER_COMMAND_SET_DI.");
+				printf("xplayer:process message XPLAYER_COMMAND_SET_DI.\n");
+
+				di = (Deinterlace*)msg.params[2];
+				PlayerSetDeinterlace(mPriData->mPlayer, di);
+
+				if(pReplyValue != NULL)
+					*pReplyValue = (int)0;
+				if(pReplySem != NULL)
+					sem_post(pReplySem);
+				continue;
+			} //* end XPLAYER_COMMAND_SET_DI
+#endif
+			case XPLAYER_COMMAND_PREPARE:
+			{
+				logd("process message XPLAYER_COMMAND_PREPARE. mPriData->mStatus: %d",
+				mPriData->mStatus);
+				printf("xplayer:process message XPLAYER_COMMAND_PREPARE.\n");
+				if(mPriData->mStatus == XPLAYER_STATUS_PREPARED)
+				{
+					//* for data source set by fd(file descriptor), the prepare() method
+					//* is called in setDataSource(), so the player is already in PREPARED
+					//* status, here we just notify a prepared message.
+#ifndef ONLY_ENABLE_AUDIO
+					//* when app call prepareAsync(), we callback video-size to app here,
+					if(mPriData->mMediaInfo->pVideoStreamInfo != NULL)
+					{
+						if (mPriData->mMediaInfo->pVideoStreamInfo->nWidth !=
+							mPriData->mVideoSizeWidth
+							&& mPriData->mMediaInfo->pVideoStreamInfo->nHeight !=
+							mPriData->mVideoSizeHeight)
+						{
+							int nRotation;
+
+							nRotation = atoi((const char*)mPriData->mMediaInfo->cRotation);
+							if((nRotation%180)==0)//* when the rotation is 0 and 180
+							{
+								mPriData->mVideoSizeWidth  =
+								mPriData->mMediaInfo->pVideoStreamInfo->nWidth;
+								mPriData->mVideoSizeHeight =
+								mPriData->mMediaInfo->pVideoStreamInfo->nHeight;
+							}
+							else
+							{
+								//* when the rotation is 90 and 270,
+								//* we should exchange nHeight and nwidth
+								mPriData->mVideoSizeWidth  =
+								mPriData->mMediaInfo->pVideoStreamInfo->nHeight;
+								mPriData->mVideoSizeHeight =
+								mPriData->mMediaInfo->pVideoStreamInfo->nWidth;
+							}
+
+							logi("xxxxxxxxxx video size: width = %d, height = %d",
+							mPriData->mVideoSizeWidth, mPriData->mVideoSizeHeight);
+
+							int size[2];
+							size[0] = mPriData->mVideoSizeWidth;
+							size[1] = mPriData->mVideoSizeHeight;
+							mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_SET_VIDEO_SIZE, 0, size);
+						}
+					}
+#endif
+					mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_PREPARED, 0, 0);
+
+					if(pReplyValue != NULL)
+						*pReplyValue = (int)0;
+					if(pReplySem != NULL)
+						sem_post(pReplySem);
+					if(1 == msg.params[2]){
+						logd("let XPlayerPrepare return");
+						mPriData->mPrepareFinishResult = 0;
+						sem_post(&mPriData->mSemPrepareFinish);
+					}
+					continue;
+				}
+
+				if(mPriData->mStatus != XPLAYER_STATUS_INITIALIZED &&
+					mPriData->mStatus != XPLAYER_STATUS_STOPPED)
+				{
+					logd("invalid prepareAsync() call, player not in initialized or stopped status.");
+					if(pReplyValue != NULL)
+						*pReplyValue = (int)-1;
+					if(pReplySem != NULL)
+						sem_post(pReplySem);
+					continue;
+				}
+
+				mPriData->mStatus = XPLAYER_STATUS_PREPARING;
+				mPriData->mPrepareSync = msg.params[2];
+				ret = DemuxCompPrepareAsync(mPriData->mDemux);
+				if(ret != 0)
+				{
+					loge("DemuxCompPrepareAsync return fail immediately.");
+					mPriData->mStatus = XPLAYER_STATUS_IDLE;
+					if(pReplyValue != NULL)
+						*pReplyValue = (int)-1;
+				}
+				else
+				{
+					if(pReplyValue != NULL)
+						*pReplyValue = (int)0;
+				}
+
+				if(pReplySem != NULL)
+					sem_post(pReplySem);
+				continue;
+			} //* end XPLAYER_COMMAND_PREPARE.
+#ifndef ONLY_ENABLE_AUDIO
+			case XPLAYER_COMMAND_SETSPEED:
+			{
+				logd("process message XPLAYER_COMMAND_SETSPEED.");
+				printf("xplayer:process message XPLAYER_COMMAND_SETSPEED.\n");
+				if(mPriData->mStatus != XPLAYER_STATUS_PREPARED &&
+					mPriData->mStatus != XPLAYER_STATUS_STARTED )
+				{
+					logd("invalid start() call, player not in prepared, \
+					started, paused or complete status.");
+					if(pReplyValue != NULL)
+						*pReplyValue = (int)-1;
+					if(pReplySem != NULL)
+						sem_post(pReplySem);
+					continue;
+				}
+
+				if(mPriData->mMediaInfo == NULL || mPriData->mMediaInfo->bSeekable == 0)
+				{
+					if(mPriData->mMediaInfo == NULL)
+					{
+						loge("setspeed fail because mMediaInfo == NULL.");
+						if(pReplyValue != NULL)
+							*pReplyValue = -1;
+						if(pReplySem != NULL)
+							sem_post(pReplySem);
+						continue;
+					}
+					else
+					{
+						loge("media not seekable. cannot fast");
+						if(pReplyValue != NULL)
+							*pReplyValue = 0;
+						if(pReplySem != NULL)
+							sem_post(pReplySem);
+						continue;
+					}
+				}
+
+				if(mPriData->mSeeking)
+				{
+					DemuxCompCancelSeek(mPriData->mDemux);
+					mPriData->mSeeking = 0;
+				}
+
+				//* protect mSeeking and mSeekTime from being changed by the seek finish callback.
+				pthread_mutex_lock(&mPriData->mMutexStatus);
+
+				int curTime;
+				XPlayerGetCurrentPosition(mPriData, &curTime);
+
+				mPriData->mSeeking  = 1;
+				mPriData->mbFast = 1;
+				mPriData->mFastTime = curTime + mPriData->mSpeed*1000;
+				mPriData->mSeekTime = mPriData->mFastTime;
+				mPriData->mSeekSync = 0;
+				pthread_mutex_unlock(&mPriData->mMutexStatus);
+
+#ifndef ONLY_DISABLE_AUDIO
+				//PlayerFastForeward(mPriData->mPlayer);
+				PlayerSetDiscardAudio(mPriData->mPlayer, 1);
+#endif
+				if(PlayerGetStatus(mPriData->mPlayer) == PLAYER_STATUS_STOPPED)
+				{
+					//* if in prepared status, the player is in stopped status,
+					//* this will make the player not record the nSeekTime at PlayerReset() operation
+					//* called at seek finish callback.
+					PlayerStart(mPriData->mPlayer,0,0);
+				}
+
+				PlayerPause(mPriData->mPlayer);
+				DemuxCompSeekTo(mPriData->mDemux, mPriData->mSeekTime, mPriData->mSeekModeType);
+
+				if (mPriData->mSpeedThreadRuning == 0)
+				{
+					int ret = pthread_create(&mPriData->mSpeedThreadId, NULL,
+					sendSpeedCmdThread, (void*)mPriData );
+					if (ret != 0)
+					{
+						loge("create sendSpeedCmdThread error!");
+						if(pReplyValue != NULL)
+							*pReplyValue = 0;
+						if(pReplySem != NULL)
+							sem_post(pReplySem);
+						continue;
+					}
+				}
+
+				if(pReplyValue != NULL)
+					*pReplyValue = (int)0;
+				if(pReplySem != NULL)
+					sem_post(pReplySem);
+				continue;
+			}//* end XPLAYER_COMMAND_SETSPEED.
+#endif
+			case XPLAYER_COMMAND_START:
+			{
+				logd("process message XPLAYER_COMMAND_START.");
+				printf("xplayer:process message XPLAYER_COMMAND_START.\n");
+				if(mPriData->mStatus != XPLAYER_STATUS_PREPARED &&
+						mPriData->mStatus != XPLAYER_STATUS_STARTED  &&
+						mPriData->mStatus != XPLAYER_STATUS_PAUSED   &&
+						mPriData->mStatus != XPLAYER_STATUS_COMPLETE)
+				{
+					logd("invalid start() call, player not in prepared, \
+					started, paused or complete status.");
+					if(pReplyValue != NULL)
+						*pReplyValue = (int)-1;
+					if(pReplySem != NULL)
+						sem_post(pReplySem);
+					continue;
+				}
+#ifndef ONLY_ENABLE_AUDIO
+				if(mPriData->mbFast == 1)
+				{
+#ifndef ONLY_DISABLE_AUDIO
+					PlayerSetDiscardAudio(mPriData->mPlayer, 0);
+#endif
+					mPriData->mbFast = 0;
+					mPriData->mSpeed = 1;
+					mPriData->mFastTime = 0;
+				}
+#endif
+				//* synchronize with the seek or complete callback and the status may be changed.
+				pthread_mutex_lock(&mPriData->mMutexStatus);
+
+				if(mPriData->mStatus == XPLAYER_STATUS_STARTED)
+				{
+					if(PlayerGetStatus(mPriData->mPlayer) == PLAYER_STATUS_PAUSED
+						&& mPriData->mSeeking == 0)
+					{
+						//* player is paused for buffering, start it.
+						//* see XPLAYER_MESSAGE_DEMUX_PAUSE_PLAYER callback message.
+						PlayerStart(mPriData->mPlayer,0,0);
+						DemuxCompStart(mPriData->mDemux);
+					}
+					pthread_mutex_unlock(&mPriData->mMutexStatus);
+					logv("player already in started status.");
+					if(pReplyValue != NULL)
+						*pReplyValue = (int)0;
+					if(pReplySem != NULL)
+						sem_post(pReplySem);
+					continue;
+				}
+
+				if(mPriData->mSeeking)
+				{
+					//* player and demux will be started at the seek callback.
+					mPriData->mStatus = XPLAYER_STATUS_STARTED;
+					pthread_mutex_unlock(&mPriData->mMutexStatus);
+
+					if(pReplyValue != NULL)
+						*pReplyValue = (int)0;
+					if(pReplySem != NULL)
+						sem_post(pReplySem);
+					continue;
+				}
+
+				//* for complete status, we seek to the begin of the file.
+				if(mPriData->mStatus == XPLAYER_STATUS_COMPLETE)
+				{
+					AwMessage newMsg;
+
+					if(mPriData->mMediaInfo->bSeekable)
+					{
+						if(mPriData->mSeeking)
+						{
+							DemuxCompCancelSeek(mPriData->mDemux);
+							mPriData->mSeeking = 0;
+						}
+
+						mPriData->mSeeking  = 1;
+						mPriData->mSeekTime = 0;
+						mPriData->mSeekSync = 0;
+						mPriData->mSeekByInner = 1;
+						logd("seekTo %.2f secs", mPriData->mSeekTime / 1E3);
+
+						PlayerPause(mPriData->mPlayer);
+						DemuxCompSeekTo(mPriData->mDemux, mPriData->mSeekTime, mPriData->mSeekModeType);
+
+						//* player and demux will be started at the seek callback.
+						mPriData->mStatus = XPLAYER_STATUS_STARTED;
+						pthread_mutex_unlock(&mPriData->mMutexStatus);
+
+						if(pReplyValue != NULL)
+							*pReplyValue = (int)0;
+						if(pReplySem != NULL)
+							sem_post(pReplySem);
+						continue;
+					}
+					else
+					{
+						//* post a stop message.
+						memset(&newMsg, 0, sizeof(AwMessage));
+						newMsg.messageId = XPLAYER_COMMAND_STOP;
+						AwMessageQueuePostMessage(mPriData->mMessageQueue, &newMsg);
+
+						//* post a prepare message.
+						memset(&newMsg, 0, sizeof(AwMessage));
+						newMsg.messageId = XPLAYER_COMMAND_PREPARE;
+						newMsg.params[0] = 0;
+						newMsg.params[1] = 0;
+						newMsg.params[2] = 1;   //* params[2] = mPrepareSync.
+						AwMessageQueuePostMessage(mPriData->mMessageQueue, &newMsg);
+
+						//* post a start message.
+						memset(&newMsg, 0, sizeof(AwMessage));
+						newMsg.messageId = XPLAYER_COMMAND_START;
+						AwMessageQueuePostMessage(mPriData->mMessageQueue, &newMsg);
+
+						//* should I reply 0 to the user at this moment?
+						//* or just set the semaphore and reply variable to the start message to
+						//* make it reply when start message done?
+						pthread_mutex_unlock(&mPriData->mMutexStatus);
+						if(pReplyValue != NULL)
+							*pReplyValue = (int)0;
+						if(pReplySem != NULL)
+							sem_post(pReplySem);
+						continue;
+					}
+				}
+
+				pthread_mutex_unlock(&mPriData->mMutexStatus);
+
+#ifndef ONLY_ENABLE_AUDIO
+				if(mPriData->mApplicationType == APP_STREAMING)
+				{
+					PlayerFast(mPriData->mPlayer, 0);
+				}
+				else
+#endif
+				{
+					PlayerStart(mPriData->mPlayer,0,0);
+				}
+
+				DemuxCompStart(mPriData->mDemux);
+				mPriData->mStatus = XPLAYER_STATUS_STARTED;
+				if(pReplyValue != NULL)
+					*pReplyValue = (int)0;
+				if(pReplySem != NULL)
+					sem_post(pReplySem);
+				continue;
+
+			} //* end XPLAYER_COMMAND_START.
+			case XPLAYER_COMMAND_STOP:
+			{
+				logv("process message XPLAYER_COMMAND_STOP.");
+				printf("xplayer:process message XPLAYER_COMMAND_STOP.\n");
+				if (mPriData->mStatus != XPLAYER_STATUS_PREPARED &&
+					mPriData->mStatus != XPLAYER_STATUS_STARTED  &&
+					mPriData->mStatus != XPLAYER_STATUS_PAUSED   &&
+					mPriData->mStatus != XPLAYER_STATUS_COMPLETE &&
+					mPriData->mStatus != XPLAYER_STATUS_STOPPED)
+				{
+					logd("invalid stop() call, player not in prepared, paused, \
+					started, stopped or complete status.");
+					if(pReplyValue != NULL)
+						*pReplyValue = (int)-1;
+					if(pReplySem != NULL)
+						sem_post(pReplySem);
+					continue;
+				}
+
+				if(mPriData->mStatus == XPLAYER_STATUS_STOPPED)
+				{
+					logv("player already in stopped status.");
+					if(pReplyValue != NULL)
+						*pReplyValue = (int)0;
+					if(pReplySem != NULL)
+						sem_post(pReplySem);
+					continue;
+				}
+
+				//* the prepare callback may happen at this moment.
+				//* so the mStatus may be changed to PREPARED asynchronizely.
+				if(mPriData->mStatus == XPLAYER_STATUS_PREPARING)
+				{
+					logw("stop() called at preparing status, cancel demux prepare.");
+					DemuxCompCancelPrepare(mPriData->mDemux);
+				}
+
+				if(mPriData->mSeeking)
+				{
+					DemuxCompCancelSeek(mPriData->mDemux);
+					mPriData->mSeeking = 0;
+				}
+
+				DemuxCompStop(mPriData->mDemux);
+				PlayerStop(mPriData->mPlayer);
+				PlayerClear(mPriData->mPlayer);               //* clear all media information in player.
+#ifndef ONLY_ENABLE_AUDIO
+				//*clear the mSubtitleDisplayIds
+				memset(mPriData->mSubtitleDisplayIds,0xff,64*sizeof(unsigned int));
+				mPriData->mSubtitleDisplayIdsUpdateIndex = 0;
+#endif
+				mPriData->mStatus  = XPLAYER_STATUS_STOPPED;
+				if (pReplyValue != NULL)
+					*pReplyValue = (int)0;
+				if (pReplySem != NULL)
+					sem_post(pReplySem);
+				continue;
+			} //* end XPLAYER_COMMAND_STOP.
+			case XPLAYER_COMMAND_PAUSE:
+			{
+				logv("process message XPLAYER_COMMAND_PAUSE.");
+				printf("xplayer:process message XPLAYER_COMMAND_PAUSE.\n");
+				if(mPriData->mStatus != XPLAYER_STATUS_STARTED  &&
+					mPriData->mStatus != XPLAYER_STATUS_PAUSED   &&
+					mPriData->mStatus != XPLAYER_STATUS_COMPLETE)
+				{
+					logd("invalid pause() call, player not in started, paused or complete status.");
+					if(pReplyValue != NULL)
+						*pReplyValue = (int)-1;
+					if(pReplySem != NULL)
+						sem_post(pReplySem);
+					continue;
+				}
+
+				if(mPriData->mStatus == XPLAYER_STATUS_PAUSED)
+				{
+					logv("player already in paused or complete status.");
+					if(pReplyValue != NULL)
+						*pReplyValue = (int)0;
+					if(pReplySem != NULL)
+						sem_post(pReplySem);
+					continue;
+				}
+
+				//* sync with the seek, complete or pause_player/resume_player call back.
+				pthread_mutex_lock(&mPriData->mMutexStatus);
+
+				if(mPriData->mSeeking)
+				{
+					//* player and demux will be paused at the seek callback.
+					mPriData->mStatus = XPLAYER_STATUS_PAUSED;
+					pthread_mutex_unlock(&mPriData->mMutexStatus);
+
+					if(pReplyValue != NULL)
+					*pReplyValue = (int)0;
+					if(pReplySem != NULL)
+						sem_post(pReplySem);
+					continue;
+				}
+
+				PlayerPause(mPriData->mPlayer);
+				mPriData->mStatus = XPLAYER_STATUS_PAUSED;
+
+				//* sync with the seek, complete or pause_player/resume_player call back.
+				pthread_mutex_unlock(&mPriData->mMutexStatus);
+
+				if (pReplyValue != NULL)
+					*pReplyValue = (int)0;
+				if (pReplySem != NULL)
+					sem_post(pReplySem);
+				continue;
+			} //* end XPLAYER_COMMAND_PAUSE.
+			case XPLAYER_COMMAND_RESET:
+			{
+				logv("process message XPLAYER_COMMAND_RESET.");
+				printf("xplayer:process message XPLAYER_COMMAND_RESET.\n");
+				//* the prepare callback may happen at this moment.
+				//* so the mStatus may be changed to PREPARED asynchronizely.
+				if(mPriData->mStatus == XPLAYER_STATUS_PREPARING)
+				{
+					logw("reset() called at preparing status, cancel demux prepare.");
+					DemuxCompCancelPrepare(mPriData->mDemux);
+				}
+
+				if(mPriData->mSeeking)
+				{
+					DemuxCompCancelSeek(mPriData->mDemux);
+					mPriData->mSeeking = 0;
+				}
+
+				//* stop and clear the demux.
+				//* this will stop the seeking if demux is currently processing seeking message.
+				//* it will clear the data source keep inside, this is important for the IStreamSource.
+				DemuxCompStop(mPriData->mDemux);
+				DemuxCompClear(mPriData->mDemux);
+
+				//* stop and clear the player.
+				PlayerStop(mPriData->mPlayer);
+				PlayerClear(mPriData->mPlayer);   //* it will clear media info config to the player.
+#ifndef ONLY_ENABLE_AUDIO
+				//* clear suface.
+				if(mPriData->mKeepLastFrame == 0)
+				{
+
+				}
+#endif
+				//* clear data source.
+				if(mPriData->mSourceUrl != NULL)
+				{
+					free(mPriData->mSourceUrl);
+					mPriData->mSourceUrl = NULL;
+				}
+				if(mPriData->mSourceFd != -1)
+				{
+					close(mPriData->mSourceFd);
+					mPriData->mSourceFd = -1;
+					mPriData->mSourceFdOffset = 0;
+					mPriData->mSourceFdLength = 0;
+				}
+				mPriData->mSourceStream = NULL;
+
+				//* clear media info.
+				clearMediaInfo(mPriData);
+
+				//* clear loop setting.
+				mPriData->mLoop   = 0;
+#ifndef ONLY_ENABLE_AUDIO
+				//* clear the mSubtitleDisplayIds
+				memset(mPriData->mSubtitleDisplayIds,0xff,64*sizeof(unsigned int));
+				mPriData->mSubtitleDisplayIdsUpdateIndex = 0;
+#endif
+				//* set status to IDLE.
+				mPriData->mStatus = XPLAYER_STATUS_IDLE;
+
+				if (pReplyValue != NULL)
+					*pReplyValue = (int)0;
+				if (pReplySem != NULL)
+					sem_post(pReplySem);
+				continue;
+			}
+			case XPLAYER_COMMAND_SEEK:
+			{
+				logd("process message XPLAYER_COMMAND_SEEK.");
+				printf("xplayer:process message XPLAYER_COMMAND_SEEK.\n");
+				if(mPriData->mStatus != XPLAYER_STATUS_PREPARED &&
+					mPriData->mStatus != XPLAYER_STATUS_STARTED  &&
+					mPriData->mStatus != XPLAYER_STATUS_PAUSED   &&
+					mPriData->mStatus != XPLAYER_STATUS_COMPLETE)
+				{
+					logd("invalid seekTo() call, player not in prepared, \
+					started, paused or complete status.");
+					if(pReplyValue != NULL)
+						*pReplyValue = (int)-1;
+					if(pReplySem != NULL)
+						sem_post(pReplySem);
+					continue;
+				}
+
+				//* the application will call seekTo() when player is in complete status.
+				//* after seekTo(), the player should still stay on complete status until
+				//* application call start().
+				//* cts test requires this implement.
+				if(mPriData->mStatus == XPLAYER_STATUS_COMPLETE)
+				{
+					//* protect mSeeking and mSeekTime from being changed by the seek finish callback.
+					pthread_mutex_lock(&mPriData->mMutexStatus);
+					mPriData->mSeekTime = msg.params[2];
+					pthread_mutex_unlock(&mPriData->mMutexStatus);
+					mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_SEEK_COMPLETE, 0, 0);
+					if(pReplyValue != NULL)
+						*pReplyValue = (int)0;
+					if(pReplySem != NULL)
+						sem_post(pReplySem);
+					continue;
+				}
+
+				if(mPriData->mMediaInfo == NULL || mPriData->mMediaInfo->bSeekable == 0)
+				{
+					if(mPriData->mMediaInfo == NULL)
+					{
+						loge("seekTo fail because mMediaInfo == NULL.");
+						mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_SEEK_COMPLETE, 0, 0);
+						if(pReplyValue != NULL)
+							*pReplyValue = -1;
+						if(pReplySem != NULL)
+							sem_post(pReplySem);
+						continue;
+					}
+					else
+					{
+						loge("media not seekable.");
+						mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_SEEK_COMPLETE, 0, 0);
+						if(pReplyValue != NULL)
+							*pReplyValue = 0;
+						if(pReplySem != NULL)
+							sem_post(pReplySem);
+						continue;
+					}
+				}
+
+				if(mPriData->mSeeking)
+				{
+					DemuxCompCancelSeek(mPriData->mDemux);
+					mPriData->mSeeking = 0;
+				}
+
+				//* protect mSeeking and mSeekTime from being changed by the seek finish callback.
+				pthread_mutex_lock(&mPriData->mMutexStatus);
+				mPriData->mSeeking  = 1;
+				mPriData->mSeekTime = msg.params[2];
+				mPriData->mSeekSync = msg.params[3];
+				logv("seekTo %.2f secs", mPriData->mSeekTime / 1E3);
+				pthread_mutex_unlock(&mPriData->mMutexStatus);
+
+				if (PlayerGetStatus(mPriData->mPlayer) == PLAYER_STATUS_STOPPED)
+				{
+					//* if in prepared status, the player is in stopped status,
+					//* this will make the player not record the nSeekTime at PlayerReset() operation
+					//* called at seek finish callback.
+					PlayerStart(mPriData->mPlayer,0,0);
+				}
+				PlayerPause(mPriData->mPlayer);
+				DemuxCompSeekTo(mPriData->mDemux, mPriData->mSeekTime, mPriData->mSeekModeType);
+
+				if (pReplyValue != NULL)
+					*pReplyValue = (int)0;
+				if (pReplySem != NULL)
+					sem_post(pReplySem);
+				continue;
+			} //* end XPLAYER_COMMAND_SEEK.
+			case XPLAYER_COMMAND_RESETURL:
+			{
+				logd("process message XPLAYER_COMMAND_RESETURL.");
+				printf("xplayer:process message XPLAYER_COMMAND_RESETURL.\n");
+				if	(mPriData->mStatus != XPLAYER_STATUS_PREPARED &&
+					mPriData->mStatus != XPLAYER_STATUS_STARTED  &&
+					mPriData->mStatus != XPLAYER_STATUS_PAUSED   &&
+					mPriData->mStatus != XPLAYER_STATUS_COMPLETE)
+				{
+					logd("invalid seekTo() call, player not in prepared, started, \
+					paused or complete status.");
+					if (pReplyValue != NULL)
+						*pReplyValue = (int)-1;
+					if(pReplySem != NULL)
+						sem_post(pReplySem);
+					continue;
+				}
+
+				if (mPriData->mSeeking)
+				{
+					DemuxCompCancelSeek(mPriData->mDemux);
+					mPriData->mSeeking = 0;
+				}
+
+				//* protect mSeeking and mSeekTime from being changed by the seek finish callback.
+				pthread_mutex_lock(&mPriData->mMutexStatus);
+				mPriData->mSeeking  = 1;
+				mPriData->mSeekTime = msg.params[2];
+				mPriData->mSeekSync = msg.params[3];
+				logd("seekTo %.2f secs", mPriData->mSeekTime / 1E3);
+				pthread_mutex_unlock(&mPriData->mMutexStatus);
+
+				if (PlayerGetStatus(mPriData->mPlayer) == PLAYER_STATUS_STOPPED)
+				{
+					//* if in prepared status, the player is in stopped status,
+					//* this will make the player not record the nSeekTime at PlayerReset() operation
+					//* called at seek finish callback.
+					PlayerStart(mPriData->mPlayer,0,0);
+				}
+				PlayerPause(mPriData->mPlayer);
+				DemuxCompSeekToResetUrl(mPriData->mDemux, mPriData->mSeekTime);
+
+				if (pReplyValue != NULL)
+					*pReplyValue = (int)0;
+				if (pReplySem != NULL)
+					sem_post(pReplySem);
+				continue;
+			}
+			case XPLAYER_COMMAND_QUIT:
+			{
+				if (pReplyValue != NULL)
+					*pReplyValue = (int)0;
+				if (pReplySem != NULL)
+					sem_post(pReplySem);
+				return 0;  //* break the thread.
+			} //* end XPLAYER_COMMAND_QUIT.
+			default:
+			{
+				logw("unknow message with id %d, ignore.", msg.messageId);
+			} break;
+		}
+	}
+
+	return 0;
 }
 
-int XPlayerSwitchSubtitle(XPlayer* p, int nStreamIndex)
-{
-    PlayerContext* mPriData = (PlayerContext*)p;
-    if(mPriData->mPlayer == NULL)
-    {
-        return -1;
-    }
 
-    return PlayerSwitchSubtitle(mPriData->mPlayer, nStreamIndex);
-}
-
+#ifndef ONLY_DISABLE_AUDIO
 int XPlayerSwitchAudio(XPlayer* p, int nStreamIndex)
 {
     PlayerContext* mPriData = (PlayerContext*)p;
@@ -2671,7 +2778,20 @@ int XPlayerSwitchAudio(XPlayer* p, int nStreamIndex)
 
     return PlayerSwitchAudio(mPriData->mPlayer, nStreamIndex);
 }
+#endif
 
+#ifndef ONLY_ENABLE_AUDIO
+#if !AWPLAYER_CONFIG_DISABLE_SUBTITLE
+int XPlayerSwitchSubtitle(XPlayer* p, int nStreamIndex)
+{
+    PlayerContext* mPriData = (PlayerContext*)p;
+    if(mPriData->mPlayer == NULL)
+    {
+        return -1;
+    }
+
+    return PlayerSwitchSubtitle(mPriData->mPlayer, nStreamIndex);
+}
 static int setSubtitleStream(PlayerContext* mPriData, int nStreamNum,
                                   SubtitleStreamInfo* pNewStreamInfo)
 {
@@ -2936,15 +3056,30 @@ int XPlayerGetSubDelay(XPlayer* p)
     else
         return -1;
 }
+#endif
+#endif
 
 int XPlayerGetBitrate(XPlayer* p)
 {
     PlayerContext* mPriData = (PlayerContext*)p;
-    if(mPriData->mPlayer!=NULL)
-        return PlayerGetVideoBitrate(mPriData->mPlayer) +
-               PlayerGetAudioBitrate(mPriData->mPlayer);
-    else
+    if (mPriData->mPlayer!=NULL) {
+#ifndef ONLY_ENABLE_AUDIO
+		int 	nBitrate;
+		nBitrate = PlayerGetVideoBitrate(mPriData->mPlayer);
+#ifndef ONLY_DISABLE_AUDIO
+		nBitrate += PlayerGetAudioBitrate(mPriData->mPlayer);
+#endif
+        return nBitrate;
+#else
+#ifndef ONLY_DISABLE_AUDIO
+        return PlayerGetAudioBitrate(mPriData->mPlayer);
+#else
+		return -1;
+#endif
+#endif
+   } else {
         return -1;
+    }
 }
 
 int XPlayerGetCacheSize(XPlayer* p)
@@ -2977,6 +3112,7 @@ int XPlayerGetBufferingSettings(XPlayer* p, AwBufferingSettings* pBuffering)
     return DemuxCompGetBufferingSettings(mPriData->mDemux, pBuffering);
 }
 
+#ifndef ONLY_ENABLE_AUDIO
 int XPlayerGetVideoDispFramerate(XPlayer* p,float* dispFramerate){
     PlayerContext* mPriData = (PlayerContext*)p;
     return PlayerGetVideoDispFramerate(mPriData->mPlayer,dispFramerate);
@@ -2992,6 +3128,13 @@ int XPlayerSetRotateDegree(XPlayer* p,int rotateDegree){
     mPriData->mVideoRotateDegree = rotateDegree;
     return 0;
 }
+
+int XPlayerSetG2dRotateDegree(XPlayer* p,int rotateDegree){
+    PlayerContext* mPriData = (PlayerContext*)p;
+    PlayerConfigVideoG2dRotateDegree(mPriData->mPlayer, rotateDegree);
+    return 0;
+}
+#endif
 
 static int callbackProcess(void *p, int messageId, void* param)
 {
@@ -3042,7 +3185,7 @@ static int callbackProcess(void *p, int messageId, void* param)
                     mPriData->mStatus = XPLAYER_STATUS_PREPARED;
                     if(mPriData->mPrepareSync == 0)
                     {
-
+#ifndef ONLY_ENABLE_AUDIO
                         if(mPriData->mMediaInfo->pVideoStreamInfo!=NULL)
                         {
                             if(mPriData->mMediaInfo->pVideoStreamInfo->nWidth !=
@@ -3079,7 +3222,7 @@ static int callbackProcess(void *p, int messageId, void* param)
                             }
                             else
                             {
-                                //此时mVideoSizeWidth必是0
+                                //麓脣脢卤mVideoSizeWidth卤脴脢脟0
                                 logi("xxxxxxxxxx video size: width = 0, height = 0");
                                 mPriData->mCallback(mPriData->pUser,
                                             AWPLAYER_MEDIA_SET_VIDEO_SIZE, 0, (int []){0, 0});
@@ -3087,12 +3230,12 @@ static int callbackProcess(void *p, int messageId, void* param)
                         }
                         else
                         {
-                            //此时mVideoSizeWidth必是0
+                            //麓脣脢卤mVideoSizeWidth卤脴脢脟0
                             logi("xxxxxxxxxx video size: width = 0, height = 0");
                             mPriData->mCallback(mPriData->pUser,
                                             AWPLAYER_MEDIA_SET_VIDEO_SIZE, 0, (int []){0, 0});
                         }
-
+#endif
                         mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_PREPARED, 0, 0);
                     }
                     else
@@ -3116,6 +3259,13 @@ static int callbackProcess(void *p, int messageId, void* param)
                 }
             }
 
+            break;
+        }
+
+        case DEMUX_NOTIFY_PRE_EOS:
+        {
+            mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_PLAYBACK_PRE_COMPLETE,
+                                0, param);
             break;
         }
 
@@ -3165,8 +3315,9 @@ static int callbackProcess(void *p, int messageId, void* param)
 
         case DEMUX_NOTIFY_BUFFER_START:
         {
+#ifndef ONLY_ENABLE_AUDIO
             logd("MEDIA_INFO_BUFFERING_START,mDisplayRatio = %d",mPriData->mDisplayRatio);
-
+#endif
             // for live mode 1, getposition when network broken
             mPriData->mDemuxNotifyPause = 1;
             struct timeval tv;
@@ -3219,6 +3370,13 @@ static int callbackProcess(void *p, int messageId, void* param)
             break;
         }
 
+        case DEMUX_NOTIFY_MEDIA_FORMAT:
+        {
+            mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_FORMAT,
+                                0, param);
+            break;
+        }
+
 #if !(defined(CONF_NEW_BDMV_STREAM))
 
         case DEMUX_IOREQ_ACCESS:
@@ -3265,9 +3423,11 @@ static int callbackProcess(void *p, int messageId, void* param)
             {
                 logd("player notify eos.");
                 mPriData->mSeekTime = 0; //* clear the seek flag.
+#ifndef ONLY_ENABLE_AUDIO
                 mPriData->mbFast = 0;
                 mPriData->mSpeed = 1;
                 mPriData->mFastTime = 0;
+#endif
                 mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_PLAYBACK_COMPLETE, 0, 0);
             }
             else
@@ -3284,14 +3444,24 @@ static int callbackProcess(void *p, int messageId, void* param)
             break;
         }
 
+#ifndef ONLY_ENABLE_AUDIO
         case PLAYBACK_NOTIFY_FIRST_PICTURE:
         {
             mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_INFO,
-                                                 AW_MEDIA_INFO_RENDERING_START, 0);
+                                                 AW_MEDIA_INFO_PICTURE_RENDERING_START, 0);
             DemuxCompNotifyFirstFrameShowed(mPriData->mDemux);
 
             break;
         }
+#endif
+
+        case PLAYBACK_NOTIFY_FIRST_AUDIO:
+        {
+            mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_INFO,
+                                                 AW_MEDIA_INFO_AUDIO_RENDERING_START, 0);
+            break;
+        }
+
         case DEMUX_NOTIFY_RESET_PLAYER:
         {
             logd("DEMUX_NOTIFY_RESET_PLAYER");
@@ -3371,7 +3541,7 @@ static int callbackProcess(void *p, int messageId, void* param)
             }
             break;
         }
-
+#ifndef ONLY_ENABLE_AUDIO
         case PLAYBACK_NOTIFY_SUBTITLE_ITEM_AVAILABLE:
         {
 
@@ -3438,9 +3608,12 @@ static int callbackProcess(void *p, int messageId, void* param)
             }
 
             break;
+#endif
 
         case PLAYBACK_NOTIFY_AUDIO_UNSUPPORTED:
+#ifndef ONLY_ENABLE_AUDIO
             if(mPriData->mMediaInfo->nVideoStreamNum == 0)
+#endif
             {
                 mPriData->mCallback(mPriData->pUser, AWPLAYER_MEDIA_ERROR,
                                         AW_MEDIA_ERROR_UNSUPPORTED, 0);
@@ -3448,6 +3621,7 @@ static int callbackProcess(void *p, int messageId, void* param)
             //* TODO
             break;
 
+#ifndef ONLY_ENABLE_AUDIO
         case PLAYBACK_NOTIFY_SUBTITLE_UNSUPPORTED:
             //* TODO
             break;
@@ -3463,11 +3637,14 @@ static int callbackProcess(void *p, int messageId, void* param)
                 updateAudioInfo(p);
             }
             break;
+#endif
+
         case DEMUX_AUDIO_STREAM_CHANGE:
             logd("update audio info");
             updateAudioInfo(p);
             break;
 
+#ifndef ONLY_ENABLE_AUDIO
         case PLAYBACK_NOTIFY_VIDEO_RENDER_FRAME:
 #if 0
             if(mPriData->mbFast)
@@ -3506,7 +3683,7 @@ static int callbackProcess(void *p, int messageId, void* param)
             }
 #endif
             break;
-
+#endif
         case DEMUX_NOTIFY_HLS_DOWNLOAD_START:
         {
             logd("--- hls message, DEMUX_NOTIFY_HLS_DOWNLOAD_START");
@@ -3564,3 +3741,36 @@ static int callbackProcess(void *p, int messageId, void* param)
 
     return 0;
 }
+
+void XPlayerSetTag(XPlayer* p, int nTimeOffset)
+{
+    loge("set breakpoint :%d(ms)\n",nTimeOffset);
+    PlayerContext* mPriData = (PlayerContext*)p;
+	if(mPriData == NULL)
+	{
+		loge("mPriData is null!\n");
+		return;
+	}
+	mPriData->mBreakPointTime = nTimeOffset;
+	mPriData->mBreakPointFlag = 1;
+	return;
+}
+#ifndef ONLY_DISABLE_AUDIO
+//* get audio balance, return 1 means left channel, 2 means right channel, 3 means stereo.
+int XPlayerGetAudioBalance(XPlayer* p)
+{
+	PlayerContext* mPriData = (PlayerContext*)p;
+	return PlayerGetAudioBalance(mPriData->mPlayer);
+}
+
+int XPlayerSetAudioBalance(XPlayer* p,int val)
+{
+	PlayerContext* mPriData = (PlayerContext*)p;
+	return PlayerSetAudioBalance(mPriData->mPlayer,val);
+}
+int XPlayerGetAudioTrack(XPlayer* p)
+{
+	PlayerContext* mPriData = (PlayerContext*)p;
+	return PlayerGetAudioTrack(mPriData->mPlayer);
+}
+#endif

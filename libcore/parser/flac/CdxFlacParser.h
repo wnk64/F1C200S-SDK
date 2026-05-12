@@ -13,7 +13,7 @@
 
 #include <CdxTypes.h>
 
-#define     READFILELEN 4096  //2048
+#define  READFILELEN 4096  //2048
 #define  LEFTFILELEN 100
 #define  INPUT_BUFFER_PADDING_SIZE 2
 #define  INPUT_BUFFER_GUARD_SIZE   8
@@ -26,6 +26,12 @@ typedef enum {
     FLAC__CHANNEL_ASSIGNMENT_RIGHT_SIDE  = 2, /**< right+side stereo */
     FLAC__CHANNEL_ASSIGNMENT_MID_SIDE    = 3 /**< mid+side stereo */
 } FLAC__ChannelAssignment;
+
+typedef struct flac_header{
+    cdx_uint8 id[4];
+    cdx_int8 block_type;
+    cdx_uint32 block_size;
+}flac_header;
 
 typedef struct FlacParserImplS
 {
@@ -48,18 +54,33 @@ typedef struct FlacParserImplS
     cdx_int32 ulChannels ;
     cdx_int32 ulBitsSample ;
     cdx_int32 ulBitRate;
-    cdx_int32 totalsamples;
+    cdx_int64 totalsamples;
     cdx_int32 nowsamples;
     cdx_int32 orgSr;
     cdx_int32 orgSampsPerFrm;
     cdx_int32 SampsPerFrm;
     cdx_int32 orgChans;
     cdx_int32 orgSampbit;
+    cdx_uint32 orgFrameNum;
+    cdx_uint64 orgSampleNum;
+    cdx_uint32 fixedBlockSize;
+    cdx_uint32 nextFixedBlockSize;
+    cdx_bool hasStreamInfo;
+    cdx_bool isSeeking;
     cdx_int32 isFirstFrame;
     FLAC__ChannelAssignment orgChanAsign;
     cdx_uint8 *pktbuf;
     cdx_uint8 *extradata;
     cdx_int32 extradata_size;
+
+    cdx_uint8 *seektable;
+    cdx_uint32 seektable_size;
+    cdx_uint8 *streaminfo;
+    cdx_uint32 streaminfo_size;
+    cdx_uint8 *vorbis;
+    cdx_uint32 vorbis_size;
+    cdx_uint8 *picture;
+    cdx_uint32 picture_size;
     //meta data
     //not imply yet
 }FlacParserImplS;

@@ -648,14 +648,14 @@ void CorrectAudioPackId(CdxMpgParserT *MpgParser, cdx_uint8 audIdx)
      dvdIfo = (DvdIfoT *) MpgParser->pDvdInfo;
 
      flagMp1 = ((dvdIfo->audioIfo.audioPackId[audIdx]&0x01e0)==0x01c0);
-     flagMp2 = ((dvdIfo->audioIfo.audioPackId[audIdx]&0x01e0)==0x01d0);
+     flagMp2 = ((dvdIfo->audioIfo.audioPackId[audIdx]&0x01f0)==0x01d0);
 
      for(i=0; i<dvdIfo->audioIfo.audioWrongNum; i++)
      {
        if(dvdIfo->audioIfo.audioErrorPackId[i]==MPG_PRIVATE_STREAM_2)
        {
           newflagMp1 = ((dvdIfo->audioIfo.audioErrorPackId[i]&0x01e0)==0x01c0);
-          newflagMp2 = ((dvdIfo->audioIfo.audioErrorStrmId[i]&0x01e0)==0x01d0);
+          newflagMp2 = ((dvdIfo->audioIfo.audioErrorStrmId[i]&0x01f0)==0x01d0);
 
           if((newflagMp1==flagMp1)||(newflagMp2 == flagMp2))
           {
