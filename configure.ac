@@ -3,12 +3,12 @@
 
 AC_PREREQ([2.68])
 AC_INIT([FULL-PACKAGE-NAME], [VERSION], [BUG-REPORT-ADDRESS])
-## 支持宏使用
+## ???????
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
 AC_CONFIG_SRCDIR([version.h])
 AC_CONFIG_HEADERS([config.h])
 
-## 不需要生成静态库
+## ?????????????
 AC_DISABLE_STATIC
 AM_SILENT_RULES([yes])
 ## support as
@@ -365,6 +365,7 @@ AC_ARG_ENABLE(aac_muxer,
 	[only_disable_audio=false])
  AM_CONDITIONAL([ONLY_DISABLE_AUDIO],  [test x$only_disable_audio = xtrue])
 
+dnl Default on: full playback links subtitle APIs; disabling omits .c files and breaks the link.
  AC_ARG_ENABLE(subtitle,
 		[AC_HELP_STRING([--enable-subtitle],[ enable subtitle])],
 		[ case "${enableval}" in
@@ -372,7 +373,7 @@ AC_ARG_ENABLE(aac_muxer,
 		  no)  enable_subtitle=false ;;
           *)   AC_MSG_ERROR(bad value ${enableval} for --enable-subtitle) ;;
 	esac],
-	[enable_subtitle=false])
+	[enable_subtitle=true])
  AM_CONDITIONAL([CONFIG_ENABLE_SUBTITLE],  [test x$enable_subtitle = xtrue])
 
  AC_ARG_ENABLE(only_audio,
