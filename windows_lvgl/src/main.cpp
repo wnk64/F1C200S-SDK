@@ -1,5 +1,6 @@
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
+#include <SDL_image.h>
 #include <windows.h>
 #include <shellapi.h>
 #include <winhttp.h>
@@ -12,6 +13,7 @@ extern "C" {
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
+#include <cstring>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -29,6 +31,8 @@ struct Video {
     std::string title;
     std::string owner;
     std::string view;
+    std::string pic;
+    std::vector<uint8_t> image_bytes;
 };
 
 SDL_Window* window = nullptr;
@@ -43,6 +47,8 @@ std::string pending_error;
 std::atomic_bool fetch_complete{false};
 lv_obj_t* content = nullptr;
 lv_obj_t* status_label = nullptr;
+std::vector<std::vector<uint8_t>> thumbnail_pixels;
+std::vector<lv_img_dsc_t> thumbnail_descriptors;
 
 void flush(lv_disp_drv_t* driver, const lv_area_t* area, lv_color_t* colors) {
     for (int y = area->y1; y <= area->y2; ++y) {
@@ -141,6 +147,7 @@ std::vector<Video> parse_recommend(const std::string& body) {
         std::string owner_object;
         json_string_at(object, "bvid", video.bvid);
         json_string_at(object, "title", video.title);
+        json_string_at(object, "pic", video.pic);
         const size_t owner_pos = object.find("\"owner\":{");
         if (owner_pos != std::string::npos) {
             owner_object = object.substr(owner_pos);
@@ -185,6 +192,77 @@ bool fetch_recommend(std::string& response, std::string& error) {
     return true;
 }
 
+std::wstring utf8_to_wide(const std::string& value) {
+    if (value.empty()) return {};
+    const int length = MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, nullptr, 0);
+    std::wstring wide(length, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, wide.data(), length);
+    wide.pop_back();
+    return wide;
+}
+
+bool fetch_thumbnail(const std::string& url, std::vector<uint8_t>& bytes) {
+    constexpr const char kHttpPrefix[] = "http://";
+    constexpr const char kHttpsPrefix[] = "https://";
+    std::string address = url;
+    if (address.rfind(kHttpPrefix, 0) == 0) address.replace(0, sizeof(kHttpPrefix) - 1, kHttpsPrefix);
+    if (address.rfind(kHttpsPrefix, 0) != 0) return false;
+    const size_t host_end = address.find('/', sizeof(kHttpsPrefix) - 1);
+    if (host_end == std::string::npos) return false;
+    const std::wstring host = utf8_to_wide(address.substr(sizeof(kHttpsPrefix) - 1, host_end - (sizeof(kHttpsPrefix) - 1)));
+    const std::wstring path = utf8_to_wide(address.substr(host_end));
+    HINTERNET session = WinHttpOpen(L"wiliwili-lvgl/0.1", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                    WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!session) return false;
+    HINTERNET connect = WinHttpConnect(session, host.c_str(), INTERNET_DEFAULT_HTTPS_PORT, 0);
+    HINTERNET request = connect ? WinHttpOpenRequest(connect, L"GET", path.c_str(), nullptr, WINHTTP_NO_REFERER,
+                                                     WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE) : nullptr;
+    bool success = request && WinHttpSendRequest(request, L"Referer: https://www.bilibili.com/\r\n", -1L,
+                                                  WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
+                   WinHttpReceiveResponse(request, nullptr);
+    DWORD available = 0;
+    while (success && WinHttpQueryDataAvailable(request, &available) && available > 0) {
+        const size_t offset = bytes.size();
+        bytes.resize(offset + available);
+        DWORD read = 0;
+        if (!WinHttpReadData(request, bytes.data() + offset, available, &read)) { success = false; break; }
+        bytes.resize(offset + read);
+    }
+    if (request) WinHttpCloseHandle(request);
+    if (connect) WinHttpCloseHandle(connect);
+    WinHttpCloseHandle(session);
+    return success && !bytes.empty();
+}
+
+void prepare_thumbnails(const std::vector<Video>& videos) {
+    thumbnail_pixels.clear();
+    thumbnail_descriptors.clear();
+    thumbnail_pixels.resize(videos.size());
+    thumbnail_descriptors.resize(videos.size());
+    for (size_t i = 0; i < videos.size(); ++i) {
+        if (videos[i].image_bytes.empty()) continue;
+        SDL_RWops* stream = SDL_RWFromConstMem(videos[i].image_bytes.data(), static_cast<int>(videos[i].image_bytes.size()));
+        SDL_Surface* decoded = stream ? IMG_Load_RW(stream, 1) : nullptr;
+        SDL_Surface* scaled = decoded ? SDL_CreateRGBSurfaceWithFormat(0, 186, 104, 32, SDL_PIXELFORMAT_ARGB8888) : nullptr;
+        if (decoded && scaled) SDL_BlitScaled(decoded, nullptr, scaled, nullptr);
+        if (decoded) SDL_FreeSurface(decoded);
+        if (!scaled) continue;
+        thumbnail_pixels[i].resize(186 * 104 * sizeof(uint32_t));
+        for (int row = 0; row < 104; ++row) {
+            std::memcpy(thumbnail_pixels[i].data() + row * 186 * sizeof(uint32_t),
+                        static_cast<uint8_t*>(scaled->pixels) + row * scaled->pitch, 186 * sizeof(uint32_t));
+        }
+        SDL_FreeSurface(scaled);
+        lv_img_dsc_t& descriptor = thumbnail_descriptors[i];
+        descriptor.header.always_zero = 0;
+        descriptor.header.w = 186;
+        descriptor.header.h = 104;
+        descriptor.header.cf = LV_IMG_CF_TRUE_COLOR_ALPHA;
+        descriptor.data_size = static_cast<uint32_t>(thumbnail_pixels[i].size());
+        descriptor.data = thumbnail_pixels[i].data();
+    }
+}
+
 void show_recommend_page(const std::vector<Video>& videos, const std::string& error);
 
 void open_original_page(lv_event_t* event) {
@@ -214,6 +292,14 @@ void show_video_detail(const Video& video) {
     lv_obj_set_style_bg_color(player, lv_color_hex(0x05070b), 0);
     lv_obj_set_style_border_width(player, 0, 0);
     lv_obj_set_style_radius(player, 6, 0);
+    const size_t video_index = static_cast<size_t>(&video - pending_videos.data());
+    if (video_index < thumbnail_descriptors.size() && thumbnail_descriptors[video_index].data) {
+        lv_obj_t* cover = lv_img_create(player);
+        lv_img_set_src(cover, &thumbnail_descriptors[video_index]);
+        lv_obj_set_size(cover, 558, 312);
+        lv_obj_center(cover);
+        lv_obj_clear_flag(cover, LV_OBJ_FLAG_CLICKABLE);
+    }
     set_label(player, "Player backend migration pending", 16, lv_color_hex(0xaeb8c6), LV_ALIGN_CENTER, 0, -16);
     set_label(player, video.bvid.c_str(), 16, lv_color_hex(0x58b9ee), LV_ALIGN_CENTER, 0, 18);
 
@@ -280,7 +366,14 @@ void build_video_card(lv_obj_t* parent, const Video& video, int index) {
     lv_obj_set_style_radius(preview, 6, 0);
     lv_obj_set_style_border_width(preview, 0, 0);
     lv_obj_clear_flag(preview, LV_OBJ_FLAG_CLICKABLE);
-    set_label(preview, video.bvid.c_str(), 16, lv_color_hex(0xffffff), LV_ALIGN_CENTER, 0, 0);
+    if (static_cast<size_t>(index) < thumbnail_descriptors.size() && thumbnail_descriptors[index].data) {
+        lv_obj_t* image = lv_img_create(preview);
+        lv_img_set_src(image, &thumbnail_descriptors[index]);
+        lv_obj_center(image);
+        lv_obj_clear_flag(image, LV_OBJ_FLAG_CLICKABLE);
+    } else {
+        set_label(preview, video.bvid.c_str(), 16, lv_color_hex(0xffffff), LV_ALIGN_CENTER, 0, 0);
+    }
 
     lv_obj_t* title = lv_label_create(card);
     lv_label_set_text(title, video.title.c_str());
@@ -346,6 +439,7 @@ void start_fetch() {
         if (fetch_recommend(body, error)) {
             videos = parse_recommend(body);
             if (videos.empty()) error = "Bilibili response could not be parsed";
+            for (auto& video : videos) fetch_thumbnail(video.pic, video.image_bytes);
         }
         std::lock_guard<std::mutex> lock(data_mutex);
         pending_videos = std::move(videos);
@@ -359,6 +453,7 @@ void start_fetch() {
 int main() {
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) return 1;
+    IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG | IMG_INIT_WEBP);
     window = SDL_CreateWindow("wiliwili LVGL", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                               kWindowWidth, kWindowHeight, 0);
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
@@ -410,6 +505,7 @@ int main() {
         last_tick = now;
         if (!displayed && fetch_complete.load()) {
             std::lock_guard<std::mutex> lock(data_mutex);
+            prepare_thumbnails(pending_videos);
             show_recommend_page(pending_videos, pending_error);
             displayed = true;
         }
@@ -421,6 +517,7 @@ int main() {
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
+    IMG_Quit();
     SDL_Quit();
     return 0;
 }

@@ -10,8 +10,8 @@ This worktree replaces rendering only. The upstream `yoga` branch at
 | `activity/main.xml` shell navigation | Partial: visual shell only | Windows capture |
 | `fragment/home_tab.xml` top tabs | Partial: visual tabs only | Windows capture |
 | `fragment/home_hots_all.cpp` public Popular data | Not started | WBI/API port and visible cards |
-| `activity/video_activity.xml` detail route | Partial: selected title/UP/view/BV and internal back route; player is still pending | Windows capture plus selected BV comparison |
-| `fragment/home_recommends.cpp` recommend data | Partial: real feed, cards, selected-video route. Current endpoint accepts the unsigned compatibility request; upstream WBI signing still must be ported. | Windows capture plus selected BV comparison |
+| `activity/video_activity.xml` detail route | Partial: selected title/UP/view/BV, real cover and internal back route; player is still pending | Windows capture plus selected BV comparison |
+| `fragment/home_recommends.cpp` recommend data | Partial: real feed, decoded covers, cards and selected-video route. Current endpoint accepts the unsigned compatibility request; upstream WBI signing still must be ported. | Windows capture plus selected BV comparison |
 
 ## Activity migration inventory
 
