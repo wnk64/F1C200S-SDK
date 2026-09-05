@@ -45,6 +45,7 @@ std::mutex data_mutex;
 std::vector<Video> pending_videos;
 std::string pending_error;
 std::atomic_bool fetch_complete{false};
+std::atomic_bool fetch_in_flight{false};
 lv_obj_t* content = nullptr;
 lv_obj_t* status_label = nullptr;
 std::vector<std::vector<uint8_t>> thumbnail_pixels;
@@ -264,6 +265,17 @@ void prepare_thumbnails(const std::vector<Video>& videos) {
 }
 
 void show_recommend_page(const std::vector<Video>& videos, const std::string& error);
+void start_fetch();
+
+void refresh_recommend(lv_event_t*) {
+    if (fetch_in_flight.exchange(true)) return;
+    if (content) {
+        lv_obj_del(content);
+        content = nullptr;
+    }
+    lv_label_set_text(status_label, "Refreshing Bilibili Home Recommend...");
+    start_fetch();
+}
 
 void open_original_page(lv_event_t* event) {
     const auto* video = static_cast<const Video*>(lv_event_get_user_data(event));
@@ -423,6 +435,13 @@ void build_shell() {
     set_label(top, "Home    Dynamic    Mine", 16, lv_color_hex(0xe9edf2), LV_ALIGN_CENTER, 0, -20);
     set_label(top, "Live     Recommend     Popular     Bangumi     Cinema", 16,
               lv_color_hex(0x58b9ee), LV_ALIGN_CENTER, 0, 22);
+    lv_obj_t* refresh = lv_btn_create(top);
+    lv_obj_set_size(refresh, 92, 38);
+    lv_obj_align(refresh, LV_ALIGN_RIGHT_MID, -42, 0);
+    lv_obj_set_style_bg_color(refresh, lv_color_hex(0x2877a9), 0);
+    lv_obj_set_style_radius(refresh, 6, 0);
+    lv_obj_add_event_cb(refresh, refresh_recommend, LV_EVENT_CLICKED, nullptr);
+    set_label(refresh, "Refresh", 16, lv_color_hex(0xffffff), LV_ALIGN_CENTER, 0, 0);
     status_label = lv_label_create(root);
     lv_obj_set_width(status_label, 1160);
     lv_obj_set_style_text_font(status_label, ui_font(), 0);
@@ -444,6 +463,7 @@ void start_fetch() {
         std::lock_guard<std::mutex> lock(data_mutex);
         pending_videos = std::move(videos);
         pending_error = std::move(error);
+        fetch_in_flight = false;
         fetch_complete = true;
     }).detach();
 }
@@ -503,7 +523,7 @@ int main() {
         const uint32_t now = SDL_GetTicks();
         lv_tick_inc(now - last_tick);
         last_tick = now;
-        if (!displayed && fetch_complete.load()) {
+        if (fetch_complete.exchange(false)) {
             std::lock_guard<std::mutex> lock(data_mutex);
             prepare_thumbnails(pending_videos);
             show_recommend_page(pending_videos, pending_error);
