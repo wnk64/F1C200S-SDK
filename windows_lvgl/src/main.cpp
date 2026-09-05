@@ -21,7 +21,8 @@ namespace {
 
 constexpr int kWindowWidth = 1280;
 constexpr int kWindowHeight = 720;
-constexpr wchar_t kPopularPath[] = L"/x/web-interface/popular?pn=1&ps=8";
+constexpr wchar_t kRecommendPath[] =
+    L"/x/web-interface/wbi/index/top/feed/rcmd?fresh_idx=1&ps=8&feed_version=V1&fresh_type=0&plat=1&x_num=3&y_num=4";
 
 struct Video {
     std::string bvid;
@@ -126,14 +127,14 @@ bool json_number_at(const std::string& object, const char* key, std::string& val
     return true;
 }
 
-std::vector<Video> parse_popular(const std::string& body) {
+std::vector<Video> parse_recommend(const std::string& body) {
     std::vector<Video> videos;
     size_t cursor = 0;
     while (videos.size() < 8) {
         const size_t marker = body.find("\"bvid\":\"", cursor);
         if (marker == std::string::npos) break;
         const size_t start = body.rfind('{', marker);
-        const size_t end = body.find("\"dimension\":", marker);
+        const size_t end = body.find("\"track_id\":", marker);
         if (start == std::string::npos || end == std::string::npos) break;
         const std::string object = body.substr(start, end - start);
         Video video;
@@ -153,13 +154,13 @@ std::vector<Video> parse_popular(const std::string& body) {
     return videos;
 }
 
-bool fetch_popular(std::string& response, std::string& error) {
+bool fetch_recommend(std::string& response, std::string& error) {
     HINTERNET session = WinHttpOpen(L"wiliwili-lvgl/0.1", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
                                     WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!session) { error = "WinHTTP initialization failed"; return false; }
     HINTERNET connect = WinHttpConnect(session, L"api.bilibili.com", INTERNET_DEFAULT_HTTPS_PORT, 0);
     if (!connect) { WinHttpCloseHandle(session); error = "Bilibili connection failed"; return false; }
-    HINTERNET request = WinHttpOpenRequest(connect, L"GET", kPopularPath, nullptr, WINHTTP_NO_REFERER,
+    HINTERNET request = WinHttpOpenRequest(connect, L"GET", kRecommendPath, nullptr, WINHTTP_NO_REFERER,
                                            WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
     if (!request || !WinHttpSendRequest(request, L"Referer: https://www.bilibili.com/\r\n", -1L,
                                         WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
@@ -184,10 +185,83 @@ bool fetch_popular(std::string& response, std::string& error) {
     return true;
 }
 
-void open_video(lv_event_t* event) {
-    const auto* bvid = static_cast<const char*>(lv_event_get_user_data(event));
-    const std::string url = std::string("https://www.bilibili.com/video/") + bvid;
+void show_recommend_page(const std::vector<Video>& videos, const std::string& error);
+
+void open_original_page(lv_event_t* event) {
+    const auto* video = static_cast<const Video*>(lv_event_get_user_data(event));
+    const std::string url = std::string("https://www.bilibili.com/video/") + video->bvid;
     ShellExecuteA(nullptr, "open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+}
+
+void return_to_recommend(lv_event_t*) {
+    show_recommend_page(pending_videos, pending_error);
+}
+
+void show_video_detail(const Video& video) {
+    if (content) lv_obj_del(content);
+    content = lv_obj_create(lv_scr_act());
+    lv_obj_set_size(content, 1160, 510);
+    lv_obj_set_pos(content, 60, 178);
+    lv_obj_set_style_bg_opa(content, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(content, 0, 0);
+    lv_obj_set_style_pad_all(content, 0, 0);
+    lv_obj_clear_flag(content, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_label_set_text(status_label, "Video detail / source contract: video_activity.xml and PlayerActivity");
+    lv_obj_t* player = lv_obj_create(content);
+    lv_obj_set_size(player, 706, 397);
+    lv_obj_set_pos(player, 0, 34);
+    lv_obj_set_style_bg_color(player, lv_color_hex(0x05070b), 0);
+    lv_obj_set_style_border_width(player, 0, 0);
+    lv_obj_set_style_radius(player, 6, 0);
+    set_label(player, "Player backend migration pending", 16, lv_color_hex(0xaeb8c6), LV_ALIGN_CENTER, 0, -16);
+    set_label(player, video.bvid.c_str(), 16, lv_color_hex(0x58b9ee), LV_ALIGN_CENTER, 0, 18);
+
+    lv_obj_t* info = lv_obj_create(content);
+    lv_obj_set_size(info, 420, 435);
+    lv_obj_set_pos(info, 740, 34);
+    lv_obj_set_style_bg_color(info, lv_color_hex(0x202735), 0);
+    lv_obj_set_style_radius(info, 8, 0);
+    lv_obj_set_style_border_width(info, 0, 0);
+    lv_obj_set_style_pad_all(info, 24, 0);
+
+    lv_obj_t* title = lv_label_create(info);
+    lv_label_set_text(title, video.title.c_str());
+    lv_label_set_long_mode(title, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(title, 370);
+    lv_obj_set_style_text_font(title, ui_font(), 0);
+    lv_obj_set_style_text_color(title, lv_color_hex(0xf3f5f8), 0);
+    lv_obj_align(title, LV_ALIGN_TOP_LEFT, 0, 0);
+
+    const std::string metadata = "UP: " + video.owner + "\nViews: " + video.view + "\nBV: " + video.bvid;
+    lv_obj_t* meta = lv_label_create(info);
+    lv_label_set_text(meta, metadata.c_str());
+    lv_label_set_long_mode(meta, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(meta, 370);
+    lv_obj_set_style_text_font(meta, ui_font(), 0);
+    lv_obj_set_style_text_color(meta, lv_color_hex(0xaeb8c6), 0);
+    lv_obj_align(meta, LV_ALIGN_TOP_LEFT, 0, 126);
+
+    lv_obj_t* original = lv_btn_create(info);
+    lv_obj_set_size(original, 370, 50);
+    lv_obj_align(original, LV_ALIGN_BOTTOM_MID, 0, -60);
+    lv_obj_set_style_bg_color(original, lv_color_hex(0x2877a9), 0);
+    lv_obj_set_style_radius(original, 6, 0);
+    lv_obj_add_event_cb(original, open_original_page, LV_EVENT_CLICKED, const_cast<Video*>(&video));
+    set_label(original, "Open original Bilibili page", 16, lv_color_hex(0xffffff), LV_ALIGN_CENTER, 0, 0);
+
+    lv_obj_t* back = lv_btn_create(info);
+    lv_obj_set_size(back, 370, 42);
+    lv_obj_align(back, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_style_bg_color(back, lv_color_hex(0x374152), 0);
+    lv_obj_set_style_radius(back, 6, 0);
+    lv_obj_add_event_cb(back, return_to_recommend, LV_EVENT_CLICKED, nullptr);
+    set_label(back, "Back to Recommend", 16, lv_color_hex(0xffffff), LV_ALIGN_CENTER, 0, 0);
+}
+
+void open_video(lv_event_t* event) {
+    const auto* video = static_cast<const Video*>(lv_event_get_user_data(event));
+    show_video_detail(*video);
 }
 
 void build_video_card(lv_obj_t* parent, const Video& video, int index) {
@@ -197,10 +271,7 @@ void build_video_card(lv_obj_t* parent, const Video& video, int index) {
     lv_obj_set_style_radius(card, 8, 0);
     lv_obj_set_style_border_width(card, 0, 0);
     lv_obj_set_style_shadow_width(card, 0, 0);
-    char* bvid = new char[video.bvid.size() + 1];
-    std::copy(video.bvid.begin(), video.bvid.end(), bvid);
-    bvid[video.bvid.size()] = '\0';
-    lv_obj_add_event_cb(card, open_video, LV_EVENT_CLICKED, bvid);
+    lv_obj_add_event_cb(card, open_video, LV_EVENT_CLICKED, const_cast<Video*>(&video));
 
     lv_obj_t* preview = lv_obj_create(card);
     lv_obj_set_size(preview, 186, 104);
@@ -208,6 +279,7 @@ void build_video_card(lv_obj_t* parent, const Video& video, int index) {
     lv_obj_set_style_bg_color(preview, lv_color_hex(index % 2 ? 0x3c5d7f : 0x734c73), 0);
     lv_obj_set_style_radius(preview, 6, 0);
     lv_obj_set_style_border_width(preview, 0, 0);
+    lv_obj_clear_flag(preview, LV_OBJ_FLAG_CLICKABLE);
     set_label(preview, video.bvid.c_str(), 16, lv_color_hex(0xffffff), LV_ALIGN_CENTER, 0, 0);
 
     lv_obj_t* title = lv_label_create(card);
@@ -227,7 +299,7 @@ void build_video_card(lv_obj_t* parent, const Video& video, int index) {
     lv_obj_align(detail, LV_ALIGN_BOTTOM_LEFT, 212, -18);
 }
 
-void show_popular_page(const std::vector<Video>& videos, const std::string& error) {
+void show_recommend_page(const std::vector<Video>& videos, const std::string& error) {
     if (content) lv_obj_del(content);
     content = lv_obj_create(lv_scr_act());
     lv_obj_set_size(content, 1160, 510);
@@ -241,7 +313,7 @@ void show_popular_page(const std::vector<Video>& videos, const std::string& erro
         lv_label_set_text(status_label, error.c_str());
         return;
     }
-    lv_label_set_text(status_label, "Bilibili public Popular feed - click a card to open its original video page");
+    lv_label_set_text(status_label, "Bilibili Home Recommend - select a card for its in-app detail page");
     for (size_t i = 0; i < videos.size(); ++i) build_video_card(content, videos[i], static_cast<int>(i));
 }
 
@@ -263,7 +335,7 @@ void build_shell() {
     lv_obj_set_style_text_font(status_label, ui_font(), 0);
     lv_obj_set_style_text_color(status_label, lv_color_hex(0xb8c3cf), 0);
     lv_obj_set_pos(status_label, 60, 142);
-    lv_label_set_text(status_label, "Loading the real Bilibili Popular feed...");
+    lv_label_set_text(status_label, "Loading the real Bilibili Home Recommend feed...");
 }
 
 void start_fetch() {
@@ -271,8 +343,8 @@ void start_fetch() {
         std::string body;
         std::string error;
         std::vector<Video> videos;
-        if (fetch_popular(body, error)) {
-            videos = parse_popular(body);
+        if (fetch_recommend(body, error)) {
+            videos = parse_recommend(body);
             if (videos.empty()) error = "Bilibili response could not be parsed";
         }
         std::lock_guard<std::mutex> lock(data_mutex);
@@ -338,7 +410,7 @@ int main() {
         last_tick = now;
         if (!displayed && fetch_complete.load()) {
             std::lock_guard<std::mutex> lock(data_mutex);
-            show_popular_page(pending_videos, pending_error);
+            show_recommend_page(pending_videos, pending_error);
             displayed = true;
         }
         lv_timer_handler();
