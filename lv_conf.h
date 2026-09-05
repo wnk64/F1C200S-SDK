@@ -10,4 +10,8 @@
 #define LV_FONT_MONTSERRAT_20 1
 #define LV_FONT_MONTSERRAT_24 1
 
+/* Windows migration host: render real upstream Chinese metadata. */
+#define LV_USE_FREETYPE 1
+#define LV_FREETYPE_CACHE_SIZE (256U * 1024U)
+
 #endif

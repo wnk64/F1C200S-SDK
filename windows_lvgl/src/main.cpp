@@ -1,23 +1,47 @@
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
+#include <windows.h>
+#include <shellapi.h>
+#include <winhttp.h>
 
 extern "C" {
 #include "lvgl.h"
+#include "extra/libs/freetype/lv_freetype.h"
 }
 
+#include <algorithm>
+#include <atomic>
 #include <cstdint>
-#include <fstream>
+#include <mutex>
+#include <string>
+#include <thread>
 #include <vector>
 
 namespace {
 
 constexpr int kWindowWidth = 1280;
 constexpr int kWindowHeight = 720;
+constexpr wchar_t kPopularPath[] = L"/x/web-interface/popular?pn=1&ps=8";
+
+struct Video {
+    std::string bvid;
+    std::string title;
+    std::string owner;
+    std::string view;
+};
 
 SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
 SDL_Texture* texture = nullptr;
 std::vector<uint32_t> frame(kWindowWidth * kWindowHeight);
+lv_indev_data_t pointer_data{};
+lv_ft_info_t chinese_font{};
+std::mutex data_mutex;
+std::vector<Video> pending_videos;
+std::string pending_error;
+std::atomic_bool fetch_complete{false};
+lv_obj_t* content = nullptr;
+lv_obj_t* status_label = nullptr;
 
 void flush(lv_disp_drv_t* driver, const lv_area_t* area, lv_color_t* colors) {
     for (int y = area->y1; y <= area->y2; ++y) {
@@ -34,61 +58,248 @@ void flush(lv_disp_drv_t* driver, const lv_area_t* area, lv_color_t* colors) {
     lv_disp_flush_ready(driver);
 }
 
-void add_label(lv_obj_t* parent, const char* text, const lv_font_t* font,
-               lv_color_t color, lv_align_t align, int x, int y) {
-    lv_obj_t* label = lv_label_create(parent);
-    lv_label_set_text(label, text);
-    lv_obj_set_style_text_font(label, font, 0);
-    lv_obj_set_style_text_color(label, color, 0);
-    lv_obj_align(label, align, x, y);
+void read_pointer(lv_indev_drv_t*, lv_indev_data_t* data) {
+    *data = pointer_data;
 }
 
-void build_source_migration_notice() {
+const lv_font_t* ui_font() {
+    return chinese_font.font ? chinese_font.font : &lv_font_montserrat_16;
+}
+
+void set_label(lv_obj_t* parent, const char* text, int size, lv_color_t color,
+               lv_align_t align, int x, int y) {
+    lv_obj_t* label = lv_label_create(parent);
+    lv_label_set_text(label, text);
+    lv_obj_set_style_text_font(label, ui_font(), 0);
+    lv_obj_set_style_text_color(label, color, 0);
+    lv_obj_set_style_text_letter_space(label, 0, 0);
+    lv_obj_set_style_text_line_space(label, 4, 0);
+    lv_obj_align(label, align, x, y);
+    (void)size;
+}
+
+std::string decode_json_string(const std::string& encoded) {
+    std::string decoded;
+    for (size_t i = 0; i < encoded.size(); ++i) {
+        if (encoded[i] != '\\' || i + 1 >= encoded.size()) {
+            decoded += encoded[i];
+            continue;
+        }
+        const char next = encoded[++i];
+        switch (next) {
+            case '"': decoded += '"'; break;
+            case '\\': decoded += '\\'; break;
+            case '/': decoded += '/'; break;
+            case 'n': decoded += '\n'; break;
+            case 'r': decoded += '\r'; break;
+            case 't': decoded += '\t'; break;
+            default: decoded += next; break;
+        }
+    }
+    return decoded;
+}
+
+bool json_string_at(const std::string& object, const char* key, std::string& value) {
+    const std::string prefix = std::string("\"") + key + "\":\"";
+    const size_t begin = object.find(prefix);
+    if (begin == std::string::npos) return false;
+    std::string raw;
+    for (size_t i = begin + prefix.size(); i < object.size(); ++i) {
+        if (object[i] == '"' && (i == 0 || object[i - 1] != '\\')) {
+            value = decode_json_string(raw);
+            return true;
+        }
+        raw += object[i];
+    }
+    return false;
+}
+
+bool json_number_at(const std::string& object, const char* key, std::string& value) {
+    const std::string prefix = std::string("\"") + key + "\":";
+    const size_t begin = object.find(prefix);
+    if (begin == std::string::npos) return false;
+    const size_t start = begin + prefix.size();
+    size_t end = start;
+    while (end < object.size() && object[end] >= '0' && object[end] <= '9') ++end;
+    if (end == start) return false;
+    value = object.substr(start, end - start);
+    return true;
+}
+
+std::vector<Video> parse_popular(const std::string& body) {
+    std::vector<Video> videos;
+    size_t cursor = 0;
+    while (videos.size() < 8) {
+        const size_t marker = body.find("\"bvid\":\"", cursor);
+        if (marker == std::string::npos) break;
+        const size_t start = body.rfind('{', marker);
+        const size_t end = body.find("\"dimension\":", marker);
+        if (start == std::string::npos || end == std::string::npos) break;
+        const std::string object = body.substr(start, end - start);
+        Video video;
+        std::string owner_object;
+        json_string_at(object, "bvid", video.bvid);
+        json_string_at(object, "title", video.title);
+        const size_t owner_pos = object.find("\"owner\":{");
+        if (owner_pos != std::string::npos) {
+            owner_object = object.substr(owner_pos);
+            json_string_at(owner_object, "name", video.owner);
+        }
+        const size_t stat_pos = object.find("\"stat\":{");
+        if (stat_pos != std::string::npos) json_number_at(object.substr(stat_pos), "view", video.view);
+        if (!video.bvid.empty() && !video.title.empty()) videos.push_back(std::move(video));
+        cursor = end;
+    }
+    return videos;
+}
+
+bool fetch_popular(std::string& response, std::string& error) {
+    HINTERNET session = WinHttpOpen(L"wiliwili-lvgl/0.1", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                    WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!session) { error = "WinHTTP initialization failed"; return false; }
+    HINTERNET connect = WinHttpConnect(session, L"api.bilibili.com", INTERNET_DEFAULT_HTTPS_PORT, 0);
+    if (!connect) { WinHttpCloseHandle(session); error = "Bilibili connection failed"; return false; }
+    HINTERNET request = WinHttpOpenRequest(connect, L"GET", kPopularPath, nullptr, WINHTTP_NO_REFERER,
+                                           WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
+    if (!request || !WinHttpSendRequest(request, L"Referer: https://www.bilibili.com/\r\n", -1L,
+                                        WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
+        !WinHttpReceiveResponse(request, nullptr)) {
+        if (request) WinHttpCloseHandle(request);
+        WinHttpCloseHandle(connect);
+        WinHttpCloseHandle(session);
+        error = "Bilibili request failed";
+        return false;
+    }
+    DWORD available = 0;
+    while (WinHttpQueryDataAvailable(request, &available) && available > 0) {
+        std::vector<char> buffer(available + 1);
+        DWORD read = 0;
+        if (!WinHttpReadData(request, buffer.data(), available, &read)) break;
+        response.append(buffer.data(), read);
+    }
+    WinHttpCloseHandle(request);
+    WinHttpCloseHandle(connect);
+    WinHttpCloseHandle(session);
+    if (response.empty()) { error = "Bilibili returned no data"; return false; }
+    return true;
+}
+
+void open_video(lv_event_t* event) {
+    const auto* bvid = static_cast<const char*>(lv_event_get_user_data(event));
+    const std::string url = std::string("https://www.bilibili.com/video/") + bvid;
+    ShellExecuteA(nullptr, "open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+}
+
+void build_video_card(lv_obj_t* parent, const Video& video, int index) {
+    lv_obj_t* card = lv_btn_create(parent);
+    lv_obj_set_size(card, 548, 132);
+    lv_obj_set_style_bg_color(card, lv_color_hex(index % 2 ? 0x252b38 : 0x202735), 0);
+    lv_obj_set_style_radius(card, 8, 0);
+    lv_obj_set_style_border_width(card, 0, 0);
+    lv_obj_set_style_shadow_width(card, 0, 0);
+    char* bvid = new char[video.bvid.size() + 1];
+    std::copy(video.bvid.begin(), video.bvid.end(), bvid);
+    bvid[video.bvid.size()] = '\0';
+    lv_obj_add_event_cb(card, open_video, LV_EVENT_CLICKED, bvid);
+
+    lv_obj_t* preview = lv_obj_create(card);
+    lv_obj_set_size(preview, 186, 104);
+    lv_obj_align(preview, LV_ALIGN_LEFT_MID, 10, 0);
+    lv_obj_set_style_bg_color(preview, lv_color_hex(index % 2 ? 0x3c5d7f : 0x734c73), 0);
+    lv_obj_set_style_radius(preview, 6, 0);
+    lv_obj_set_style_border_width(preview, 0, 0);
+    set_label(preview, video.bvid.c_str(), 16, lv_color_hex(0xffffff), LV_ALIGN_CENTER, 0, 0);
+
+    lv_obj_t* title = lv_label_create(card);
+    lv_label_set_text(title, video.title.c_str());
+    lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(title, 320);
+    lv_obj_set_style_text_font(title, ui_font(), 0);
+    lv_obj_set_style_text_color(title, lv_color_hex(0xf3f5f8), 0);
+    lv_obj_align(title, LV_ALIGN_TOP_LEFT, 212, 18);
+
+    const std::string meta = video.owner + "   " + video.view + " views";
+    lv_obj_t* detail = lv_label_create(card);
+    lv_label_set_text(detail, meta.c_str());
+    lv_obj_set_width(detail, 320);
+    lv_obj_set_style_text_font(detail, ui_font(), 0);
+    lv_obj_set_style_text_color(detail, lv_color_hex(0xaeb8c6), 0);
+    lv_obj_align(detail, LV_ALIGN_BOTTOM_LEFT, 212, -18);
+}
+
+void show_popular_page(const std::vector<Video>& videos, const std::string& error) {
+    if (content) lv_obj_del(content);
+    content = lv_obj_create(lv_scr_act());
+    lv_obj_set_size(content, 1160, 510);
+    lv_obj_set_pos(content, 60, 178);
+    lv_obj_set_style_bg_opa(content, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(content, 0, 0);
+    lv_obj_set_style_pad_all(content, 0, 0);
+    lv_obj_set_flex_flow(content, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(content, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    if (!error.empty()) {
+        lv_label_set_text(status_label, error.c_str());
+        return;
+    }
+    lv_label_set_text(status_label, "Bilibili public Popular feed - click a card to open its original video page");
+    for (size_t i = 0; i < videos.size(); ++i) build_video_card(content, videos[i], static_cast<int>(i));
+}
+
+void build_shell() {
     lv_obj_t* root = lv_scr_act();
-    lv_obj_set_style_bg_color(root, lv_color_hex(0x181c25), 0);
+    lv_obj_set_style_bg_color(root, lv_color_hex(0x151922), 0);
+    lv_obj_set_style_pad_all(root, 0, 0);
+    lv_obj_t* top = lv_obj_create(root);
+    lv_obj_set_size(top, kWindowWidth, 126);
+    lv_obj_set_style_bg_color(top, lv_color_hex(0x202633), 0);
+    lv_obj_set_style_border_width(top, 0, 0);
+    lv_obj_set_style_radius(top, 0, 0);
+    set_label(top, "wiliwili", 24, lv_color_hex(0xffffff), LV_ALIGN_LEFT_MID, 54, -20);
+    set_label(top, "Home    Dynamic    Mine", 16, lv_color_hex(0xe9edf2), LV_ALIGN_CENTER, 0, -20);
+    set_label(top, "Live     Recommend     Popular     Bangumi     Cinema", 16,
+              lv_color_hex(0x58b9ee), LV_ALIGN_CENTER, 0, 22);
+    status_label = lv_label_create(root);
+    lv_obj_set_width(status_label, 1160);
+    lv_obj_set_style_text_font(status_label, ui_font(), 0);
+    lv_obj_set_style_text_color(status_label, lv_color_hex(0xb8c3cf), 0);
+    lv_obj_set_pos(status_label, 60, 142);
+    lv_label_set_text(status_label, "Loading the real Bilibili Popular feed...");
+}
 
-    lv_obj_t* panel = lv_obj_create(root);
-    lv_obj_set_size(panel, 980, 420);
-    lv_obj_center(panel);
-    lv_obj_set_style_bg_color(panel, lv_color_hex(0x222936), 0);
-    lv_obj_set_style_radius(panel, 16, 0);
-    lv_obj_set_style_border_width(panel, 0, 0);
-
-    add_label(panel, "wiliwili LVGL rewrite", &lv_font_montserrat_24,
-              lv_color_hex(0xffffff), LV_ALIGN_TOP_LEFT, 42, 42);
-    add_label(panel, "Windows source-migration worktree", &lv_font_montserrat_16,
-              lv_color_hex(0x68b7f0), LV_ALIGN_TOP_LEFT, 42, 84);
-    add_label(panel,
-              "The original Borealis/NanoVG activities, fragments, presenters,"
-              " API models and resources are the migration contract.",
-              &lv_font_montserrat_16, lv_color_hex(0xc7d2de), LV_ALIGN_TOP_LEFT, 42, 148);
-    add_label(panel,
-              "This executable is only the Windows LVGL display bootstrap."
-              " Page-by-page parity starts from main.xml and HomeTab.",
-              &lv_font_montserrat_16, lv_color_hex(0xc7d2de), LV_ALIGN_TOP_LEFT, 42, 212);
-    add_label(panel, "Esc closes the test window.", &lv_font_montserrat_14,
-              lv_color_hex(0x91a2b4), LV_ALIGN_BOTTOM_LEFT, 42, -34);
+void start_fetch() {
+    std::thread([] {
+        std::string body;
+        std::string error;
+        std::vector<Video> videos;
+        if (fetch_popular(body, error)) {
+            videos = parse_popular(body);
+            if (videos.empty()) error = "Bilibili response could not be parsed";
+        }
+        std::lock_guard<std::mutex> lock(data_mutex);
+        pending_videos = std::move(videos);
+        pending_error = std::move(error);
+        fetch_complete = true;
+    }).detach();
 }
 
 }  // namespace
 
 int main() {
-    std::ofstream trace("E:/LVGL界面/wiliwili_lvgl/windows_lvgl_bootstrap.log", std::ios::app);
-    trace << "main\n" << std::flush;
     SDL_SetMainReady();
-    trace << "main-ready\n" << std::flush;
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) return 1;
-    trace << "sdl-init\n" << std::flush;
-    window = SDL_CreateWindow("wiliwili LVGL", SDL_WINDOWPOS_CENTERED,
-                              SDL_WINDOWPOS_CENTERED, kWindowWidth, kWindowHeight, 0);
+    window = SDL_CreateWindow("wiliwili LVGL", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                              kWindowWidth, kWindowHeight, 0);
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
-                                SDL_TEXTUREACCESS_STREAMING, kWindowWidth, kWindowHeight);
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
+                                kWindowWidth, kWindowHeight);
     if (!window || !renderer || !texture) return 1;
-    trace << "window-ready\n" << std::flush;
-
     lv_init();
-    trace << "lv-init\n" << std::flush;
+    if (lv_freetype_init(4, 4, 0)) {
+        chinese_font.name = "C:/Windows/Fonts/msyh.ttc";
+        chinese_font.weight = 18;
+        chinese_font.style = FT_FONT_STYLE_NORMAL;
+        lv_ft_font_init(&chinese_font);
+    }
     std::vector<lv_color_t> draw_a(kWindowWidth * kWindowHeight);
     std::vector<lv_color_t> draw_b(kWindowWidth * kWindowHeight);
     lv_disp_draw_buf_t draw_buf;
@@ -100,23 +311,41 @@ int main() {
     display.draw_buf = &draw_buf;
     display.flush_cb = flush;
     lv_disp_drv_register(&display);
-    build_source_migration_notice();
-    trace << "ui-ready\n" << std::flush;
+    lv_indev_drv_t pointer;
+    lv_indev_drv_init(&pointer);
+    pointer.type = LV_INDEV_TYPE_POINTER;
+    pointer.read_cb = read_pointer;
+    lv_indev_drv_register(&pointer);
+    build_shell();
+    start_fetch();
 
     bool running = true;
+    bool displayed = false;
+    uint32_t last_tick = SDL_GetTicks();
     while (running) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT ||
-                (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
-                running = false;
+            if (event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) running = false;
+            if (event.type == SDL_MOUSEMOTION) { pointer_data.point.x = event.motion.x; pointer_data.point.y = event.motion.y; }
+            if (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) {
+                pointer_data.point.x = event.button.x;
+                pointer_data.point.y = event.button.y;
+                pointer_data.state = event.type == SDL_MOUSEBUTTONDOWN ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
             }
         }
-        lv_tick_inc(16);
+        const uint32_t now = SDL_GetTicks();
+        lv_tick_inc(now - last_tick);
+        last_tick = now;
+        if (!displayed && fetch_complete.load()) {
+            std::lock_guard<std::mutex> lock(data_mutex);
+            show_popular_page(pending_videos, pending_error);
+            displayed = true;
+        }
         lv_timer_handler();
-        SDL_Delay(16);
+        SDL_Delay(5);
     }
-
+    if (chinese_font.font) lv_ft_font_destroy(chinese_font.font);
+    lv_freetype_destroy();
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
