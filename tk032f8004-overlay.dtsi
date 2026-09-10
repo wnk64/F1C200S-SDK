@@ -19,17 +19,17 @@ tk032f8004_panel: panel@0 {
 	display-timings {
 		native-mode = <&tk032f8004_timing>;
 		tk032f8004_timing: timing0 {
-			/* Verified target orientation: 800x480 landscape. */
+			/* LG4573A native scan: 480 RGB source columns x 800 gate rows. */
 			clock-frequency = <0>; /* Confirm panel PCLK before DTS compilation. */
-			hactive = <800>;
-			vactive = <480>;
-			/* TK499 timing axes are transposed for the landscape TCON output. */
+			hactive = <480>;
+			vactive = <800>;
+			/* 800x480 is an upper-layer rotated logical presentation. */
 			hfront-porch = <0>;
-			hback-porch = <9>;
-			hsync-len = <7>;
+			hback-porch = <20>;
+			hsync-len = <2>;
 			vfront-porch = <0>;
-			vback-porch = <20>;
-			vsync-len = <2>;
+			vback-porch = <9>;
+			vsync-len = <7>;
 			hsync-active = <0>;
 			vsync-active = <0>;
 			de-active = <1>;
