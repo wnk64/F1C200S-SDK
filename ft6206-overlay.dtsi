@@ -1,0 +1,13 @@
+&i2c0 {
+	status = "okay";
+	ft6206: touchscreen@38 {
+		compatible = "focaltech,ft6206";
+		reg = <0x38>;
+		interrupt-parent = <&pio>;
+		interrupts = <0 0 IRQ_TYPE_EDGE_FALLING>; /* Replace with verified IRQ GPIO. */
+		reset-gpios = <&pio 0 0 GPIO_ACTIVE_HIGH>; /* Replace with verified reset GPIO. */
+		touchscreen-size-x = <480>;
+		touchscreen-size-y = <800>;
+		touchscreen-swapped-x-y;
+	};
+};
