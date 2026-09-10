@@ -19,17 +19,17 @@ tk032f8004_panel: panel@0 {
 	display-timings {
 		native-mode = <&tk032f8004_timing>;
 		tk032f8004_timing: timing0 {
-			/* TK499 reference LTDC: panel-native 480x800 scan direction. */
-			clock-frequency = <0>; /* Derive/confirm before DTS compilation. */
-			hactive = <480>;
-			vactive = <800>;
-			/* H total=502, HSYNC=2; V total=816, VSYNC=7. */
+			/* Verified target orientation: 800x480 landscape. */
+			clock-frequency = <0>; /* Confirm panel PCLK before DTS compilation. */
+			hactive = <800>;
+			vactive = <480>;
+			/* TK499 timing axes are transposed for the landscape TCON output. */
 			hfront-porch = <0>;
-			hback-porch = <20>;
-			hsync-len = <2>;
+			hback-porch = <9>;
+			hsync-len = <7>;
 			vfront-porch = <0>;
-			vback-porch = <9>;
-			vsync-len = <7>;
+			vback-porch = <20>;
+			vsync-len = <2>;
 			hsync-active = <0>;
 			vsync-active = <0>;
 			de-active = <1>;
