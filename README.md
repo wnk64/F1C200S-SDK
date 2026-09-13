@@ -8,6 +8,6 @@ The module does not modify the stable kernel tree. Build against the matching
 kernel build tree only after release-lock preflight.
 
 Required GPIO mappings: `cs-gpios = PA0`, `sclk-gpios = PA2`, and
-`mosi-gpios = PA1`. `miso-gpios = PA4` is recorded for a future readback
+`mosi-gpios = PA1`. `miso-gpios = PA3` is recorded for a future readback
 protocol but is not used by this write-only initialisation driver. No reset or
 backlight GPIO is required or driven.
