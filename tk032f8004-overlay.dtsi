@@ -1,6 +1,10 @@
 /* Candidate only: merge into the active board DTS on a dedicated branch. */
 
-&sii9022_panel {
+&sii9022 {
+	status = "disabled";
+};
+
+&spi1 {
 	status = "disabled";
 };
 
@@ -8,19 +12,16 @@ tk032f8004_panel: panel@0 {
 	compatible = "tk,tk032f8004";
 	status = "okay";
 
-	/* Replace each GPIO specifier with the verified F1C200S wiring. */
-	reset-gpios = <&pio 0 0 GPIO_ACTIVE_HIGH>;
-	enable-gpios = <&pio 0 1 GPIO_ACTIVE_HIGH>;
-	backlight-gpios = <&pio 0 2 GPIO_ACTIVE_HIGH>;
-	cs-gpios = <&pio 0 3 GPIO_ACTIVE_HIGH>;
-	sclk-gpios = <&pio 0 4 GPIO_ACTIVE_HIGH>;
-	mosi-gpios = <&pio 0 5 GPIO_ACTIVE_HIGH>;
+	/* Shared command bus: PA2/PA3 are released after initialization. */
+	cs-gpios = <&pio 0 0 GPIO_ACTIVE_HIGH>;
+	sclk-gpios = <&pio 0 2 GPIO_ACTIVE_HIGH>;
+	mosi-gpios = <&pio 0 3 GPIO_ACTIVE_HIGH>;
 
 	display-timings {
 		native-mode = <&tk032f8004_timing>;
 		tk032f8004_timing: timing0 {
 			/* LG4573A native scan: 480 RGB source columns x 800 gate rows. */
-			clock-frequency = <0>; /* Confirm panel PCLK before DTS compilation. */
+			clock-frequency = <24580000>; /* 502 x 816 x 60 Hz */
 			hactive = <480>;
 			vactive = <800>;
 			/* 800x480 is an upper-layer rotated logical presentation. */
@@ -38,7 +39,7 @@ tk032f8004_panel: panel@0 {
 	};
 
 	port {
-		panel_input: endpoint {
+		tk032f8004_input: endpoint {
 			remote-endpoint = <&tcon0_out_tk032f8004>;
 		};
 	};
@@ -46,8 +47,8 @@ tk032f8004_panel: panel@0 {
 
 &tcon0_out {
 	tcon0_out_tk032f8004: endpoint@2 {
-		reg = <2>;
-		remote-endpoint = <&panel_input>;
+		reg = <1>;
+		remote-endpoint = <&tk032f8004_input>;
 		allwinner,tcon-channel = <0>;
 	};
 };

@@ -96,11 +96,14 @@ static int tk_prepare(struct drm_panel *panel)
     struct tk032f8004 *tk = to_tk(panel);
     if (tk->prepared)
         return 0;
-    gpiod_set_value_cansleep(tk->enable, 1);
-    gpiod_set_value_cansleep(tk->reset, 0);
-    msleep(20);
-    gpiod_set_value_cansleep(tk->reset, 1);
-    msleep(20);
+    if (tk->enable)
+        gpiod_set_value_cansleep(tk->enable, 1);
+    if (tk->reset) {
+        gpiod_set_value_cansleep(tk->reset, 0);
+        msleep(20);
+        gpiod_set_value_cansleep(tk->reset, 1);
+        msleep(20);
+    }
     tk_init_sequence(tk);
     tk->prepared = true;
     return 0;
@@ -111,8 +114,10 @@ static int tk_unprepare(struct drm_panel *panel)
     struct tk032f8004 *tk = to_tk(panel);
     if (!tk->prepared)
         return 0;
-    gpiod_set_value_cansleep(tk->backlight, 0);
-    gpiod_set_value_cansleep(tk->enable, 0);
+    if (tk->backlight)
+        gpiod_set_value_cansleep(tk->backlight, 0);
+    if (tk->enable)
+        gpiod_set_value_cansleep(tk->enable, 0);
     tk->prepared = false;
     return 0;
 }
@@ -120,7 +125,8 @@ static int tk_unprepare(struct drm_panel *panel)
 static int tk_enable(struct drm_panel *panel)
 {
     struct tk032f8004 *tk = to_tk(panel);
-    gpiod_set_value_cansleep(tk->backlight, 1);
+    if (tk->backlight)
+        gpiod_set_value_cansleep(tk->backlight, 1);
     tk->enabled = true;
     return 0;
 }
@@ -128,7 +134,8 @@ static int tk_enable(struct drm_panel *panel)
 static int tk_disable(struct drm_panel *panel)
 {
     struct tk032f8004 *tk = to_tk(panel);
-    gpiod_set_value_cansleep(tk->backlight, 0);
+    if (tk->backlight)
+        gpiod_set_value_cansleep(tk->backlight, 0);
     tk->enabled = false;
     return 0;
 }
@@ -160,9 +167,9 @@ static int tk_probe(struct platform_device *pdev)
 {
     struct tk032f8004 *tk = devm_kzalloc(&pdev->dev, sizeof(*tk), GFP_KERNEL);
     if (!tk) return -ENOMEM;
-    tk->reset = devm_gpiod_get(&pdev->dev, "reset", GPIOD_OUT_LOW);
-    tk->enable = devm_gpiod_get(&pdev->dev, "enable", GPIOD_OUT_LOW);
-    tk->backlight = devm_gpiod_get(&pdev->dev, "backlight", GPIOD_OUT_LOW);
+    tk->reset = devm_gpiod_get_optional(&pdev->dev, "reset", GPIOD_OUT_LOW);
+    tk->enable = devm_gpiod_get_optional(&pdev->dev, "enable", GPIOD_OUT_LOW);
+    tk->backlight = devm_gpiod_get_optional(&pdev->dev, "backlight", GPIOD_OUT_LOW);
     tk->cs = devm_gpiod_get(&pdev->dev, "cs", GPIOD_OUT_HIGH);
     tk->sclk = devm_gpiod_get(&pdev->dev, "sclk", GPIOD_OUT_HIGH);
     tk->mosi = devm_gpiod_get(&pdev->dev, "mosi", GPIOD_OUT_LOW);
