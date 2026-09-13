@@ -561,17 +561,17 @@
 		#size-cells = <0x00>;
 
 		panel-timing {
-		clock-frequency = <0x1801eb8>; /* U-Boot: 640x480@60, 25.175 MHz */
-			hactive = <0x280>;
-			vactive = <0x1e0>;
-			hfront-porch = <0x10>;
-			hback-porch = <0x30>;
-			hsync-len = <0x60>;
-			vfront-porch = <0x0a>;
-			vback-porch = <0x21>;
-			vsync-len = <0x02>;
-			hsync-active = <0x00>;
-			vsync-active = <0x00>;
+		clock-frequency = <0x17d7840>; /* U-Boot 480x800 TCON control: 25 MHz */
+			hactive = <0x1e0>;
+			vactive = <0x320>;
+			hfront-porch = <0x5d>;
+			hback-porch = <0x02>;
+			hsync-len = <0x01>;
+			vfront-porch = <0x5d>;
+			vback-porch = <0x02>;
+			vsync-len = <0x01>;
+			hsync-active = <0x01>;
+			vsync-active = <0x01>;
 			de-active = <0x01>;
 			pixelclk-active = <0x00>;
 		};
