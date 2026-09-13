@@ -552,28 +552,28 @@
 
 	panel {
 		status = "okay";
-		compatible = "simple-panel";
+		compatible = "panel-dpi";
+		width-mm = <69>;
+		height-mm = <42>;
+		bpc = <6>;
+		bus-format = <0x1009>; /* MEDIA_BUS_FMT_RGB666_1X18 */
 		#address-cells = <0x01>;
 		#size-cells = <0x00>;
 
-		display-timings {
-			native-mode = <0x20>;
-			timing0 {
-				clock-frequency = <0x1770780>; /* 502 x 816 x 60 Hz */
-				hactive = <0x1e0>;
-				vactive = <0x320>;
-				hfront-porch = <0x00>;
-				hback-porch = <0x14>;
-				hsync-len = <0x02>;
-				vfront-porch = <0x00>;
-				vback-porch = <0x09>;
-				vsync-len = <0x07>;
-				hsync-active = <0x00>;
-				vsync-active = <0x00>;
-				de-active = <0x01>;
-				pixelclk-active = <0x00>;
-				phandle = <0x20>;
-			};
+		panel-timing {
+			clock-frequency = <0x1770780>; /* 502 x 816 x 60 Hz */
+			hactive = <0x1e0>;
+			vactive = <0x320>;
+			hfront-porch = <0x00>;
+			hback-porch = <0x14>;
+			hsync-len = <0x02>;
+			vfront-porch = <0x00>;
+			vback-porch = <0x09>;
+			vsync-len = <0x07>;
+			hsync-active = <0x00>;
+			vsync-active = <0x00>;
+			de-active = <0x01>;
+			pixelclk-active = <0x00>;
 		};
 
 		port {

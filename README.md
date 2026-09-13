@@ -2,7 +2,7 @@
 
 External Linux 5.7.1 module that sends only the supplied LG4573A three-wire
 initialisation sequence. RGB timing and DRM binding are handled by the DTS
-`simple-panel` node, not by this module.
+`panel-dpi` node, not by this module.
 
 The module does not modify the stable kernel tree. Build against the matching
 kernel build tree only after release-lock preflight.
