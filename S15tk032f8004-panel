@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+MODULE=/root/tk032f8004_candidate_20260913/tk032f8004_panel.v2.ko
+DRM_DRIVER=/sys/bus/platform/drivers/sun4i-drm
+
+case "${1:-start}" in
+start)
+    grep -q '^tk032f8004_panel ' /proc/modules || /sbin/insmod "$MODULE"
+    printf '%s' display-engine > "$DRM_DRIVER/unbind"
+    sleep 1
+    printf '%s' display-engine > "$DRM_DRIVER/bind"
+    ;;
+stop)
+    printf '%s' display-engine > "$DRM_DRIVER/unbind"
+    /sbin/rmmod tk032f8004_panel 2>/dev/null || true
+    ;;
+*)
+    exit 2
+    ;;
+esac
