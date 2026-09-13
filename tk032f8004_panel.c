@@ -87,7 +87,7 @@ static void tk_init_sequence(struct tk032f8004 *tk)
         else
             tk_data(tk, sequence[i][1]);
         if (sequence[i][0] == 0x11)
-            msleep(10);
+            msleep(120);
     }
 }
 
@@ -143,7 +143,7 @@ static int tk_disable(struct drm_panel *panel)
 static int tk_get_modes(struct drm_panel *panel, struct drm_connector *connector)
 {
     struct device_node *timings = of_get_child_by_name(panel->dev->of_node, "display-timings");
-    struct drm_display_mode mode;
+    struct drm_display_mode mode = { 0 };
     int ret;
     if (!timings)
         return 0;
