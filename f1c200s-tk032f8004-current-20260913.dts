@@ -233,7 +233,7 @@
 			resets = <0x02 0x06>;
 			dmas = <0x07 0x00 0x05 0x07 0x00 0x05>;
 			dma-names = "rx\0tx";
-			/* The panel owns PA0 (CS), PA2 (SCLK), and PA3 (MOSI). */
+			/* The panel owns PA0 (CS), PA2 (SCLK), PA1 (MOSI), and PA4 (MISO). */
 			status = "disabled";
 			#address-cells = <0x01>;
 			#size-cells = <0x00>;
@@ -551,17 +551,35 @@
 	};
 
 	panel {
-		status = "disabled";
-		compatible = "lattland,mostima\0simple-panel";
+		status = "okay";
+		compatible = "simple-panel";
 		#address-cells = <0x01>;
 		#size-cells = <0x00>;
 
-		port@0 {
-			reg = <0x00>;
-			#address-cells = <0x01>;
-			#size-cells = <0x00>;
+		display-timings {
+			native-mode = <0x20>;
+			timing0 {
+				clock-frequency = <0x1770780>; /* 502 x 816 x 60 Hz */
+				hactive = <0x1e0>;
+				vactive = <0x320>;
+				hfront-porch = <0x00>;
+				hback-porch = <0x14>;
+				hsync-len = <0x02>;
+				vfront-porch = <0x00>;
+				vback-porch = <0x09>;
+				vsync-len = <0x07>;
+				hsync-active = <0x00>;
+				vsync-active = <0x00>;
+				de-active = <0x01>;
+				pixelclk-active = <0x00>;
+				phandle = <0x20>;
+			};
+		};
 
-			endpoint@0 {
+		port {
+			endpoint {
+				remote-endpoint = <0x16>;
+				phandle = <0x21>;
 			};
 		};
 	};
@@ -611,38 +629,12 @@
 		status = "disabled";
 	};
 
-	tk032f8004-panel {
-		compatible = "tk,tk032f8004";
+	tk032f8004-init {
+		compatible = "tk,tk032f8004-init";
 		status = "okay";
 		cs-gpios = <0x09 0x00 0x00 0x00>;
 		sclk-gpios = <0x09 0x00 0x02 0x00>;
-		mosi-gpios = <0x09 0x00 0x03 0x00>;
-
-		display-timings {
-			native-mode = <0x20>;
-			timing0 {
-				clock-frequency = <0x1770780>; /* 502 x 816 x 60 Hz */
-				hactive = <0x1e0>;
-				vactive = <0x320>;
-				hfront-porch = <0x00>;
-				hback-porch = <0x14>;
-				hsync-len = <0x02>;
-				vfront-porch = <0x00>;
-				vback-porch = <0x09>;
-				vsync-len = <0x07>;
-				hsync-active = <0x00>;
-				vsync-active = <0x00>;
-				de-active = <0x01>;
-				pixelclk-active = <0x00>;
-				phandle = <0x20>;
-			};
-		};
-
-		port {
-			endpoint {
-				remote-endpoint = <0x16>;
-				phandle = <0x21>;
-			};
-		};
+		mosi-gpios = <0x09 0x00 0x01 0x00>;
+		miso-gpios = <0x09 0x00 0x04 0x00>;
 	};
 };
