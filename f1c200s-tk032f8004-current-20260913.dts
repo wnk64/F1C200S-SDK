@@ -561,17 +561,18 @@
 		#size-cells = <0x00>;
 
 		panel-timing {
-		clock-frequency = <0x1770780>; /* TK032F8004 reference: 502 x 816 x 60 Hz */
+		/* LT8619C EDID detailed timing halved from 120 Hz to 60 Hz. */
+		clock-frequency = <0x1c27b40>; /* 29.520 MHz, 600 x 820 x 60 Hz */
 			hactive = <0x1e0>;
 			vactive = <0x320>;
-			hfront-porch = <0x02>;
-			hback-porch = <0x12>;
-			hsync-len = <0x02>;
-			vfront-porch = <0x02>;
-			vback-porch = <0x07>;
-			vsync-len = <0x07>;
-			hsync-active = <0x00>;
-			vsync-active = <0x00>;
+			hfront-porch = <0x32>;
+			hback-porch = <0x28>;
+			hsync-len = <0x1e>;
+			vfront-porch = <0x08>;
+			vback-porch = <0x08>;
+			vsync-len = <0x04>;
+			hsync-active = <0x01>;
+			vsync-active = <0x01>;
 			de-active = <0x01>;
 			pixelclk-active = <0x00>;
 		};
