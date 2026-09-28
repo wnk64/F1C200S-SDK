@@ -86,3 +86,14 @@ Deployment: isolated ugreen_rxguard_db0d0b4_20260927; remote hash verified; orig
 Test deviation: initial wrong system firmware produced 8d81 and timeout; cold cycle acknowledged OFF/ON, then correct isolated firmware used.
 Measured: 8d80->8d83->wlan1; 5745MHz GO COMPLETED/AP-ENABLED; AP confirmation param=4 expected=4; SSH/ifconfig responsive. No rejected-span evidence proving original crash cause.
 Runtime: DHCP/PBC watcher, ARM lowest sink wait, FIFO native dtsview 90-degree 640x480@60. WFD subelement 11 returned FAIL; phone/end-to-end still pending. Acceptance count zero.
+
+## 2026-09-28 / planned / USB message endpoint length envelope
+Hypothesis: a short or inconsistent USB message-endpoint skb can be copied past its actual length before IPC dispatch during P2P GO; static defect only, crash cause unproven.
+Files: aic8800_fdrv/aicwf_txrxif.c, WORKTREE_CHANGELOG.md, Chinese change record.
+Base: 53bec9ea; original source tree, local-only tag aic-ugreen-rxguard-local-baseline-20260928; complete source bundle and build prerequisite tar in /home/wnk/aic8800_local_baselines/ugreen_53bec9e_20260928. No remote push, per user instruction.
+Scope: only aicwf_process_msg_rxframes input length and IPC envelope guards; do not alter MUSB, firmware, player, the preallocated aggregation path, or PRINT formatting.
+Protected: 5.7.1 kernel, AIC 8d80->8d83, WLAN naming based on attached RTL, 5GHz GO, existing Miracast FIFO/rotated display; USB shared dependencies not accepted without three full cold boots.
+Build: pending; kernelrelease checked exactly 5.7.1, existing fdrv vermagic 5.7.1.
+Deploy and rollback: do not deploy without SSH/SCP; revert source to local baseline tag; running board remains cold 8d80 without AIC modules.
+Tests: pending, 0/3 accepted cold boots.
+Decision: pending.
