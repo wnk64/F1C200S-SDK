@@ -924,6 +924,7 @@ int aicwf_process_msg_rxframes(struct aicwf_rx_priv *rx_priv)
     u16 aggr_len = 0, adjust_len = 0;
     u8 *data = NULL;
     u8_l *msg = NULL;
+    struct ipc_e2a_msg *ipc_msg;
 
     while (1) {
         spin_lock_irqsave(&rx_priv->msg_rxqlock, flags);
@@ -938,6 +939,8 @@ int aicwf_process_msg_rxframes(struct aicwf_rx_priv *rx_priv)
             txrx_err("skb_error\r\n");
             break;
         }
+        if (skb->len < 4)
+            goto drop_msg_skb;
         data = skb->data;
         pkt_len = (*skb->data | (*(skb->data + 1) << 8));
         //printk("p:%d, s:%d , %x\n", pkt_len, skb->len, data[2]);
@@ -950,6 +953,11 @@ int aicwf_process_msg_rxframes(struct aicwf_rx_priv *rx_priv)
 #endif
 
         if((skb->data[2] & USB_TYPE_CFG) != USB_TYPE_CFG) { // type : data
+            if (skb->len < RX_HWHRD_LEN ||
+                pkt_len > skb->len - RX_HWHRD_LEN ||
+                roundup((unsigned int)pkt_len + RX_HWHRD_LEN,
+                        RX_ALIGNMENT) > skb->len)
+                goto drop_msg_skb;
             aggr_len = pkt_len + RX_HWHRD_LEN;
             if (aggr_len & (RX_ALIGNMENT - 1))
                 adjust_len = roundup(aggr_len, RX_ALIGNMENT);
@@ -974,6 +982,9 @@ int aicwf_process_msg_rxframes(struct aicwf_rx_priv *rx_priv)
             skb_pull(skb, adjust_len);
         }
         else { //  type : config
+            if (pkt_len > skb->len - 4 ||
+                roundup((unsigned int)pkt_len, RX_ALIGNMENT) + 4 > skb->len)
+                goto drop_msg_skb;
             aggr_len = pkt_len;
             if (aggr_len & (RX_ALIGNMENT - 1))
                 adjust_len = roundup(aggr_len, RX_ALIGNMENT);
@@ -988,9 +999,27 @@ int aicwf_process_msg_rxframes(struct aicwf_rx_priv *rx_priv)
             }
             memcpy(msg, data, aggr_len + 4);
 
-            if(((*(msg + 2) & 0x7f) == USB_TYPE_CFG_CMD_RSP) && (rx_priv->usbdev->bus_if->state != (int)USB_DOWN_ST))
-                rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4));
+            if ((*(msg + 2) & 0x7f) == USB_TYPE_CFG_CMD_RSP) {
+                if (pkt_len < offsetof(struct ipc_e2a_msg, param)) {
+                    kfree(msg);
+                    goto drop_msg_skb;
+                }
+                ipc_msg = (struct ipc_e2a_msg *)(msg + 4);
+                if (ipc_msg->param_len > pkt_len -
+                    offsetof(struct ipc_e2a_msg, param) ||
+                    ipc_msg->param_len > sizeof(ipc_msg->param)) {
+                    kfree(msg);
+                    goto drop_msg_skb;
+                }
+                if (rx_priv->usbdev->bus_if->state != (int)USB_DOWN_ST)
+                    rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, ipc_msg);
+            }
 
+            if ((*(msg + 2) & 0x7f) == USB_TYPE_CFG_DATA_CFM &&
+                pkt_len < 2 * sizeof(u32)) {
+                kfree(msg);
+                goto drop_msg_skb;
+            }
             if((*(msg + 2) & 0x7f) == USB_TYPE_CFG_DATA_CFM)
                 aicwf_usb_host_tx_cfm_handler(&(rx_priv->usbdev->rwnx_hw->usb_env), (u32 *)(msg + 4));
 
@@ -1002,6 +1031,7 @@ int aicwf_process_msg_rxframes(struct aicwf_rx_priv *rx_priv)
             kfree(msg);
         }
 
+drop_msg_skb:
         dev_kfree_skb(skb);
         atomic_dec(&rx_priv->msg_rx_cnt);
     }
