@@ -96,4 +96,5 @@ Protected: 5.7.1 kernel, AIC 8d80->8d83, WLAN naming based on attached RTL, 5GHz
 Build: pending; kernelrelease checked exactly 5.7.1, existing fdrv vermagic 5.7.1.
 Deploy and rollback: do not deploy without SSH/SCP; revert source to local baseline tag; running board remains cold 8d80 without AIC modules.
 Tests: pending, 0/3 accepted cold boots.
-Decision: pending.
+Source commit: a0bdc31f9adc97400daf552e40998d22a0d39f7e; only aic8800_fdrv/aicwf_txrxif.c (32 added / 2 removed). Guard dedicated message skb header and declared/aligned span, IPC param envelope and DATA_CFM minimum payload. Previous source and binary are retained in the local baseline archive.
+Decision: pending; no board test, not an accepted fix.
