@@ -13,3 +13,9 @@ I2C-device attributes:charger_enabled (RW), light_load_shutdown_enabled (RW), bo
 ADC sampling uses high/low/high retry and signed14-bit conversion. VBAT and OCV use2600000uV+raw*268.55uV. Silicon IBAT positive represents discharge in OCV=VBAT+IBAT*R; current_now reverses that sign to charging-positive.
 
 RTC uses the existing kernel RTC interface, preserves CLKOUT with nxp,keep-clkout and honors edge-triggered nested IRQ. /dev/rtc0 and hwclock provide date/time; alarm resolution is one minute. Kernel/config changes and external module must use release5.7.1.
+
+Deployed2026-09-30: kernel5.7.1 #246, RTC binds0-0051, IP5209 binds0-0075; /etc/init.d/S47ip5209-power loads the module at boot. Use /sbin/hwclock (the noninteractive SSH PATH does not include /sbin). RTC voltage-low flag was cleared by writing current PC UTC. RTC alarm IRQ is registered, but actual alarm firing and backup retention were not tested.
+
+Battery selection remains hardwareVSET:register0x26 bit6=1, schematic VSET23 is NC. Internal0x24 bits6:5=00 are not active in that mode; charge-current limit stays2.3A. Measured battery ADC about4.507V; this driver does not resolve the reported4.5V output.
+
+Rollback files are /root/aic_miracast/candidates/rtc_ip5209_20260930/rollback. Restore zImage and the DTB to the FAT boot partition, restore sunxi-extra.ko/sunxi-kernel.ko to their recorded module paths and cedar_ve.ko/sunxi_ion_core.ko to /lib/modules/5.7.1/extra, then verify hashes, sync and unmount before reboot. Stop and remove only the added S47 service to disable the IP5209 candidate. Existing S46 AIC service is retained.
