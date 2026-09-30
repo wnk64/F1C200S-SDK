@@ -1,0 +1,12 @@
+#!/bin/sh
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+MODULE=/root/aic_miracast/candidates/rtc_ip5209_20260930/ip5209_power.ko
+case "$1" in
+    start)
+        grep -q '^ip5209_power ' /proc/modules && exit 0
+        [ "$(uname -r)" = 5.7.1 ] || exit 1
+        insmod "$MODULE"
+        ;;
+    stop) rmmod ip5209_power ;;
+    *) exit 1 ;;
+esac
