@@ -5,6 +5,8 @@ case "$1" in
     start)
         grep -q '^ip5209_power ' /proc/modules && exit 0
         [ "$(uname -r)" = 5.7.1 ] || exit 1
+        hash=$(md5sum "$MODULE") || exit 1
+        [ "${hash%% *}" = b32b00aa54dd72009239e05f81397b9b ] || exit 1
         insmod "$MODULE"
         ;;
     stop) rmmod ip5209_power ;;
