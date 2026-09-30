@@ -13,5 +13,7 @@ Writes: no writes at probe. User-requested controls use regmap_update_bits, pres
 Hardware:0xEA/0xEB in manual become7-bit0x75. Address acknowledges on I2C0. L3 is not connected on schematic, so no invented IRQ; periodic status monitoring.
 Protected: AIC SSH, TCA9555, PE11/PE12 bus, boot power supply and external battery-voltage strap.
 Rollback: remove the new startup service/module and restore the recorded #245 kernel/DTB candidate when necessary.
-Build/deployment: pending, exact release5.7.1, SSH-only transfer and hashes.
+Build: kernel b8b1d71, driver d7dfb13; tmux /tmp/f1-rtc-ip5209-build-0930.rc=0. zImage MD5 2b9b8cf3f41d88fc7182be2c63bcdf22; DTB c9904bd6d2e90634e165895928f804c6; ip5209_power.ko b32b00aa54dd72009239e05f81397b9b, vermagic5.7.1 mod_unload ARMv5 p2v8.
+Dependency: rebuilt sunxi.ko MD5 f9e4d79850a9ed80dbf8b965a2df2014 differs from the current board module; the matched kernel/module set must be prepared before deployment. phy-generic.ko unchanged3103db03a0bfe371ddd30922cfbeff28. No candidate deployed yet.
+Battery-selection readback:0x26=0xff, bit6=1 means external VSET pin selection; schematic pin23 is NC/floating.0x24=0x85, bits6:5=00 are internal4.2V selection but are not active in external mode.0x25=0xd7 gives2.3A charge-current limit. No selection/current setting modified.
 Decision: pending; user requested driver implementation and direct verification, no repeated network stress or cold-boot campaigns this turn.
