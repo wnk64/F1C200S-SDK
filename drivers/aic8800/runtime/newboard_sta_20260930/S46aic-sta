@@ -1,0 +1,75 @@
+#!/bin/sh
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+
+BASE=/root/aic_miracast/candidates
+LOADER=$BASE/ugreen_pool64_disconnectfix_20260922/aic_load_fw.ko
+FW_DIR=$BASE/ugreen_pool64_disconnectfix_20260922
+FDRV=$BASE/ugreen_rxguard_db0d0b4_20260927/aic8800_fdrv.ko
+WPA=/root/aic_miracast/wpa24_aic_wfd_supplicant
+CLI=/root/aic_miracast/wpa24_aic_wfd_cli
+CONF=/etc/aic-sta.conf
+RUN=/run/aic-sta
+IFACE=
+
+log() { echo "[aic-sta] $*"; }
+loaded() { grep -q "^$1 " /proc/modules; }
+find_iface() {
+    for dev in /sys/class/net/wlan*; do
+        [ -e "$dev/device/driver/module" ] || continue
+        case "$(readlink -f "$dev/device/driver/module")" in
+            */aic8800_fdrv) IFACE=${dev##*/}; return 0 ;;
+        esac
+    done
+    return 1
+}
+check_md5() {
+    actual=$(md5sum "$1") || return 1
+    [ "${actual%% *}" = "$2" ] || { log "hash mismatch: $1"; return 1; }
+}
+start() {
+    [ -r "$CONF" ] || { log "missing $CONF"; return 1; }
+    mkdir -p "$RUN" || return 1
+    if ! find_iface; then
+        check_md5 "$LOADER" bb2d68ed26fbb8d3cee554af0aa7735a || return 1
+        check_md5 "$FW_DIR/fmacfw_8800d80_u02.bin" 01acfbebdfb15755e3fe853e7bc95c7d || return 1
+        check_md5 "$FDRV" 334699cc17b7201a23c790306c64b381 || return 1
+        loaded aic_load_fw || insmod "$LOADER" aic_fw_path="$FW_DIR" aicwf_dbg_level=0 || return 1
+        n=0
+        until lsusb | grep -qi 'a69c:8d83'; do
+            [ "$n" -lt 20 ] || { log "firmware enumeration timed out"; return 1; }
+            n=$((n + 1)); sleep 1
+        done
+        loaded aic8800_fdrv || insmod "$FDRV" aicwf_dbg_level=0 || return 1
+        n=0
+        until find_iface; do
+            [ "$n" -lt 10 ] || { log "no AIC interface"; return 1; }
+            n=$((n + 1)); sleep 1
+        done
+    fi
+    ifconfig "$IFACE" up || return 1
+    if ! "$CLI" -p "$RUN" -i "$IFACE" ping 2>/dev/null | grep -q PONG; then
+        "$WPA" -B -Dnl80211 -i "$IFACE" -c "$CONF" -P "$RUN/wpa.pid" -f "$RUN/wpa.log" || return 1
+    fi
+    n=0
+    until "$CLI" -p "$RUN" -i "$IFACE" status 2>/dev/null | grep -q '^wpa_state=COMPLETED'; do
+        [ "$n" -lt 25 ] || { log "association timed out; see $RUN/wpa.log"; return 1; }
+        n=$((n + 1)); sleep 1
+    done
+    if [ -r "$RUN/dhcp.pid" ] && kill -0 "$(cat "$RUN/dhcp.pid")" 2>/dev/null; then
+        log "$IFACE DHCP already running"
+        return 0
+    fi
+    udhcpc -i "$IFACE" -t 3 -T 3 -b -p "$RUN/dhcp.pid" || return 1
+    log "$IFACE associated; DHCP started"
+}
+stop() {
+    find_iface || return 0
+    [ ! -r "$RUN/dhcp.pid" ] || kill "$(cat "$RUN/dhcp.pid")" 2>/dev/null
+    "$CLI" -p "$RUN" -i "$IFACE" terminate >/dev/null 2>&1 || true
+}
+case "$1" in
+    start) start ;;
+    stop) stop ;;
+    restart) stop; start ;;
+    *) echo "Usage: $0 {start|stop|restart}"; exit 1 ;;
+esac
