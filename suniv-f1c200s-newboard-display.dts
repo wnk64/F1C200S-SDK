@@ -33,7 +33,7 @@
     newboard_lcd_backlight: backlight {
         compatible = "pwm-backlight";
         /* PT4103 EN dimming: datasheet recommends 1kHz or less. */
-        pwms = <&newboard_lcd_pwm 1 1000000 PWM_POLARITY_NORMAL>;
+        pwms = <&newboard_lcd_pwm 1 1000000 0>;
         brightness-levels = <0 32 64 96 128 160 192 224 255>;
         default-brightness-level = <4>;
     };
