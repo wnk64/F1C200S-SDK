@@ -15,7 +15,14 @@ log() { echo "[aic-sta] $*"; }
 loaded() { grep -q "^$1 " /proc/modules; }
 find_iface() {
     for dev in /sys/class/net/wlan*; do
-        [ -e "$dev/device/driver/module" ] || continue
+        [ -d "$dev/device" ] || continue
+        # UGREEN attaches netdev to the USB device, not its interface.
+        if [ -r "$dev/device/idVendor" ] &&
+           [ "$(cat "$dev/device/idVendor")" = a69c ] &&
+           [ "$(cat "$dev/device/idProduct")" = 8d83 ]; then
+            IFACE=${dev##*/}
+            return 0
+        fi
         case "$(readlink -f "$dev/device/driver/module")" in
             */aic8800_fdrv) IFACE=${dev##*/}; return 0 ;;
         esac
