@@ -11,6 +11,8 @@ User request:attempt nominal4.2V using the IP5209 control interface. Existing re
 Files:ip5209_power.c; S47 startup path/hash after build; logs/README.
 Change:add constant_charge_voltage_max property. Read-modify-write register24 mask0x66 (battery type and voltage compensation), then register26 bit6 to internal selection.4.2V means type00 plus zero compensation. Readback verification and masked rollback on failure; keep boost/charger/current/NTC/reserved bits.
 Deployment:isolated updated module, unload/reload only IP5209 monitor; kernel/RTC/AIC untouched. Boot service upgrades the driver but does not automatically write voltage policy.
+Source:bdf0e50; tmux numeric rc=0, incremental module only. New moduleMD5 660b80d1ef8be261ec49437406291ec7, vermagic5.7.1 mod_unload ARMv5 p2v8.
+Startup:upgrade S47 module path/hash to isolated ip5209_voltage_4200_20260930. Preserve the old module and old service; new service loads the interface but does not auto-apply4.2V policy.
 Decision:pending; runtime setting only, actual voltage to be read after the request.
 
 ## 2026-09-30 / planned / IP5209 battery monitor and controls
