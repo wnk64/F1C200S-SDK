@@ -6,7 +6,9 @@ Reference PDFs SHA256:
 - IP5209 register manual V1.2: CCF2A5519DCC1CE5043134A27B3620CC2C3CFBE17E5A051BB7E62E2AE77BDEC2
 - New-board schematic:40969D57843FE3E379F56A9DC21FF5CB8C9A936D3DA9B28590B179F0195A280E
 
-IP5209 provides /sys/class/power_supply/ip5209-battery: status, health, voltage_now, voltage_ocv, current_now and constant_charge_current_max. Voltage is in microvolts, current in microamps; current is charging-positive. Charge-current limit uses100000uA steps over0..3100000uA, retaining register0x25 bits7..5.
+IP5209 provides /sys/class/power_supply/ip5209-battery: status, health, voltage_now, voltage_ocv, current_now, constant_charge_current_max and constant_charge_voltage_max. Voltage is in microvolts, current in microamps; current is charging-positive. Charge-current limit uses100000uA steps over0..3100000uA, retaining register0x25 bits7..5.
+
+constant_charge_voltage_max accepts4200000,4300000,4350000uV. A write selects that nominal battery type, clears14/28/42mV compensation and selects internal voltage control; unrelated/reserved bits are preserved. The transaction verifies both registers and attempts masked rollback on failure. Reading this property in externalVSET mode returns ENODATA because the physical strap is not readable through the documented interface. Probe/boot do not automatically set a voltage; this is an explicit runtime user control.
 
 I2C-device attributes:charger_enabled (RW), light_load_shutdown_enabled (RW), boost_enabled (RO), key_flags (RO; bit3=current press, bit1=long press, bit0=short press). Explicit writes use read/modify/write; probe does not change supply settings. Existing external VSET chemistry selection, NTC and boost remain untouched. No fabricated percentage, battery-present signal, temperature or input-online signal is exposed because the supplied manual does not document them.
 

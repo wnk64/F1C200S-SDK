@@ -3,6 +3,7 @@
 #include <linux/i2c.h>
 #include <linux/math64.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
 #include <linux/power_supply.h>
 #include <linux/regmap.h>
 #include <linux/slab.h>
@@ -11,6 +12,10 @@
 #define IP5209_SYS_CTL0 0x01
 #define IP5209_SYS_CTL1 0x02
 #define IP5209_CHARGE_CURRENT 0x25
+#define IP5209_CHARGE_VOLTAGE 0x24
+#define IP5209_CHARGE_SELECTION 0x26
+#define IP5209_VOLTAGE_MASK (GENMASK(6, 5) | GENMASK(2, 1))
+#define IP5209_EXTERNAL_VSET BIT(6)
 #define IP5209_CHARGE_STATUS 0x71
 #define IP5209_SYSTEM_STATUS 0x72
 #define IP5209_KEY_FLAGS 0x77
@@ -25,6 +30,7 @@ struct ip5209 {
 	struct regmap *map;
 	struct power_supply *battery;
 	struct delayed_work poll_work;
+	struct mutex voltage_lock;
 	int last_charge;
 	int last_system;
 	int last_voltage;
@@ -60,6 +66,87 @@ static int ip5209_voltage_uv(struct ip5209 *chip, unsigned int reg, int *uv)
 
 	if (!ret)
 		*uv = 2600000 + DIV_ROUND_CLOSEST(raw * 26855, 100);
+	return ret;
+}
+
+static int ip5209_charge_voltage_get(struct ip5209 *chip, int *uv)
+{
+	static const int nominal[] = { 4200000, 4300000, 4350000 };
+	unsigned int selection, voltage, type;
+	int ret;
+
+	mutex_lock(&chip->voltage_lock);
+	ret = regmap_read(chip->map, IP5209_CHARGE_SELECTION, &selection);
+	if (ret)
+		goto out;
+	if (selection & IP5209_EXTERNAL_VSET) {
+		ret = -ENODATA;
+		goto out;
+	}
+	ret = regmap_read(chip->map, IP5209_CHARGE_VOLTAGE, &voltage);
+	if (ret)
+		goto out;
+	type = (voltage >> 5) & 3;
+	if (type >= ARRAY_SIZE(nominal)) {
+		ret = -EIO;
+		goto out;
+	}
+	*uv = nominal[type] + ((voltage >> 1) & 3) * 14000;
+out:
+	mutex_unlock(&chip->voltage_lock);
+	return ret;
+}
+
+static int ip5209_charge_voltage_set(struct ip5209 *chip, int uv)
+{
+	unsigned int type, old_voltage, old_selection, voltage, selection;
+	int ret, restore;
+
+	switch (uv) {
+	case 4200000: type = 0; break;
+	case 4300000: type = 1; break;
+	case 4350000: type = 2; break;
+	default: return -EINVAL;
+	}
+	mutex_lock(&chip->voltage_lock);
+	ret = regmap_read(chip->map, IP5209_CHARGE_VOLTAGE, &old_voltage);
+	if (ret)
+		goto out;
+	ret = regmap_read(chip->map, IP5209_CHARGE_SELECTION, &old_selection);
+	if (ret)
+		goto out;
+	/* Set a complete nominal target before selecting internal control. */
+	ret = regmap_update_bits(chip->map, IP5209_CHARGE_VOLTAGE,
+				 IP5209_VOLTAGE_MASK, type << 5);
+	if (ret)
+		goto rollback;
+	ret = regmap_update_bits(chip->map, IP5209_CHARGE_SELECTION,
+				 IP5209_EXTERNAL_VSET, 0);
+	if (ret)
+		goto rollback;
+	ret = regmap_read(chip->map, IP5209_CHARGE_VOLTAGE, &voltage);
+	if (ret)
+		goto rollback;
+	ret = regmap_read(chip->map, IP5209_CHARGE_SELECTION, &selection);
+	if (ret)
+		goto rollback;
+	if ((voltage & IP5209_VOLTAGE_MASK) != (type << 5) ||
+	    (selection & IP5209_EXTERNAL_VSET)) {
+		ret = -EIO;
+		goto rollback;
+	}
+	goto out;
+rollback:
+	/* Restore the selection first, then only the voltage fields we own. */
+	restore = regmap_update_bits(chip->map, IP5209_CHARGE_SELECTION,
+				     IP5209_EXTERNAL_VSET, old_selection);
+	if (!restore)
+		restore = regmap_update_bits(chip->map, IP5209_CHARGE_VOLTAGE,
+					     IP5209_VOLTAGE_MASK, old_voltage);
+	if (restore)
+		dev_err(&chip->battery->dev, "voltage setting rollback failed: %d\n", restore);
+out:
+	mutex_unlock(&chip->voltage_lock);
 	return ret;
 }
 
@@ -127,6 +214,8 @@ static int ip5209_get_property(struct power_supply *psy,
 		if (!ret)
 			val->intval = (reg & 0x1f) * 100000;
 		return ret;
+	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE_MAX:
+		return ip5209_charge_voltage_get(chip, &val->intval);
 	case POWER_SUPPLY_PROP_MODEL_NAME:
 		val->strval = "IP5209";
 		return 0;
@@ -145,6 +234,12 @@ static int ip5209_set_property(struct power_supply *psy,
 	struct ip5209 *chip = power_supply_get_drvdata(psy);
 	int ret;
 
+	if (prop == POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE_MAX) {
+		ret = ip5209_charge_voltage_set(chip, val->intval);
+		if (!ret)
+			power_supply_changed(psy);
+		return ret;
+	}
 	if (prop != POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX ||
 	    val->intval < 0 || val->intval > 3100000 || val->intval % 100000)
 		return -EINVAL;
@@ -158,13 +253,15 @@ static int ip5209_set_property(struct power_supply *psy,
 static int ip5209_property_writeable(struct power_supply *psy,
 				     enum power_supply_property prop)
 {
-	return prop == POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX;
+	return prop == POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX ||
+		prop == POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE_MAX;
 }
 
 static enum power_supply_property ip5209_properties[] = {
 	POWER_SUPPLY_PROP_STATUS, POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW, POWER_SUPPLY_PROP_VOLTAGE_OCV,
 	POWER_SUPPLY_PROP_CURRENT_NOW, POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX,
+	POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE_MAX,
 	POWER_SUPPLY_PROP_MODEL_NAME, POWER_SUPPLY_PROP_MANUFACTURER,
 };
 
@@ -292,6 +389,7 @@ static int ip5209_probe(struct i2c_client *client, const struct i2c_device_id *i
 	chip = devm_kzalloc(&client->dev, sizeof(*chip), GFP_KERNEL);
 	if (!chip)
 		return -ENOMEM;
+	mutex_init(&chip->voltage_lock);
 	chip->map = devm_regmap_init_i2c(client, &ip5209_regmap_config);
 	if (IS_ERR(chip->map))
 		return PTR_ERR(chip->map);

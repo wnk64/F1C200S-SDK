@@ -5,6 +5,14 @@ Worktree: original UGREEN repository peripherals/ip5209_20260930; no new worktre
 Base: Linux5.7.1 #245, kernel963147c, driver43c1f10; source-backed archives in /home/wnk/F1C200S_archives/rtc_ip5209_baseline_20260930.
 Purpose: bind IP5209 at I2C0 address0x75 and expose documented battery registers.
 
+## 2026-09-30 / planned / nominal 4.2V voltage control
+Base:driverff20f4d, moduleb32b00aa54dd72009239e05f81397b9b; tagip5209-monitor-before-voltage-20260930 and full source/config/module baseline in /home/wnk/F1C200S_archives/ip5209_voltage_baseline_20260930.
+User request:attempt nominal4.2V using the IP5209 control interface. Existing registers24=85,26=ff,01=fe, batteryADC4506974uV.
+Files:ip5209_power.c; S47 startup path/hash after build; logs/README.
+Change:add constant_charge_voltage_max property. Read-modify-write register24 mask0x66 (battery type and voltage compensation), then register26 bit6 to internal selection.4.2V means type00 plus zero compensation. Readback verification and masked rollback on failure; keep boost/charger/current/NTC/reserved bits.
+Deployment:isolated updated module, unload/reload only IP5209 monitor; kernel/RTC/AIC untouched. Boot service upgrades the driver but does not automatically write voltage policy.
+Decision:pending; runtime setting only, actual voltage to be read after the request.
+
 ## 2026-09-30 / planned / IP5209 battery monitor and controls
 Files: ip5209_power.c, Makefile, S47ip5209-power, this log and Chinese record.
 Reference: user IP5209/IP5109/IP5207/IP5108 register manual V1.2; new-board schematic20260930.
