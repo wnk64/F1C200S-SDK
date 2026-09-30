@@ -13,7 +13,10 @@ Change:add constant_charge_voltage_max property. Read-modify-write register24 ma
 Deployment:isolated updated module, unload/reload only IP5209 monitor; kernel/RTC/AIC untouched. Boot service upgrades the driver but does not automatically write voltage policy.
 Source:bdf0e50; tmux numeric rc=0, incremental module only. New moduleMD5 660b80d1ef8be261ec49437406291ec7, vermagic5.7.1 mod_unload ARMv5 p2v8.
 Startup:upgrade S47 module path/hash to isolated ip5209_voltage_4200_20260930. Preserve the old module and old service; new service loads the interface but does not auto-apply4.2V policy.
-Decision:pending; runtime setting only, actual voltage to be read after the request.
+Deploy:module660b80d1ef8be261ec49437406291ec7 verified in isolated board directory; old b32 module remains untouched. Hot-unload/reload only IP5209, same boot_id14a29e34-43f5-485b-8951-c17517b67ed2. S47 source5bad8e4, deployed MD53512550d22583d7d97fbf2e5fbacbec3; old service preserved at ip5209_voltage_4200_20260930/rollback/S47ip5209-power.
+Request:echo4200000 to constant_charge_voltage_max returned success. Readback24=81,26=bf, nominal4200000uV; charger/boost01=fe and current25=d7 unchanged. Internal type00 and zero compensation selected.
+Actual:voltage_now stayed4506974uV, current0..745uA, Charging. One charger-only restart via charger_enabled0/1 changed01 fe->fc->fe while retaining boost; ADC still4506974uV afterward. No power cycle or network stress. User asked whether this can achieve4.2V; register setting succeeded, physical voltage reduction remains unproven. Need distinguish batteryVBAT from VOUT and know whether a battery is connected.
+Decision:retain requested nominal4.2V configuration and upgraded interface, but do not claim actual4.5V issue fixed. No automatic boot voltage policy; IP register state may reset after chip power loss. Software rollback does not itself restore the old voltage-selection fields.
 
 ## 2026-09-30 / planned / IP5209 battery monitor and controls
 Files: ip5209_power.c, Makefile, S47ip5209-power, this log and Chinese record.
