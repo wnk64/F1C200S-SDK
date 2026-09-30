@@ -17,4 +17,6 @@ Decision: pending, no Miracast acceptance claim.
 Service source: b6984df; UTF-8 record filename corrected at d219063. Deployed service MD5 7767ee4c1de5f65b974cdc5b826e6c74; private config mode600, no credentials in Git.
 First software reboot: modules auto-loaded, but no WPA/DHCP. Serial shows wlan0/device points directly to USB 1-1 and has no driver/module symlink.
 Correction: identify the AIC netdev via USB idVendor=a69c/idProduct=8d83, retain module-path fallback. Serial manually restarts WPA from the deployed private config to recover SSH; no serial file transfer.
-Acceptance: zero cold boots; first startup failure recorded, corrected restart test pending.
+Acceptance: zero cold boots; first startup failure recorded.
+Corrected source: dd436b7; deployed MD5 3a45762d1e4a9370f19dbd37fa3edba8. Software reboot automatically registered wlan0, WPA connected and DHCP acquired 192.168.2.5; SSH boot_id 767913ec-ec89-4ddf-9e53-654ccd42d656, no serial intervention.
+TCA kernel regression: boot_id 0dcac36c-971b-4729-af4d-f9c2f98969fd, kernel5.7.1 #245; same service automatically connected and SSH recovered. Cold-boot acceptance and input-transition IRQ test pending.
