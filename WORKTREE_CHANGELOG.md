@@ -21,3 +21,19 @@ old binary, runtime instructions/relocations unchanged. Archive includes origina
 source/objects, configs referenced by complete kernel archive, reproduction logs.
 Rollback: old DTB0b0ab18eb88f3bb7be12426e797cae38 and panelb74f692.
 Decision pending; external module + DTB only, no kernel build or GitHub push.
+Sourcea6f4b85/c665e2e (Linux5.7 normal PWM polarity uses literal0). Module
+88cfcf04e437864349bd024741559aa5, DTB50499cb0527d269e0da7e436c092f643,
+startupa7b7c20ea20df3b943a811c4b1a66fda, vermagic5.7.1.
+Initial remote-to-local multi-source SCP failed; first deploy guard refused
+missing artifacts without mounting/writing boot. First COM12 OFF/ON was therefore
+old baseline only, not a candidate test; initial COM13 recorder lost device and
+exited on disconnect. After retransferring files, hashes/sync/unmount succeeded.
+Candidate cold boot: COM12 exactOFF/ON, COM13 retry reader captured startup;
+boot1856f724-2bd3-40c1-9eff-e5491e019ba7, kernel#248/zImage unchanged.
+Panel reports reset controlled; GPIO67PC3 CS high, GPIO407P07 reset high(active-low);
+PE6 muxpwm1. Backlight PWM1 requested/enabled period1000000 duty501960ns;
+brightness4/max8. MMC1 actual15MHz, BS autoSSH/default route intact.
+Local decoder-only check: original dtsview11386ab plays test_800x480.mp4 with
+CEDAR_ROTATE=90 CEDAR_AUDIODEV=default; native480x800/no scaling.
+Visual result pending; no Miracast/BTaudio acceptance, complete cold cycles0/3.
+Rollback at board candidates/newboard_panel_20260930/rollback (old DTB/startup/module).
