@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR X11)
+#include "suniv-f1c200s-newboard-rtl8723bs.dts"
+#include <dt-bindings/pwm/pwm.h>
+
+&tk032f8004_init {
+    cs-gpios = <&pio 2 3 GPIO_ACTIVE_HIGH>;
+    sclk-gpios = <&pio 0 2 GPIO_ACTIVE_HIGH>;
+    mosi-gpios = <&pio 0 1 GPIO_ACTIVE_HIGH>;
+    reset-gpios = <&tca9555 7 GPIO_ACTIVE_LOW>;
+};
+
+&pio {
+    newboard_lcd_pwm1_pins: newboard-lcd-pwm1-pins {
+        pins = "PE6";
+        function = "pwm1";
+        bias-disable;
+    };
+};
+
+&{/soc} {
+    newboard_lcd_pwm: pwm@1c21000 {
+        compatible = "allwinner,suniv-f1c100s-pwm", "allwinner,sun7i-a20-pwm";
+        reg = <0x01c21000 0x0c>;
+        clocks = <&osc24M>;
+        #pwm-cells = <3>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&newboard_lcd_pwm1_pins>;
+        status = "okay";
+    };
+};
+
+/ {
+    newboard_lcd_backlight: backlight {
+        compatible = "pwm-backlight";
+        /* PT4103 EN dimming: datasheet recommends 1kHz or less. */
+        pwms = <&newboard_lcd_pwm 1 1000000 PWM_POLARITY_NORMAL>;
+        brightness-levels = <0 32 64 96 128 160 192 224 255>;
+        default-brightness-level = <4>;
+    };
+};
+
+&panel {
+    backlight = <&newboard_lcd_backlight>;
+};

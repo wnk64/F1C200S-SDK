@@ -10,6 +10,7 @@ struct tk032f8004 {
     struct gpio_desc *cs;
     struct gpio_desc *sclk;
     struct gpio_desc *mosi;
+    struct gpio_desc *reset;
 };
 
 static void tk_write_byte(struct tk032f8004 *tk, u8 value)
@@ -98,8 +99,18 @@ static int tk_probe(struct platform_device *pdev)
     if (IS_ERR(tk->mosi))
         return PTR_ERR(tk->mosi);
 
+    tk->reset = devm_gpiod_get_optional(&pdev->dev, "reset", GPIOD_OUT_HIGH);
+    if (IS_ERR(tk->reset))
+        return PTR_ERR(tk->reset);
+    if (tk->reset) {
+        /* Logical high asserts the active-low reset from the device tree. */
+        msleep(20);
+        gpiod_set_value_cansleep(tk->reset, 0);
+        msleep(120);
+    }
     tk_init_sequence(tk);
-    dev_info(&pdev->dev, "LG4573A init complete (CS=PA0 SCLK=PA2 MOSI=PA1)\n");
+    dev_info(&pdev->dev, "LG4573A init complete (DT GPIOs, reset=%s)\n",
+             tk->reset ? "controlled" : "external");
     return 0;
 }
 

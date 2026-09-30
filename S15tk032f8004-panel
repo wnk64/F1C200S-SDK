@@ -1,8 +1,6 @@
 #!/bin/sh
 set -eu
-
-MODULE=/root/tk032f8004_candidate_20260913/tk032f8004_panel.init.ko
-
+MODULE=/root/aic_miracast/candidates/newboard_panel_20260930/tk032f8004_panel.ko
 case "${1:-start}" in
 start)
     grep -q '^tk032f8004_panel ' /proc/modules || /sbin/insmod "$MODULE"
@@ -10,7 +8,5 @@ start)
 stop)
     /sbin/rmmod tk032f8004_panel 2>/dev/null || true
     ;;
-*)
-    exit 2
-    ;;
+*) exit 2 ;;
 esac
