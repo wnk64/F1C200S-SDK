@@ -1,5 +1,17 @@
 # Worktree Change Log
 
+## 2026-10-02 planned / recover live audio after route changes
+CurrentdefaultBluetooth restored but sinkwritten330244096 frozen: old audio
+thread setsfailed and exits forever on PCM loss. Change onlywfd_audio.c:
+bounded500ms route-state polling fordefault, close/reopen PCM on route change,
+retry failures without permanent audio disable, discard stale queued PCM.
+Original7043562/executableff58d9fc/source snapshot99bf218 archived/pushed;
+retain old versioned sink/player/native800x48060/90/pool9/CMA20/AIC/BS/kernel.
+Add deterministic mock ALSA lifecycle/route/retry/partialwrite/stop tests,
+ASan/UBSan, existing video/RTSP regressions and reproducible ARM builds.
+Candidate branch in original worktree only, no new worktree/driver changes.
+ActualBT disconnect/reconnect with ongoing video required; threecold pending.
+
 ## 2026-10-02 tested / reconnect after archive-induced memory pressure
 Plan localcrash_20261002/RECONNECT_TEST.md before runtime restore; same
 kernel#250/CMA20/boot31071e77/AIC/BS/playera683cf70/sinkff58d9fc/fullBT.
