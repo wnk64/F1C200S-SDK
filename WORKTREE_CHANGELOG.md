@@ -1,5 +1,15 @@
 # Worktree Change Log
 
+## 2026-10-02 archived / successful runtime source snapshot uploaded
+GitHubownerwnk64, snapshotbranch/tag-verified99bf218 remotely checked.
+Kernelb3d8ed3/AIC53bec9e/player5685c63 complete-source refs verified.
+Original source/archive docs7b55a6f, filename89c8d48, recovery7d881a6,
+public metadata99bf218. Complete local archives/SHA256 passed, publicsubset
+GITHUB_SHA256SUMS passed. LocalSDK/build prerequisites preserved; private
+network configs replaced with templates only in archive. Full tarSHA256
+84e97e0bb6be07a6313eeab5895805a942dc915a4f67f801a2dcc8604cfc22b2.
+No board/source rebuild/new worktree/old stable ref overwrite. Pendingcold.
+
 ## 2026-10-02 planned / archive current successful runtime sources
 User requests full-source GitHub snapshot; owner changedWnjbk->wnk64.
 Add runtime/snapshot-20261002 documentation/archive tool/launcher recipe and
