@@ -1,5 +1,19 @@
 # Worktree Change Log
 
+## 2026-10-02 tested / reconnect after archive-induced memory pressure
+Plan localcrash_20261002/RECONNECT_TEST.md before runtime restore; same
+kernel#250/CMA20/boot31071e77/AIC/BS/playera683cf70/sinkff58d9fc/fullBT.
+Only temporary session commands, no source build/driver/service replacement.
+Two ADB connections succeeded, native800x48060/90/pool9/defaultBluetooth.
+Run1 140.24s/6640commits/max179340us; run2 140.27s/7703/max117335us;
+both zero gaps>250ms/errors, six socketdrop deltas0 each. Run1 controlled
+TEARDOWN sinkrc0, old processes exited/CmaFree17692KiB, then new session.
+Run2 CPU73.82..78.87%, available18892..18972KiB/CmaFree7912KiB,
+PCM advancing with startupdiscard/oneunderrun; not zeroaudio-loss claim.
+No new OOM; old two events at7805..7808s correlate with boardtmpfs archive
+and SFTP. No new board archive, /tmp188KiB. Currentplayer14603/watch14604/
+sink14651 kept streaming. Hot reconnect not cold acceptance; no stable push.
+
 ## 2026-10-02 archived / successful runtime source snapshot uploaded
 GitHubownerwnk64, snapshotbranch/tag-verified99bf218 remotely checked.
 Kernelb3d8ed3/AIC53bec9e/player5685c63 complete-source refs verified.
