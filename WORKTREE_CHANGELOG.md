@@ -1,6 +1,14 @@
 # Worktree Change Log
 
 ## 2026-10-02 planned / recover live audio after route changes
+Live result:source072bbc3/deploy295bdab/338c87bf, phoneplayer21327/watch21328/
+sink21380. Two speaker-only Disconnect/Connect cycles: headphone->Bluetooth
+routes restored, audio written25176720->26359248 and28912368->30178304,
+samevideo/sink PIDs, commits advancing, route_changes3..6/opens4..7.
+LaterPCM32778880/retries2/drop986240/underruns2, FIFO full/failed0,
+RTPmissing/socket_missing0/videoerrors0/maxgap134916us. CurrentBT andstream
+kept. Hosttesttool and detailedruntime/audio-reopen-results-20261002.md
+recorded. Actualspeaker poweroff/audible/threecold acceptance pending.
 Planc05fac8/source072bbc3: onlywfd_audio.c plus fakeALSA lifecycle tests.
 Six sanitizer lifecycle runs pass: initial/parameter failure, bounded retries,
 ENODEV, EAGAIN/partialwrite/EPIPE, route change duringblockedwrite, explicit
