@@ -1,6 +1,13 @@
 # Worktree Change Log
 
 ## 2026-10-02 planned / recover live audio after route changes
+Planc05fac8/source072bbc3: onlywfd_audio.c plus fakeALSA lifecycle tests.
+Six sanitizer lifecycle runs pass: initial/parameter failure, bounded retries,
+ENODEV, EAGAIN/partialwrite/EPIPE, route change duringblockedwrite, explicit
+device unaffected, stop whileunavailable. Demux/video-byte/RTSP800/IDR pass.
+Two ARM Makefile builds338c87bf1517807e782af48c1157904e; oldff58 retained.
+Next SSH versioned deploy, phone reconnect once, then speaker-only live
+disconnect/reconnect with same video PID and PCM counters/resourcemonitor.
 CurrentdefaultBluetooth restored but sinkwritten330244096 frozen: old audio
 thread setsfailed and exits forever on PCM loss. Change onlywfd_audio.c:
 bounded500ms route-state polling fordefault, close/reopen PCM on route change,
