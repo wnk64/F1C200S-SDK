@@ -1,6 +1,9 @@
 # Worktree Change Log
 
 ## 2026-10-02 planned / recover live audio after route changes
+Launcher2de371a deployed isolated, MD59168c75b4a07a1e98e3745fe7e784cc3,
+shellsyntax/readonlypreflight pass; current PIDs21327/21380 unchanged.
+Live-testrecordf1fc62b, not stableacceptance. Source/program edits tracked.
 Follow-up plan/result:versionedruntime/audio-reopen-20261002/start-cast.sh
 selects338c87bf with same existing workflow/options/templates, old archived
 launcher untouched. This avoids next start selecting unfixedff58. Shell

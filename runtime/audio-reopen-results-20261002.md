@@ -39,3 +39,11 @@ Current archived launcher selectsff58d9fc; future starts must explicitly
 select338c87bf versioned sink, keeping existing batch/coalescing/IDR options.
 Host-only reusable tooltools/test_speaker_audio_reconnect.py preserves phone
 media and records bounded phase results, no boardtmpfs archive.
+
+Follow-up launcher source2de371a, boardcandidate/start-cast.sh
+MD5 9168c75b4a07a1e98e3745fe7e784cc3. Same workflow/templates, only sink
+path/hash updated. Shellsyntax/readonlyartifact preflight pass. Existing
+archived launcher unchanged; new candidate launch path is
+/root/aic_miracast/candidates/audio_reopen_20261002/start-cast.sh.
+Actualcold/session launch via this new wrapper remains pending, current
+manual session unaffected. Functional source072bbc3, live-testrecordf1fc62b.
