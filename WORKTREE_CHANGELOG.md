@@ -1,6 +1,10 @@
 # Worktree Change Log
 
 ## 2026-10-02 planned / recover live audio after route changes
+Follow-up plan/result:versionedruntime/audio-reopen-20261002/start-cast.sh
+selects338c87bf with same existing workflow/options/templates, old archived
+launcher untouched. This avoids next start selecting unfixedff58. Shell
+syntax and readonly boardpreflight required; coldmode remains unaccepted.
 Live result:source072bbc3/deploy295bdab/338c87bf, phoneplayer21327/watch21328/
 sink21380. Two speaker-only Disconnect/Connect cycles: headphone->Bluetooth
 routes restored, audio written25176720->26359248 and28912368->30178304,
