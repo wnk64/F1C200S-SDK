@@ -1,3 +1,9 @@
+## 2026-10-02 / Planned / Register wiliwili menu entry
+Files: SCRCPT/cast-and-menu-source/apps.conf; add one external application row only.
+Command: /root/aic_miracast/candidates/wiliwili_lvgl_port_20261002/launch-with-menu.sh.
+Protected: existing three rows, menu binary/supervisor, cast/kernel/network/BT unchanged.
+Test: wiliwili exit must return to existing menu; parent-owned launch returns normally rather than creating a second supervisor.
+
 ## 2026-10-02 / completed / all source categories physically relocated
 Worktree: /home/wnk/Desktop/F1c200S_SOFT; moved original shared .git, not a new worktree.
 Files: physical directory moves, source-index path moves, category README and existing Git metadata.
