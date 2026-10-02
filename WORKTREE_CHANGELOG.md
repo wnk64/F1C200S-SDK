@@ -1,5 +1,20 @@
 # Worktree Change Log
 
+## 2026-10-02 pending / live Wi-Fi and Bluetooth settings available
+Source2c87b6b/buildrecord2100a6a, deployeddb2d1b55/helperaca7bf18/CJK3ae39f36
+checked remotehash. Initialdeploy preflight refused absent/proc/.../children
+(kernel option not enabled); no statechange. Switched ownGUI detection to
+exe/PPid, stoppedold5012/5804, mock network-smoke exited0, new8946/GUI8952.
+Realvisible scanning/list and pagination captured: Wi-Fi CU_201/ChinaNet/
+CMCCrows,3/5page, alltouch targets fit. User browsed realpages duringcapture.
+GUI RSS1452KiB/PSS487KiB/anon136KiB afterscans; no helper left, WPA runtime
+socket removed. Underlying #250/CMA20/DTB7018246d/BS/BT/audio/cast unchanged.
+No live WiFi join/disconnect/forget or Bluetoothpair/remove executed for testing;
+these and DHCP/rebootpersistence/audio/cast regressions remainpending, cold0/3.
+README describes supportedsecurity, unknownUnicode limits, command and rollback.
+Local temporarywrappers cleaned, hostprotocol-testbinary removed.
+
+
 ## 2026-10-02 planned / deploy connection UI after mock page smoke
 Source2c87b6b, menu db2d1b552887486b3874f06ebd30aa12,
 helper aca7bf187ef1cbcbd4f49884ede8e82d,
