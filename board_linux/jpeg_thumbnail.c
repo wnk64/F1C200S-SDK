@@ -4,23 +4,25 @@
 #include <setjmp.h>
 #include <jpeglib.h>
 
+struct thumb_error { struct jpeg_error_mgr base; jmp_buf jump; };
 struct decoder {
     struct jpeg_decompress_struct jpeg;
-    struct jpeg_error_mgr error;
-    jmp_buf jump;
+    struct thumb_error error;
     uint8_t *row;
     int created;
 };
-static void fail(j_common_ptr jpeg) { longjmp(((struct decoder *)jpeg->client_data)->jump, 1); }
+static void fail(j_common_ptr jpeg) {
+    struct thumb_error *error = (struct thumb_error *)jpeg->err;
+    longjmp(error->jump, 1);
+}
 int board_jpeg_thumbnail(const uint8_t *input, size_t length, int width, int height, uint16_t *pixels)
 {
     if (!input || !pixels || length < 2 || length > 131072 || input[0] != 0xff || input[1] != 0xd8 ||
         width < 1 || height < 1 || width > 256 || height > 256) return 0;
     struct decoder *d = calloc(1, sizeof(*d));
     if (!d) return 0;
-    d->jpeg.err = jpeg_std_error(&d->error); d->error.error_exit = fail;
-    d->jpeg.client_data = d;
-    if (setjmp(d->jump)) {
+    d->jpeg.err = jpeg_std_error(&d->error.base); d->error.base.error_exit = fail;
+    if (setjmp(d->error.jump)) {
         if (d->created) jpeg_destroy_decompress(&d->jpeg);
         free(d->row); free(d); return 0;
     }

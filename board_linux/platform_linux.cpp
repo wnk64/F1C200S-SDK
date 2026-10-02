@@ -241,7 +241,9 @@ const _lv_font_t *platform_ui_font(const _lv_font_t *) { return &menu_font_strea
 std::string platform_config_path() {
     const char *directory = std::getenv("F1_CONFIG_DIR");
     const std::string path = directory ? directory : "/root/.config/wiliwili-lvgl";
-    (void)mkdir("/root/.config", 0700); (void)mkdir(path.c_str(), 0700); return path;
+    umask(0077);
+    (void)mkdir("/root/.config", 0700); (void)mkdir(path.c_str(), 0700);
+    return path + "/wiliwili_config.json";
 }
 void platform_set_http_proxy(const std::string& proxy, bool enabled) { std::lock_guard<std::mutex> lock(network_mutex); network.proxy = proxy; network.proxy_enabled = enabled; }
 void platform_set_http_timeouts(uint32_t connect_ms, uint32_t receive_ms) { std::lock_guard<std::mutex> lock(network_mutex); network.connect_ms = std::max(1000U, std::min(30000U, connect_ms)); network.receive_ms = std::max(1000U, std::min(30000U, receive_ms)); }
