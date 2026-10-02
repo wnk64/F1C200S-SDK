@@ -1,3 +1,11 @@
+## 2026-10-02 / Planned / Progressive feed, QR entry and exit
+Baseline: 3a71367, user-confirmed touch navigation; bfdd34e7 runtime SHA256.
+Files: windows_lvgl/src/main.cpp, header_cookies helper/tests, launch-with-menu.sh, phase2-record.md.
+Hypothesis: metadata is blocked behind all eight serial covers; publish metadata first and load four visible covers.
+QR: add missing board Mine entry, case-insensitive cookie headers, white quiet zone; human approval required.
+Exit: close board display/font/player and terminate detached workers before C++ global teardown; return to existing menu.
+Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance pending, cold 0/3.
+
 # Worktree Change Log
 
 Worktree: /home/wnk/Desktop/F1c200S_SOFT/LVGL/wiliwili_lvgl

@@ -9,6 +9,7 @@ extern "C" {
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -18,6 +19,7 @@ extern "C" {
 #include <mutex>
 #include <string>
 #include "../../board_linux/compat_cpp17.h"
+#include "../../board_linux/header_cookies.h"
 #include <thread>
 #include <vector>
 
@@ -152,6 +154,7 @@ struct Video {
 int window_width = kWindowWidth;
 int window_height = kWindowHeight;
 bool board_preview = false;
+std::atomic_bool quit_requested{false};
 lv_indev_data_t pointer_data{};
 lv_group_t* focus_group = nullptr;
 std::mutex data_mutex;
@@ -2264,16 +2267,7 @@ void fetch_qr_login() {
             qr_status_complete = true;
             return;
         }
-        std::string generate_cookies;
-        size_t generate_cursor = 0;
-        while ((generate_cursor = generate_response_headers.find("Set-Cookie:", generate_cursor)) != std::string::npos) {
-            size_t start = generate_cursor + 11;
-            while (start < generate_response_headers.size() && (generate_response_headers[start] == ' ' || generate_response_headers[start] == '\t')) ++start;
-            const size_t end = generate_response_headers.find(';', start);
-            if (!generate_cookies.empty()) generate_cookies += "; ";
-            generate_cookies += generate_response_headers.substr(start, end == std::string::npos ? std::string::npos : end - start);
-            generate_cursor = end == std::string::npos ? generate_response_headers.size() : end + 1;
-        }
+        const std::string generate_cookies = header_cookie_pairs(generate_response_headers);
         std::string poll_headers = qr_headers;
         if (!generate_cookies.empty()) {
             const size_t cookie = poll_headers.find("Cookie: ");
@@ -2284,8 +2278,9 @@ void fetch_qr_login() {
         }
         bool login_completed = false;
         if (qr_debug) qr_debug << "generate url=1 key=1\n" << std::flush;
-        for (int attempt = 0; attempt < 30 && !login_completed; ++attempt) {
+        for (int attempt = 0; attempt < 30 && !login_completed && !quit_requested.load(); ++attempt) {
             platform_delay(3000);
+            if (quit_requested.load()) return;
             std::vector<uint8_t> poll_bytes;
             std::string response_headers;
             std::string poll_error;
@@ -2318,16 +2313,7 @@ void fetch_qr_login() {
                 qr_status_complete = true;
                 continue;
             }
-            std::string merged;
-            size_t cursor = 0;
-            while ((cursor = response_headers.find("Set-Cookie:", cursor)) != std::string::npos) {
-                size_t start = cursor + 11;
-                while (start < response_headers.size() && (response_headers[start] == ' ' || response_headers[start] == '\t')) ++start;
-                const size_t end = response_headers.find(';', start);
-                if (!merged.empty()) merged += "; ";
-                merged += response_headers.substr(start, end == std::string::npos ? std::string::npos : end - start);
-                cursor = end == std::string::npos ? response_headers.size() : end + 1;
-            }
+            std::string merged = header_cookie_pairs(response_headers);
             if (!merged.empty()) {
                 if (qr_debug) qr_debug << "poll " << attempt + 1 << " success session_headers=1\n";
                 merged += "; _uuid=" + device_uuid + "; buvid3=" + device_buvid;
@@ -5705,7 +5691,14 @@ void show_board_section(MainSection section) {
         set_label(user, account_name.empty() ? "Click to sign in" : account_name.c_str(), 17, ui_color(0xf3f5f8), LV_ALIGN_LEFT_MID, 64, -12);
         set_label(user, account_name.empty() ? "Import a Cookie session to sign in" : "Cookie session is active", 13, ui_color(0xaeb8c6),
                   LV_ALIGN_LEFT_MID, 64, 14);
-        if (!account_name.empty()) {
+        if (account_name.empty()) {
+            lv_obj_t* login = lv_btn_create(user);
+            lv_obj_set_size(login, 112, 48);
+            lv_obj_align(login, LV_ALIGN_RIGHT_MID, -12, 0);
+            lv_obj_set_style_bg_color(login, ui_color(0x0ea5e9), 0);
+            lv_obj_add_event_cb(login, open_qr_login, LV_EVENT_CLICKED, nullptr);
+            set_label(login, "Show QR", 14, ui_color(0xffffff), LV_ALIGN_CENTER, 0, 0);
+        } else {
             lv_obj_t* logout = lv_btn_create(user);
             lv_obj_set_size(logout, 82, 32);
             lv_obj_align(logout, LV_ALIGN_RIGHT_MID, -12, 0);
@@ -6153,6 +6146,14 @@ void build_shell() {
                             reinterpret_cast<void*>(static_cast<uintptr_t>(MainSection::Settings)));
         main_nav[static_cast<size_t>(MainSection::Settings)] = settings;
         set_symbol(settings, LV_SYMBOL_SETTINGS, ui_color(0xffffff));
+        lv_obj_t* exit_button = lv_btn_create(rail);
+        lv_obj_set_size(exit_button, 52, 56);
+        lv_obj_set_pos(exit_button, 6, window_height - 66);
+        lv_obj_set_style_bg_color(exit_button, ui_color(0x374151), 0);
+        lv_obj_set_style_radius(exit_button, 6, 0);
+        lv_obj_add_event_cb(exit_button, [](lv_event_t*) { quit_requested = true; }, LV_EVENT_CLICKED, nullptr);
+        set_symbol(exit_button, LV_SYMBOL_POWER, ui_color(0xffffff));
+        set_label(exit_button, "Exit", 12, ui_color(0xffffff), LV_ALIGN_BOTTOM_MID, 0, -2);
         lv_obj_t* top = lv_obj_create(root);
         lv_obj_set_size(top, 736, 72);
         lv_obj_set_pos(top, 64, 0);
@@ -6363,6 +6364,7 @@ void start_fetch() {
     const int page = feed_page;
     const bool append = feed_append;
     std::thread([mode, query, image_threads, page, append, request_epoch] {
+        const uint32_t fetch_started = platform_ticks();
         std::string body;
         std::string error;
         std::vector<Video> videos;
@@ -6377,15 +6379,32 @@ void start_fetch() {
         if (fetch_feed(path, body, error)) {
             videos = mode == FeedMode::Search ? parse_search(body) : parse_feed(body, popular);
             if (videos.empty()) error = "Bilibili response could not be parsed";
+#ifdef WILIWILI_BOARD
+            if (quit_requested.load() || request_epoch != navigation_epoch.load()) return;
+            if (!append && mode != FeedMode::Search && !videos.empty()) {
+                std::lock_guard<std::mutex> lock(data_mutex);
+                pending_videos = videos;
+                pending_error = error;
+                pending_feed_append = false;
+                pending_feed_epoch = request_epoch;
+                fetch_in_flight = false;
+                fetch_complete = true;
+                std::fprintf(stderr, "FEED epoch=%u metadata_ms=%u items=%zu\n", request_epoch,
+                             platform_ticks() - fetch_started, videos.size());
+            }
+            const size_t thumbnail_count = mode == FeedMode::Search ? videos.size() : std::min<size_t>(4, videos.size());
+#else
+            const size_t thumbnail_count = videos.size();
+#endif
             // Bound in-flight image transfers. The selected setting controls
             // work parallelism without retaining extra decoded surfaces.
             size_t retained_cover_bytes = 0;
-            for (size_t first = 0; first < videos.size(); first += static_cast<size_t>(image_threads)) {
-                if (request_epoch != navigation_epoch.load() || retained_cover_bytes >= kEncodedThumbnailBatchBytes) break;
+            for (size_t first = 0; first < thumbnail_count; first += static_cast<size_t>(image_threads)) {
+                if (quit_requested.load() || request_epoch != navigation_epoch.load() || retained_cover_bytes >= kEncodedThumbnailBatchBytes) break;
 #ifndef WILIWILI_BOARD
                 std::vector<std::future<void>> jobs;
 #endif
-                const size_t end = std::min(videos.size(), first + static_cast<size_t>(image_threads));
+                const size_t end = std::min(thumbnail_count, first + static_cast<size_t>(image_threads));
 #ifndef WILIWILI_BOARD
                 jobs.reserve(end - first);
 #endif
@@ -6408,6 +6427,10 @@ void start_fetch() {
                 for (size_t index = first; index < end; ++index) retained_cover_bytes += videos[index].image_bytes.capacity();
             }
         }
+        if (quit_requested.load() || request_epoch != navigation_epoch.load()) return;
+#ifdef WILIWILI_BOARD
+        std::fprintf(stderr, "FEED epoch=%u covers_ms=%u\n", request_epoch, platform_ticks() - fetch_started);
+#endif
         std::lock_guard<std::mutex> lock(data_mutex);
         pending_videos = std::move(videos);
         pending_error = std::move(error);
@@ -6590,7 +6613,7 @@ int main(int argc, char** argv) {
     bool running = true;
     bool displayed = false;
     uint32_t last_tick = platform_ticks();
-    while (running) {
+    while (running && !quit_requested.load()) {
         PlatformEvent event;
         while (platform_poll_event(event)) {
             if (event.type == PlatformEventType::Quit) running = false;
@@ -6907,7 +6930,16 @@ int main(int argc, char** argv) {
                 lv_obj_set_pos(content, board_preview ? 72 : 130, board_preview ? 86 : 110);
                 lv_obj_set_style_bg_opa(content, LV_OPA_TRANSP, 0);
                 lv_obj_set_style_border_width(content, 0, 0);
-                qr_code_widget = lv_qrcode_create(content, board_preview ? 220 : 300,
+                lv_obj_t* qr_frame = lv_obj_create(content);
+                const int qr_size = board_preview ? 220 : 300;
+                lv_obj_set_size(qr_frame, qr_size + 32, qr_size + 32);
+                lv_obj_set_style_bg_color(qr_frame, lv_color_hex(0xffffff), 0);
+                lv_obj_set_style_border_width(qr_frame, 0, 0);
+                lv_obj_set_style_radius(qr_frame, 0, 0);
+                lv_obj_set_style_pad_all(qr_frame, 0, 0);
+                lock_static_canvas(qr_frame);
+                lv_obj_center(qr_frame);
+                qr_code_widget = lv_qrcode_create(qr_frame, qr_size,
                                                    lv_color_hex(0x111111), lv_color_hex(0xffffff));
                 lv_qrcode_update(qr_code_widget, qr_login_url.c_str(), qr_login_url.size());
                 lv_obj_center(qr_code_widget);
@@ -6988,11 +7020,18 @@ int main(int argc, char** argv) {
             : wiliwili::clamp<uint32_t>(next_timer, 5U, 20U);
         platform_delay(frame_delay);
     }
+    quit_requested = true;
+    ++navigation_epoch;
     platform_stop_text_input();
     platform_player_stop();
     lv_group_set_default(nullptr);
     if (focus_group) lv_group_del(focus_group);
     platform_font_shutdown();
     platform_display_shutdown();
+#ifdef WILIWILI_BOARD
+    // Detached requests must not race destruction of shared C++ globals.
+    // Board display/player resources are closed before terminating workers.
+    std::_Exit(0);
+#endif
     return 0;
 }
