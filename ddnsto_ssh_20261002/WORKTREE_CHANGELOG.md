@@ -6,6 +6,20 @@ Base: 46712d5; board kernel/player/source archives retained
 Purpose: reuse paid DDNSTO HTTPS mapping for native SSH/SCP
 
 ## 2026-10-02 planned / authenticated WebSocket relay
+Source31c0617/d8374fc/a15f5b4. First nginxcheck failed longkey/maphash;
+removed both additions, oldnginx untouched. Bucket128 fixed. Reload listener
+startupcurl raced (no bind yet); laterlocal401/cloud401/health/LuCI200 passed.
+Nativeplink localhost2223 authenticated verifiedboardhostkey/boot9868a347.
+Windowswebsocat TLS Schannel unavailable; wrappedbytes using Pythonstdlib
+verifiedTLS, maturewebsocat RFC6455 unchanged, cloudSSHlocalhost2222 success.
+256KiB allbytevalues SCP bothdirections SHA256
+2312394bd99545d9de131c24efb781e765ac1aec243f2ed9347597a793a415e9
+matched host/board/returned; boardtestfile removed. DirectLANproxy stopped.
+Plan persistentrouterprocd service verifiedvendorbinary/root scopedapp,
+respawn/bootstart independent of existingnginx. No WANrule/DDNSTOmap change.
+TemporaryWindowsbinary retained only for activeintegration; D installblocked,
+must migrate before permanenthostinstallation. Randomsecret private/nottracked.
+After service transition retestcloudSSH/SCP; no different-WiFi test yet.
 Both domains still return routerLuCI; use existingHTTPmapping /f1-ssh path
 and additionally scoped10.0.0.1:18089 server. Add two nginxfiles only,
 nginxsyntaxtest before reload, remove additions and reload on failedgate.

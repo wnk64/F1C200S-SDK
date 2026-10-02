@@ -37,9 +37,11 @@ def tls_forward(client, host, port, semaphore):
         remote = context.wrap_socket(socket.create_connection((host, port), 15), server_hostname=host)
         remote.settimeout(None)
         while True:
-            ready, _, _ = select.select([client, remote], [], [], 30)
-            if remote.pending() and remote not in ready:
+            if remote.pending():
+                ready, _, _ = select.select([client], [], [], 0)
                 ready.append(remote)
+            else:
+                ready, _, _ = select.select([client, remote], [], [], 30)
             for source in ready:
                 data = source.recv(65536)
                 if not data:
