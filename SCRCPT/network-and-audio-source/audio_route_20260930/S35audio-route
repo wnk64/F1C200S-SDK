@@ -1,0 +1,25 @@
+#!/bin/sh
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+start() {
+    if [ -r /run/f1-audio-route.pid ] && kill -0 "$(cat /run/f1-audio-route.pid)" 2>/dev/null; then
+        return 0
+    fi
+    /opt/f1-audio/f1-audio-route --once || return 1
+    if ! { [ -r /run/f1-audio-backend.pid ] && kill -0 "$(cat /run/f1-audio-backend.pid)" 2>/dev/null; }; then
+        start-stop-daemon -S -b -m -p /run/f1-audio-backend.pid -x /opt/f1-audio/audio-backend.sh || return 1
+    fi
+    start-stop-daemon -S -b -m -p /run/f1-audio-route.pid -x /opt/f1-audio/f1-audio-route -- --watch
+}
+stop() {
+    start-stop-daemon -K -p /run/f1-audio-route.pid -x /opt/f1-audio/f1-audio-route 2>/dev/null || true
+    # The shell trap only stops Bluetooth processes started by this service.
+    if [ -r /run/f1-audio-backend.pid ]; then
+        kill "$(cat /run/f1-audio-backend.pid)" 2>/dev/null || true
+    fi
+}
+case "${1:-start}" in
+    start) start ;;
+    stop) stop ;;
+    restart) stop; sleep 2; start ;;
+    *) echo "Usage:$0 {start|stop|restart}" >&2; exit 1 ;;
+esac

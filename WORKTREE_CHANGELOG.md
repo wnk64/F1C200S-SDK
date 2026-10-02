@@ -1,3 +1,12 @@
+## 2026-10-02 / completed / all source categories physically relocated
+Worktree: /home/wnk/Desktop/F1c200S_SOFT; moved original shared .git, not a new worktree.
+Files: physical directory moves, source-index path moves, category README and existing Git metadata.
+Verification: primary directory inode/full metadata comparisons passed; U-Boot HEAD/status identical; kernel/U-Boot SHA256 unchanged.
+Preserved: complete source/config/build directories, untracked files, original histories and dirty historical DTB.
+Mappings: no category symlinks at depth 1/2; removed old aliases created during this reorganization.
+Build: not run; legacy absolute source/SDK/cache paths still require explicit updates before build acceptance.
+Board: not contacted, rebooted, modified or exported.
+
 ## 2026-10-02 / completed / development directory reorganization
 Hypothesis: classify existing sources without changing board runtime.
 Files: repository location, compatibility symlinks, environment_layout_20261002/README.md.

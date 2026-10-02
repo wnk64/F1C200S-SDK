@@ -1,0 +1,12 @@
+#!/bin/sh
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+BASE=/root/aic_miracast/candidates/rtl8723bs_poll_20260930
+case "${1:-start}" in
+    start|restart)
+        # WLAN is initialized earlier by S17rtl8723bs-sta.
+        [ -d /sys/module/hci_uart ] || sh "$BASE/load-bluetooth.sh" || exit 1
+        echo '[rtl8723bs] UART Bluetooth driver loaded'
+        ;;
+    stop) ;;
+    *) exit 0 ;;
+esac

@@ -1,0 +1,3 @@
+#!/bin/sh
+# Old RTL8723BU association wait retired. AIC STA owns management networking.
+exit 0

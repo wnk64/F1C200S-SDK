@@ -1,0 +1,3 @@
+#!/bin/sh
+# Old USB RTL8723BU startup retired; current hardware uses SDIO RTL8723BS.
+exit 0

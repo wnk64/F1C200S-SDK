@@ -1,0 +1,34 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR X11)
+#include "suniv-f1c200s-newboard-rtl8723ds.dts"
+
+/ {
+    aliases {
+        serial2 = &uart2;
+    };
+};
+
+&pio {
+    rtl8723ds_uart2_pins: rtl8723ds-uart2-pins {
+        pins = "PE7", "PE8", "PE9", "PE10";
+        function = "uart2";
+    };
+};
+
+&uart2 {
+    pinctrl-names = "default";
+    pinctrl-0 = <&rtl8723ds_uart2_pins>;
+    status = "okay";
+
+    rtl8723ds_bt: bluetooth {
+        compatible = "realtek,rtl8723ds-bt";
+        enable-gpios = <&tca9555 3 GPIO_ACTIVE_HIGH>;
+        device-wake-gpios = <&tca9555 4 GPIO_ACTIVE_HIGH>;
+        host-wake-gpios = <&tca9555 2 GPIO_ACTIVE_HIGH>;
+        clocks = <&pcf8563>;
+        clock-names = "lpo";
+        assigned-clocks = <&pcf8563>;
+        assigned-clock-rates = <32768>;
+        /* Firmware config requests 1.5Mbaud with CTS/RTS flow control. */
+        /* No wakeup-source: suspend wake IRQ support has not been validated. */
+    };
+};

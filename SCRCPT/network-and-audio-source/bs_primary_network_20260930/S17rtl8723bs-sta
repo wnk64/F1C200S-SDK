@@ -1,0 +1,45 @@
+#!/bin/sh
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+BASE=/root/aic_miracast/candidates/rtl8723bs_poll_20260930
+WPA=/root/aic_miracast/wpa24_aic_wfd_supplicant
+CLI=/root/aic_miracast/wpa24_aic_wfd_cli
+RUN=/run/rtl-bs-sta
+CONF=/etc/rtl8723bs-sta.conf
+
+network_worker() {
+    while ! "$CLI" -p "$RUN" -i rtlwlan0 status 2>/dev/null | grep -q '^wpa_state=COMPLETED'; do
+        [ -r "$RUN/wpa.pid" ] && kill -0 "$(cat "$RUN/wpa.pid")" 2>/dev/null || return 1
+        sleep 1
+    done
+    exec udhcpc -f -i rtlwlan0 -t 3 -T 3 -p "$RUN/dhcp.pid"
+}
+
+start() {
+    [ -s "$CONF" ] || { echo '[bs-sta] private Wi-Fi config missing' >&2; return 1; }
+    mkdir -p "$RUN" || return 1
+    sh "$BASE/load-wifi.sh" "$BASE/r8723bs.ko" || return 1
+    ifconfig rtlwlan0 up || return 1
+    if ! "$CLI" -p "$RUN" -i rtlwlan0 ping 2>/dev/null | grep -q PONG; then
+        "$WPA" -B -Dnl80211 -i rtlwlan0 -c "$CONF" -P "$RUN/wpa.pid" -f "$RUN/wpa.log" || return 1
+    fi
+    if [ -r "$RUN/worker.pid" ] && kill -0 "$(cat "$RUN/worker.pid")" 2>/dev/null; then
+        return 0
+    fi
+    network_worker >>"$RUN/network.log" 2>&1 &
+    echo $! > "$RUN/worker.pid"
+    echo '[bs-sta] association/DHCP running in background; SSH startup is not blocked'
+}
+
+stop() {
+    for file in worker.pid dhcp.pid; do
+        [ ! -r "$RUN/$file" ] || kill "$(cat "$RUN/$file")" 2>/dev/null
+    done
+    "$CLI" -p "$RUN" -i rtlwlan0 terminate >/dev/null 2>&1 || true
+}
+
+case "${1:-start}" in
+    start) start ;;
+    stop) stop ;;
+    restart) stop; start ;;
+    *) echo "Usage: $0 {start|stop|restart}" >&2; exit 1 ;;
+esac

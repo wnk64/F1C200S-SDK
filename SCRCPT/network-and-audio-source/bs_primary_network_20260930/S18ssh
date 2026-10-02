@@ -1,0 +1,7 @@
+#!/bin/sh
+# Listen early; association and DHCP proceed independently in the background.
+case "${1:-start}" in
+    start) /etc/init.d/S50dropbear start ;;
+    stop) ;;
+    *) exit 0 ;;
+esac

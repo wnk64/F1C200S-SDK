@@ -1,0 +1,13 @@
+# RTL8723BS firmware
+
+Source:armbian/firmware commit2a9e1c19460401443267926181191d57e3ff175d.
+rtlwifi/rtl8723bs_nic.bin blob8d534053823e47ba4e49c8600463af47fbec7306,
+32108bytes, SHA256a52b5a7be4841b4b2839eddf5122b3300a3610866abe4bb3c3c9e444c8ab7969.
+rtl_bt/rtl8723bs_fw.bin upstream is a symlink to rtl8723b_fw.bin;
+packaged with resolved46236byte binary, blobd29f16403376f54fb8714e879174c0920627e945,
+SHA25620dd9e162d48099906579c5e1bd3c7b65a7e8cbf79954bba59ef0ce985e93827.
+rtl_bt/rtl8723bs_config.bin upstream is a symlink to rtl8723b_config.bin;
+packaged with resolved68byte binary, blobad2bc264d72a56e2be8ea126bdfb20a779af8238,
+SHA256e120988a772efa67cd3c55eee84b00d24aa7fbf0109f8d2adaecc3ec3ff6d280.
+No binary edits. UART config1.5Mbaud/CTS-RTS; board-specific compatibility pending.
+Firmware license retained from earlier source-backed Realtek candidate.

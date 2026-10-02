@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# Cold boot can leave the first sunxi MUSB probe without a USB host.
+# Keep USB host recovery for AIC; do not load the retired RTL8723BU driver.
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+
+[ -d /sys/bus/usb/devices/usb1 ] && exit 0
+
+echo "[musb-reprobe] delayed retry" > /tmp/musb-reprobe.log
+# The reset controller can still be busy during early platform probes.
+# Let all early platform probes settle before the proven unload/reinsert path.
+sleep 15
+rmmod sunxi 2>/dev/null || true
+sleep 3
+# modprobe can report a successful insert even when the MUSB probe failed.
+# Direct insertion is required to observe the second, known-good probe.
+insmod /lib/modules/5.7.1/extra/sunxi.ko 2>/dev/null || true
+sleep 4
+
+if [ -d /sys/bus/usb/devices/usb1 ]; then
+    echo "[musb-reprobe] USB host recovered"
+    echo "[musb-reprobe] USB host recovered" >> /tmp/musb-reprobe.log
+else
+    echo "[musb-reprobe] USB host retry failed" >> /tmp/musb-reprobe.log
+fi
+exit 0

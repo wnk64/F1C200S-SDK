@@ -1,0 +1,3 @@
+#!/bin/sh
+# AIC8800 is reserved for Miracast. No ordinary STA networking at boot.
+exit 0

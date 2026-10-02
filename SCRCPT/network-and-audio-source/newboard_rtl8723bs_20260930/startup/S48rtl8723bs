@@ -1,0 +1,17 @@
+#!/bin/sh
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+BASE=/root/aic_miracast/candidates/rtl8723bs_poll_20260930
+case "${1:-start}" in
+    start)
+        # Management networking remains on AIC; no IP/route changes here.
+        sh "$BASE/load-wifi.sh" "$BASE/r8723bs.ko" || exit 1
+        ifconfig rtlwlan0 up || exit 1
+        if [ ! -d /sys/module/hci_uart ]; then
+            sh "$BASE/load-bluetooth.sh" || exit 1
+        fi
+        echo '[rtl8723bs] SDIO WLAN and UART Bluetooth drivers loaded'
+        ;;
+    stop) ;;
+    restart) "$0" start ;;
+    *) echo "Usage: $0 {start|stop|restart}" >&2; exit 1 ;;
+esac
