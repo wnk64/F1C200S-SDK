@@ -35,7 +35,7 @@ static void flush(lv_disp_drv_t *driver, const lv_area_t *area, lv_color_t *pixe
     for (int row = area->y1; row <= area->y2; row++) {
         uint32_t *out = (uint32_t *)(fb + (row + screen.yoffset) * fixed.line_length);
         for (int col = area->x1; col <= area->x2; col++) {
-            lv_color32_t c = lv_color_to32(*pixels++);
+            lv_color32_t c; c.full = lv_color_to32(*pixels++);
             out[col + screen.xoffset] = ((uint32_t)c.ch.red << screen.red.offset) |
                 ((uint32_t)c.ch.green << screen.green.offset) |
                 ((uint32_t)c.ch.blue << screen.blue.offset);
