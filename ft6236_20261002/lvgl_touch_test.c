@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "lvgl/lvgl.h"
+#include "touch_orientation.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/fb.h>
@@ -68,7 +69,11 @@ static void pointer_read(lv_indev_drv_t *driver, lv_indev_data_t *data)
         if (ioctl(i2c_fd, I2C_RDWR, &transfer) == 2) {
             samples++;
             pressed = (report[0] & 15) > 0;
-            if (pressed) { x = ((report[1] & 15) << 8) | report[2]; y = ((report[3] & 15) << 8) | report[4]; }
+            if (pressed) {
+                int raw_x = ((report[1] & 15) << 8) | report[2];
+                int raw_y = ((report[3] & 15) << 8) | report[4];
+                ft_touch_portrait(raw_x, raw_y, &x, &y);
+            }
         }
     }
     data->point.x = x < 0 ? 0 : x > 479 ? 479 : x;

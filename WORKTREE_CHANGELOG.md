@@ -1,5 +1,13 @@
 # Worktree Change Log
 
+## 2026-10-02 planned / measured portrait touch orientation
+User01raw171,402/02raw198,90/03raw721,368/04raw707,62.
+Map screenX=479-rawY, screenY=rawX; controllernative800x480 vs panel480x800.
+Upstream applies inversionbefore swap: properties800/480,inverted-y,swappedxy.
+GUI I2C fallback uses same map, evdev alreadytransformed (no double rotation).
+Only boardproperties/testGUI/helper/tests/logs. Original framebuffer/video
+and existing touch IRQ unchanged. Stop GUI before board unregister/rebind.
+
 ## 2026-10-02 pending / persistent LVGL touch test requested by user
 FTsource2855195/buildrecorde9bb157 loaded onboot3950ce0d/#250/CMA20,
 inputevent0 native0..479/0..799 nestedIRQ130/P06. Actualtapreader returned

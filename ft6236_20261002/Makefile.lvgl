@@ -2,5 +2,6 @@ CC := /home/wnk/LicheePi_Nano/buildroot-2018.02.11/output/host/bin/arm-buildroot
 CFLAGS := -Os -std=gnu99 -DLV_CONF_INCLUDE_SIMPLE -I. -Ilvgl -ffunction-sections -fdata-sections
 LVGL_SRC := $(shell find lvgl/src -name '*.c')
 OBJ := $(LVGL_SRC:.c=.o) lvgl_touch_test.o
+lvgl_touch_test.o: touch_orientation.h lv_conf.h
 lvgl-touch-test: $(OBJ)
 	$(CC) -Wl,--gc-sections -o $@ $(OBJ) -lm

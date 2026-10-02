@@ -21,8 +21,10 @@ static struct gpiod_lookup_table reset_lookup = {
     },
 };
 static const struct property_entry touch_properties[] = {
-    PROPERTY_ENTRY_U32("touchscreen-size-x", 480),
-    PROPERTY_ENTRY_U32("touchscreen-size-y", 800),
+    PROPERTY_ENTRY_U32("touchscreen-size-x", 800),
+    PROPERTY_ENTRY_U32("touchscreen-size-y", 480),
+    PROPERTY_ENTRY_BOOL("touchscreen-inverted-y"),
+    PROPERTY_ENTRY_BOOL("touchscreen-swapped-x-y"),
     { }
 };
 static struct gpio_desc *interrupt_gpio;
