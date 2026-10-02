@@ -1,6 +1,10 @@
 # Worktree Change Log
 
 ## 2026-10-02 planned / measured portrait touch orientation
+Deploy7018213 plan completed: oldGUI3040 terminated normally and oldboard
+unregistered; newboarda7922bd1/UI47b2884f verified and launchedPID4211.
+ExistingEDT/kernel/DTB/display unchanged. Await visiblebutton/drag validation;
+touch IRQ acceptance remains pending, fallback onlydiagnostic.
 Sourcef44b988, measured4points/native4corners test pass. Boardmodulea7922bd1
 and UI47b2884f buildsuccess, boardvermagic5.7.1. Fix Makefiledefault goal
 after explicit object prerequisite insertion; no program behavior change.

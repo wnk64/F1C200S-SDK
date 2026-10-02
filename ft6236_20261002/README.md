@@ -12,6 +12,9 @@ ft6236_board.c只提供软件设备属性、GPIO lookup、嵌套IRQ及I2C设备�
 IRQ不用固定动态GPIO编号，按扩展器label及硬件offset6解析。
 复位使用active-low lookup offset5。内核共享input/touchscreen属性符号已导出。
 尺寸先按原生480×800，坐标方向需实触四角验证，不能拿固定尺寸代替校准。
+2026-10-02用户四角数据确认原始坐标800×480。现使用X=479-rawY/Y=rawX，
+驱动软件属性先反转原Y再交换XY，evdev最终范围480×800；GUI轮询后备同映射，
+evdev路径不重复转换。实测点变换落在四个按钮内，待用户确认点击与滑动。
 
 候选不修改zImage、.config或启动DTB，也不改变扩展器其他GPIO及现有显示路径。
 手动验证时先插入edt_ft6236.ko，再插入ft6236_board.ko。
