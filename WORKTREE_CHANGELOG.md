@@ -1,5 +1,23 @@
 # Worktree Change Log
 
+## 2026-10-02 pending / two warm contiguous-pool starts verified
+Sourcededa9d6/scriptsfe515f1c/f3333ad4; samekernel/player/sink/GO throughout.
+Round1: beforeCma8692KiB/cache18172; after15644/cache7828. Pool9437184
+reserved, real800x480/90/rawframes advance, no FIFOoverflow. ADBdisconnect
+normalclose: peak8437760/33allocs/fallback0/live0, arena released.
+Round2 intentional read existing11MiB CJKfont beforestart: cache25900,
+CmaFree312KiB; preflight cache6804/CmaFree16344, pool9437184 reserved.
+ADB reconnect true; commits998/window246/5.0sec/errors0, socketdrops0,
+FIFO full0, available18960KiB/Cma5192KiB. Audio defaultheadphone actualroute,
+not a Bluetooth A/B claim. No cold/visual acceptance yet.
+Now add versioned candidateapps/supervisor referring unchanged networkGUI
+db2d1b55 and newcache-preflight castwrapper. Oldmenu/config retained. Stop
+round2 throughphone, verify release, startcandidate supervisor and trigger
+menu launch through optional controlfile (no codechange yet) or standalone
+candidate managedforeground test. Avoid orphan app/GUI overlap. Thirdwarm
+start and normalmenu return regression pending; no stablepromotion.
+
+
 ## 2026-10-02 planned / reclaim idle file-cache before contiguous arena
 Baseline originalmenu defaultaudio launcher6be8390d/wrapper408bfac2/player
 a683cf70/sink338c87bf; running9772/10037, boot9868a347/#250/CMA20/DTB7018246d.
