@@ -95,6 +95,8 @@ int platform_open(void)
         screen.red.length != 8 || screen.green.length != 8 || screen.blue.length != 8) return -1;
     fb = mmap(NULL, fixed.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fb_fd, 0);
     if (fb == MAP_FAILED) { fb = NULL; return -1; }
+    int tty = open("/dev/tty0", O_WRONLY | O_NOCTTY);
+    if (tty >= 0) { (void)write(tty, "\033[?25l", 6); close(tty); }
     input_fd = open("/dev/input/event0", O_RDONLY | O_NONBLOCK);
     i2c_fd = open("/dev/i2c-0", O_RDWR);
     lv_init();

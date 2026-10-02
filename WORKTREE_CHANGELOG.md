@@ -1,5 +1,16 @@
 # Worktree Change Log
 
+## 2026-10-02 planned / final idle pacing and console cursor suppression
+Source6fa5d01/f1-menu6022abc4: normal/fourappconfig valid, invalid rejected;
+both4page smoke runs exited0. Persistent supervisor3742/GUI3747; actual
+fb capture Chinese/icons/layout clear and bounded. GUI RSS1380KiB/PSS430KiB,
+anon104KiB; supervisor PSS204KiB/anon64KiB. No newCMA buffer.
+Set rootbgopaque, hide tty0cursor (visible blackcorner artifact) using VTescape,
+sleep by LVGL nexttimer1..16ms instead of fixed5ms. Retain original polling.
+Rebuild candidate then orderlystop only ownsupervisor/GUI and restart verified
+files; no init/driver changes. Real touch/menu-cast acceptance stillpending.
+
+
 ## 2026-10-02 rejected / stack-local LVGL driver lifetime
 Firstcandidatecb0dae00 configvalid/4valid/invalidrejected passed. GUI322 exited
 normally, firstsmoke then SIGSEGV. No kerneloops or caststarted. Root cause:

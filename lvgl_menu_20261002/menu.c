@@ -182,13 +182,16 @@ int main(int argc, char **argv)
     if (platform_open()) { platform_close(); return 2; }
     signal(SIGTERM, signal_stop); signal(SIGINT, signal_stop);
     content = lv_scr_act(); lv_obj_set_style_bg_color(content, lv_color_hex(0xF1F4F6), 0);
+    lv_obj_set_style_bg_opa(content, LV_OPA_COVER, 0);
     lv_obj_clear_flag(content, LV_OBJ_FLAG_SCROLLABLE);
     home();
     uint64_t previous = platform_ms(), start = previous, update = 0;
     int smoke_stage = 0;
     while (!quit) {
         uint64_t now = platform_ms(); lv_tick_inc((uint32_t)(now - previous)); previous = now;
-        lv_timer_handler();
+        uint32_t idle_ms = lv_timer_handler();
+        if (idle_ms < 1) idle_ms = 1;
+        if (idle_ms > 16) idle_ms = 16;
         if (now - update >= 250) {
             update = now;
             lv_label_set_text(status_label, access("/sys/class/net/rtlwlan0", F_OK) ? "Wi-Fi --" : "Wi-Fi  /  F1C200S");
@@ -206,7 +209,7 @@ int main(int argc, char **argv)
             else quit = 1;
             smoke_stage++;
         }
-        struct timespec delay = {0, 5000000}; nanosleep(&delay, NULL);
+        struct timespec delay = {0, (long)idle_ms * 1000000}; nanosleep(&delay, NULL);
     }
     fprintf(stderr, "menu: exit=%d heap=%u\n", exit_code, (unsigned)LV_MEM_SIZE);
     if (exit_code >= 20 && exit_code < 20 + (int)count) {
