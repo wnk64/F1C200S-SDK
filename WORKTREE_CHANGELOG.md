@@ -1,3 +1,12 @@
+## 2026-10-02 / completed / development directory reorganization
+Hypothesis: classify existing sources without changing board runtime.
+Files: repository location, compatibility symlinks, environment_layout_20261002/README.md.
+Source: moved original repositories; no new git worktree; Windows LVGL imported with history at 39695b1.
+Verification: seven repository HEAD/status pairs and shared tracked status unchanged; critical SHA256 checks passed.
+Board: no files changed; mistaken rootfs export stopped and generated VM exports removed.
+Decision: directory organization completed; no compile/deploy/cold-boot acceptance claimed.
+Details: environment_layout_20261002/README.md and /home/wnk/Desktop/F1c200S_SOFT/records.
+
 # Worktree Change Log
 
 ## 2026-10-02 pending / managed pool allocation and menu recovery verified
