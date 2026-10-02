@@ -1,5 +1,16 @@
 # Worktree Change Log
 
+## 2026-10-02 pending / headphone startup path verified and menu restored
+Sourcee6a4787, launcher6be8390d03a110d65a290133ad61821d,
+wrapper408bfac290de785a3458c56106457f08; sh-n and artifactpreflight passed.
+Stopped owned GUI4355/supervisor4033 before test. Real session with route
+headphone reached readyforphone, player4751/watch4752 alive; no GUI remained.
+No phone sink started; terminated only owned testwrapper, confirmed player/
+watch exit, restored supervisor5012/menu5017. Originallauncher9168c75b intact.
+No BTconnection gating now; actual headphoneaudible/Bluetooth switching and
+phonecast stillpending, threecold0/3. No driver/DTB/kernel/player/sink changes.
+
+
 ## 2026-10-02 planned / optional Bluetooth for menu cast launch
 Userclicked twice; application.log preflightpassed/wlan1registered then
 Bluetoothconnectionfailed; bt-connect.log Hostisdown, currentrouteheadphone.
