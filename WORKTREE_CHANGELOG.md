@@ -1,5 +1,15 @@
 # Worktree Change Log
 
+## 2026-10-02 planned / upstream FT6236 software board registration
+Basepanel1c14066/full source snapshot preserved; kernelb3d8ed3/#250/
+zImagebffc71e8/config3e4a7d09 preflight and exactrelease5.7.1 passed.
+SchematicI2C1 PE11SCL/PE12SDA, Linuxbus0/address38/A3=64; PCA P05reset/
+P06 IRQ/PE5parent. Stage unmodified upstream EDT module plus small board
+glue: GPIOlookup/nestedIRQ/I2Cproperties480x800. No kernel/DTB/hardware change.
+Originalpanelrepo candidatebranch only; preserve unrelated dirtyDTB.
+Rollback unregisterboard then unloadtouch; no bootautoload. Actualtouch/
+IRQ/I2C/cast/audio/memory and threecold acceptance pending.
+
 Worktree: /home/wnk/SoftWare/Driver software/tk032f8004-panel
 Component: external panel initializer and new-board DTS
 Base: 3445a58, tag panel-before-newboard-20260930, full source archived
