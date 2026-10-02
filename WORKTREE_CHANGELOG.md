@@ -1,5 +1,16 @@
 # Worktree Change Log
 
+## 2026-10-02 rejected / managed deploy missing execute bit, corrected
+Two warmarena runs reserved9MiB and finalpeak8437760/33alloc/fallback0/live0.
+Firstmanagedtest GUIreaped but exec cast-app denied(mode644 afterWindowsSCP),
+so no newplayer/watch started; ADBconnection timedout. Supervisor22186
+correctly restored GUI22198/error. No CMA/kernelfailure in this attempt.
+Mark candidate scripts executable in Git and board. Deploymentguard require
+all -x, newplayerPID distinct and alive before reading newpoollog/ADBconnect;
+never treat oldloglines as candidate result. Stop only own22186/22198 and
+rerun managedtest; originalmenu/phone/media retained. Cold0/3/warmstreakreset.
+
+
 ## 2026-10-02 planned / one-shot managed lifecycle regression
 Candidate supervisor adds --test-cast-once only for automated regression:
 start realunchangedGUI, wait2sec/SIGTERM/reap it, selectfirstcast application
