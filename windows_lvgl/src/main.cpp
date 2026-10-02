@@ -694,7 +694,13 @@ const lv_font_t* font_for_text(const char* text, int size) {
     // Generated board fonts carry CJK text. Use the compact built-in ASCII
     // faces for narrow navigation controls so 800x480 never truncates labels.
     for (const unsigned char* cursor = bytes; *cursor; ++cursor) {
-        if (*cursor & 0x80) return ui_font();
+        if (*cursor & 0x80) {
+#ifdef WILIWILI_BOARD
+            return platform_ui_font(font_for_text("", size));
+#else
+            return ui_font();
+#endif
+        }
     }
     if (size <= 12) return &lv_font_montserrat_12;
     if (size <= 14) return &lv_font_montserrat_14;

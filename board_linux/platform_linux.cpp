@@ -1,8 +1,8 @@
 #include "platform_services.h"
 extern "C" {
 #include "lvgl.h"
-extern const lv_font_t menu_font_stream;
-void menu_font_stream_close(void);
+const lv_font_t *board_font_for(const lv_font_t *fallback);
+void board_font_close(void);
 int board_jpeg_thumbnail(const uint8_t *, size_t, int, int, uint16_t *);
 }
 #include <curl/curl.h>
@@ -236,8 +236,8 @@ bool platform_decode_thumbnail_lvgl(const std::vector<uint8_t>& encoded, int wid
     return true;
 }
 void platform_font_init() {}
-void platform_font_shutdown() { menu_font_stream_close(); }
-const _lv_font_t *platform_ui_font(const _lv_font_t *) { return &menu_font_stream; }
+void platform_font_shutdown() { board_font_close(); }
+const _lv_font_t *platform_ui_font(const _lv_font_t *fallback) { return board_font_for(fallback); }
 std::string platform_config_path() {
     const char *directory = std::getenv("F1_CONFIG_DIR");
     const std::string path = directory ? directory : "/root/.config/wiliwili-lvgl";
