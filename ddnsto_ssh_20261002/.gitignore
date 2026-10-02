@@ -1,0 +1,5 @@
+private/
+_tmp_websocat.exe
+*.log
+*.pid
+__pycache__/
