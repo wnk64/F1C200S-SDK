@@ -163,6 +163,7 @@ static void input_submit(void)
 }
 static void keyboard_event(lv_event_t *event)
 {
+    (void)event;
     const char *key = lv_btnmatrix_get_btn_text(keyboard, lv_btnmatrix_get_selected_btn(keyboard));
     if (!key) return;
     if (!strcmp(key, "ABC")) key_mode = 1;
@@ -180,11 +181,11 @@ static void input_page(int pair)
     page_header(pair ? "配对码" : "Wi-Fi密码", pair ? to_list : details);
     label(menu_content(), devices[selected].name, 28, 164, 424, 0x172329);
     entry = lv_textarea_create(menu_content()); lv_obj_set_pos(entry, 24, 252); lv_obj_set_size(entry, 432, 72);
-    lv_textarea_set_one_line(entry, TRUE); lv_textarea_set_max_length(entry, pair ? 16 : 64);
+    lv_textarea_set_one_line(entry, true); lv_textarea_set_max_length(entry, pair ? 16 : 64);
     lv_textarea_set_password_mode(entry, !pair);
     lv_obj_set_style_text_font(entry, &lv_font_montserrat_24, 0);
     keyboard = lv_btnmatrix_create(menu_content()); lv_obj_set_pos(keyboard, 12, 388); lv_obj_set_size(keyboard, 456, 380);
-    lv_btnmatrix_set_map(keyboard, letters); lv_btnmatrix_set_one_checked(keyboard, FALSE);
+    lv_btnmatrix_set_map(keyboard, letters); lv_btnmatrix_set_one_checked(keyboard, false);
     lv_obj_set_style_text_font(keyboard, &lv_font_montserrat_24, LV_PART_ITEMS);
     lv_obj_set_style_pad_all(keyboard, 4, 0); lv_obj_set_style_pad_row(keyboard, 8, 0); lv_obj_set_style_pad_column(keyboard, 4, 0);
     lv_obj_set_style_bg_color(keyboard, lv_color_hex(0xFFFFFF), LV_PART_ITEMS);
