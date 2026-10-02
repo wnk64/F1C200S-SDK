@@ -17,7 +17,7 @@ extern "C" {
 #include <map>
 #include <mutex>
 #include <string>
-#include <string_view>
+#include "../../board_linux/compat_cpp17.h"
 #include <thread>
 #include <vector>
 
@@ -495,11 +495,11 @@ void load_lvgl_config() {
         setting_limited_fps = 0;
     setting_tv_osd = read_bool_setting(source, "PLAYER_OSD_TV_MODE", setting_tv_osd);
     setting_danmaku_on = read_bool_setting(source, "DANMAKU_ON", setting_danmaku_on);
-    setting_danmaku_speed = std::clamp(read_int_setting(source, "DANMAKU_STYLE_SPEED", setting_danmaku_speed), 50, 200);
+    setting_danmaku_speed = wiliwili::clamp(read_int_setting(source, "DANMAKU_STYLE_SPEED", setting_danmaku_speed), 50, 200);
     setting_danmaku_area = read_int_setting(source, "DANMAKU_STYLE_AREA", setting_danmaku_area);
     if (setting_danmaku_area != 25 && setting_danmaku_area != 50 && setting_danmaku_area != 75 && setting_danmaku_area != 100)
         setting_danmaku_area = 100;
-    setting_danmaku_alpha = std::clamp(read_int_setting(source, "DANMAKU_STYLE_ALPHA", setting_danmaku_alpha), 10, 100);
+    setting_danmaku_alpha = wiliwili::clamp(read_int_setting(source, "DANMAKU_STYLE_ALPHA", setting_danmaku_alpha), 10, 100);
     setting_tls_verify = read_bool_setting(source, "TLS_VERIFY", setting_tls_verify);
     setting_http_proxy_enabled = read_bool_setting(source, "HTTP_PROXY_STATUS", setting_http_proxy_enabled);
     setting_http_proxy = read_string_setting(source, "HTTP_PROXY", setting_http_proxy);
@@ -526,8 +526,8 @@ void load_lvgl_config() {
         setting_http_timeout_seconds = 15;
     if (setting_http_connect_timeout_seconds != 5 && setting_http_connect_timeout_seconds != 10 && setting_http_connect_timeout_seconds != 15 && setting_http_connect_timeout_seconds != 30)
         setting_http_connect_timeout_seconds = 10;
-    setting_volume = std::clamp(read_int_setting(source, "PLAYER_VOLUME", setting_volume), 0, 100);
-    setting_playback_speed = std::clamp(read_int_setting(source, "PLAYER_DEFAULT_SPEED", setting_playback_speed), 50, 200);
+    setting_volume = wiliwili::clamp(read_int_setting(source, "PLAYER_VOLUME", setting_volume), 0, 100);
+    setting_playback_speed = wiliwili::clamp(read_int_setting(source, "PLAYER_DEFAULT_SPEED", setting_playback_speed), 50, 200);
     setting_player_strategy = read_int_setting(source, "PLAYER_STRATEGY", setting_player_strategy);
     if (setting_player_strategy < 0 || setting_player_strategy > 3) setting_player_strategy = 0;
     setting_aspect = read_string_setting(source, "PLAYER_ASPECT", setting_aspect);
@@ -1572,7 +1572,7 @@ void limit_dynamic_label(std::string& text, size_t max_bytes) {
     text.resize(cursor);
 }
 
-std::string_view dynamic_member(std::string_view object, std::string_view key) {
+wiliwili::string_view dynamic_member(wiliwili::string_view object, wiliwili::string_view key) {
     if (object.empty() || object.front() != '{') return {};
     size_t cursor = 1;
     const auto skip_space = [&object, &cursor] {
@@ -1588,7 +1588,7 @@ std::string_view dynamic_member(std::string_view object, std::string_view key) {
             ++cursor;
         }
         if (cursor >= object.size()) return {};
-        const std::string_view name = object.substr(name_start, cursor++ - name_start);
+        const wiliwili::string_view name = object.substr(name_start, cursor++ - name_start);
         skip_space();
         if (cursor >= object.size() || object[cursor++] != ':') return {};
         skip_space();
@@ -1627,7 +1627,7 @@ std::string_view dynamic_member(std::string_view object, std::string_view key) {
     return {};
 }
 
-std::string_view dynamic_module(std::string_view modules, std::string_view key) {
+wiliwili::string_view dynamic_module(wiliwili::string_view modules, wiliwili::string_view key) {
     if (modules.empty()) return {};
     if (modules.front() == '{') return dynamic_member(modules, key);
     if (modules.front() != '[') return {};
@@ -1651,14 +1651,14 @@ std::string_view dynamic_module(std::string_view modules, std::string_view key) 
             else if (character == '}' && --depth == 0) { ++cursor; break; }
         }
         if (depth != 0) break;
-        const std::string_view value = dynamic_member(modules.substr(start, cursor - start), key);
+        const wiliwili::string_view value = dynamic_member(modules.substr(start, cursor - start), key);
         if (!value.empty()) return value;
     }
     return {};
 }
 
-std::string dynamic_text(std::string_view object, std::string_view key, size_t max_bytes) {
-    const std::string_view value = dynamic_member(object, key);
+std::string dynamic_text(wiliwili::string_view object, wiliwili::string_view key, size_t max_bytes) {
+    const wiliwili::string_view value = dynamic_member(object, key);
     if (value.size() < 2 || value.front() != '"' || value.back() != '"') return {};
     std::string text = decode_json_string(std::string(value.substr(1, std::min(value.size() - 2, size_t{1024}))));
     limit_dynamic_label(text, max_bytes);
@@ -1702,27 +1702,27 @@ std::vector<DynamicItem> parse_dynamic_items(const std::string& body) {
             else if (character == '}' && --depth == 0) { ++cursor; break; }
         }
         if (depth != 0) break;
-        const std::string_view object(body.data() + start, cursor - start);
+        const wiliwili::string_view object(body.data() + start, cursor - start);
         DynamicItem item;
         item.id = dynamic_text(object, "id_str", 32);
         if (item.id.empty()) item.id = dynamic_text(object, "dynamic_id", 32);
         if (item.id.empty()) {
-            const std::string_view numeric_id = dynamic_member(object, "id");
+            const wiliwili::string_view numeric_id = dynamic_member(object, "id");
             if (numeric_id.size() <= 32) item.id = numeric_id;
         }
-        const std::string_view modules = dynamic_member(object, "modules");
-        const std::string_view dynamic = dynamic_module(modules, "module_dynamic");
-        const std::string_view legacy_description = dynamic_module(modules, "module_desc");
-        const std::string_view major = dynamic_member(dynamic, "major");
-        const std::string_view archive = dynamic_member(major, "archive");
-        const std::string_view legacy_archive = dynamic_member(dynamic, "dyn_archive");
-        const std::string_view opus = dynamic_member(major, "opus");
-        const std::string_view pgc = dynamic_member(major, "pgc");
-        const std::string_view live = dynamic_member(major, "live_rcmd");
-        const std::string_view legacy_live = dynamic_member(dynamic_member(dynamic, "dyn_live_rcmd"), "card_info");
-        const std::string_view legacy_live_info = dynamic_member(legacy_live, "live_play_info");
-        const std::string_view description = dynamic_member(dynamic, "desc");
-        const std::string_view opus_summary = dynamic_member(opus, "summary");
+        const wiliwili::string_view modules = dynamic_member(object, "modules");
+        const wiliwili::string_view dynamic = dynamic_module(modules, "module_dynamic");
+        const wiliwili::string_view legacy_description = dynamic_module(modules, "module_desc");
+        const wiliwili::string_view major = dynamic_member(dynamic, "major");
+        const wiliwili::string_view archive = dynamic_member(major, "archive");
+        const wiliwili::string_view legacy_archive = dynamic_member(dynamic, "dyn_archive");
+        const wiliwili::string_view opus = dynamic_member(major, "opus");
+        const wiliwili::string_view pgc = dynamic_member(major, "pgc");
+        const wiliwili::string_view live = dynamic_member(major, "live_rcmd");
+        const wiliwili::string_view legacy_live = dynamic_member(dynamic_member(dynamic, "dyn_live_rcmd"), "card_info");
+        const wiliwili::string_view legacy_live_info = dynamic_member(legacy_live, "live_play_info");
+        const wiliwili::string_view description = dynamic_member(dynamic, "desc");
+        const wiliwili::string_view opus_summary = dynamic_member(opus, "summary");
         item.bvid = dynamic_text(archive, "bvid", 24);
         if (item.bvid.empty()) item.bvid = dynamic_text(legacy_archive, "bvid", 24);
         if (item.bvid.empty()) item.bvid = dynamic_text(object, "bvid", 24);
@@ -1743,19 +1743,19 @@ std::vector<DynamicItem> parse_dynamic_items(const std::string& body) {
         if (item.summary.empty()) item.summary = dynamic_text(opus_summary, "text", 120);
         if (item.summary.empty()) item.summary = dynamic_text(opus, "summary", 120);
         if (item.title.empty()) {
-            std::string_view original_modules = dynamic_member(dynamic_member(object, "orig"), "modules");
+            wiliwili::string_view original_modules = dynamic_member(dynamic_member(object, "orig"), "modules");
             if (original_modules.empty()) {
-                const std::string_view forwarded = dynamic_member(dynamic_member(dynamic, "dyn_forward"), "item");
+                const wiliwili::string_view forwarded = dynamic_member(dynamic_member(dynamic, "dyn_forward"), "item");
                 original_modules = dynamic_member(forwarded, "modules");
             }
-            const std::string_view original_dynamic = dynamic_module(original_modules, "module_dynamic");
-            const std::string_view original_major = dynamic_member(original_dynamic, "major");
-            std::string_view original_archive = dynamic_member(original_major, "archive");
+            const wiliwili::string_view original_dynamic = dynamic_module(original_modules, "module_dynamic");
+            const wiliwili::string_view original_major = dynamic_member(original_dynamic, "major");
+            wiliwili::string_view original_archive = dynamic_member(original_major, "archive");
             if (original_archive.empty()) original_archive = dynamic_member(original_dynamic, "dyn_archive");
-            const std::string_view original_opus = dynamic_member(original_major, "opus");
-            const std::string_view original_summary = dynamic_member(original_opus, "summary");
-            const std::string_view original_description = dynamic_member(original_dynamic, "desc");
-            const std::string_view original_legacy_description = dynamic_module(original_modules, "module_desc");
+            const wiliwili::string_view original_opus = dynamic_member(original_major, "opus");
+            const wiliwili::string_view original_summary = dynamic_member(original_opus, "summary");
+            const wiliwili::string_view original_description = dynamic_member(original_dynamic, "desc");
+            const wiliwili::string_view original_legacy_description = dynamic_module(original_modules, "module_desc");
             item.title = dynamic_text(original_archive, "title", 192);
             if (item.title.empty()) item.title = dynamic_text(original_opus, "title", 192);
             if (item.title.empty()) item.title = dynamic_text(original_description, "text", 192);
@@ -6497,6 +6497,11 @@ int main(int argc, char** argv) {
         feed_mode = FeedMode::Search;
         search_term = argv[2];
     }
+#ifdef WILIWILI_BOARD
+    board_preview = true;
+    window_width = kBoardWidth;
+    window_height = kBoardHeight;
+#endif
     load_lvgl_config();
     platform_set_http_proxy(setting_http_proxy, setting_http_proxy_enabled);
     platform_set_tls_verify(setting_tls_verify);
@@ -6612,7 +6617,7 @@ int main(int argc, char** argv) {
                 pointer_data.point.y = event.y;
                 lv_obj_update_layout(lv_scr_act());
                 lv_obj_t* target = scroll_target_at(lv_scr_act(), pointer_data.point, event.wheel_y);
-                if (target) lv_obj_scroll_by_bounded(target, 0, std::clamp(event.wheel_y, -20, 20) * 32, LV_ANIM_OFF);
+                if (target) lv_obj_scroll_by_bounded(target, 0, wiliwili::clamp(event.wheel_y, -20, 20) * 32, LV_ANIM_OFF);
             }
         }
         const uint32_t now = platform_ticks();
@@ -6951,7 +6956,7 @@ int main(int argc, char** argv) {
         }
         const uint32_t frame_delay = setting_limited_fps > 0
             ? std::max<uint32_t>(1, 1000U / static_cast<uint32_t>(setting_limited_fps))
-            : std::clamp<uint32_t>(next_timer, 5U, 20U);
+            : wiliwili::clamp<uint32_t>(next_timer, 5U, 20U);
         platform_delay(frame_delay);
     }
     platform_stop_text_input();
