@@ -1,6 +1,11 @@
 # Worktree Change Log
 
 ## 2026-10-02 planned / measured portrait touch orientation
+Sourcef44b988, measured4points/native4corners test pass. Boardmodulea7922bd1
+and UI47b2884f buildsuccess, boardvermagic5.7.1. Fix Makefiledefault goal
+after explicit object prerequisite insertion; no program behavior change.
+Deploy versionedportrait files, stop ownGUI and unregisteroldboard, then
+loadnewboard/reopen GUI. Retain old files as rollback, no new backup tree.
 User01raw171,402/02raw198,90/03raw721,368/04raw707,62.
 Map screenX=479-rawY, screenY=rawX; controllernative800x480 vs panel480x800.
 Upstream applies inversionbefore swap: properties800/480,inverted-y,swappedxy.
