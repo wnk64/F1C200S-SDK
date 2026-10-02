@@ -3,16 +3,21 @@ CC := $(SDK)/bin/arm-buildroot-linux-gnueabi-gcc
 CXX := $(SDK)/bin/arm-buildroot-linux-gnueabi-g++
 STRIP := $(SDK)/bin/arm-buildroot-linux-gnueabi-strip
 LV := ../third_party/lvgl
-CPPFLAGS := -DWILIWILI_BOARD -DLV_CONF_INCLUDE_SIMPLE -I.. -I$(LV) -I$(LV)/src -I../windows_lvgl/src -I../../menu -Ivendor/curl-8.16.0/include
+CPPFLAGS := -DWILIWILI_BOARD -DLV_CONF_INCLUDE_SIMPLE -I.. -I../third_party -I$(LV) -I$(LV)/src -I../windows_lvgl/src -I../../menu -Ivendor/curl-8.16.0/include
 CFLAGS := -Os -std=gnu99 -ffunction-sections -fdata-sections -MMD -MP
 CXXFLAGS := -Os -std=c++1z -ffunction-sections -fdata-sections -MMD -MP -pthread
 LVOBJ := $(patsubst $(LV)/%.c,build-arm/lvgl/%.o,$(shell find $(LV)/src -name '*.c'))
 OBJ := build-arm/main.o build-arm/platform_linux.o build-arm/jpeg_thumbnail.o build-arm/menu_font_stream.o $(LVOBJ)
 .DEFAULT_GOAL := all
-all: build-arm/wiliwili-lvgl
+all: build-arm/wiliwili-lvgl build-arm/platform-probe
 build-arm/wiliwili-lvgl: $(OBJ) build-curl/lib/.libs/libcurl.a
 	$(CXX) -Wl,--gc-sections -o $@ $^ -lssl -lcrypto -ljpeg -pthread -lm
 build-arm/main.o: ../windows_lvgl/src/main.cpp compat_cpp17.h
+	@mkdir -p $(@D)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
+build-arm/platform-probe: build-arm/platform_probe.o build-arm/platform_linux.o build-arm/jpeg_thumbnail.o build-arm/menu_font_stream.o $(LVOBJ) build-curl/lib/.libs/libcurl.a
+	$(CXX) -Wl,--gc-sections -o $@ $^ -lssl -lcrypto -ljpeg -pthread -lm
+build-arm/platform_probe.o: platform_probe.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 build-arm/platform_linux.o: platform_linux.cpp geometry.h
