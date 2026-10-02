@@ -5689,7 +5689,7 @@ void show_board_section(MainSection section) {
         lock_static_canvas(user);
         set_label(user, "@", 24, ui_color(0xdce8f3), LV_ALIGN_LEFT_MID, 22, 0);
         set_label(user, account_name.empty() ? "Click to sign in" : account_name.c_str(), 17, ui_color(0xf3f5f8), LV_ALIGN_LEFT_MID, 64, -12);
-        set_label(user, account_name.empty() ? "Import a Cookie session to sign in" : "Cookie session is active", 13, ui_color(0xaeb8c6),
+        set_label(user, account_name.empty() ? "Not signed in" : "Signed in", 13, ui_color(0xaeb8c6),
                   LV_ALIGN_LEFT_MID, 64, 14);
         if (account_name.empty()) {
             lv_obj_t* login = lv_btn_create(user);
