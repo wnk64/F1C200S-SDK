@@ -1,5 +1,17 @@
 # Worktree Change Log
 
+## 2026-10-02 pending / real read-only Wi-Fi and Bluetooth scans passed
+Menu74a63311/helper329d1af8 sourcea81abe6; helper tested onboard5.7.1.
+Wifi-list correctly current/savedwnk641_2.4G; wifi-scan12networks including
+ChineseSSID. BTlist pairedWt-070; 8secBTscan3devices inclWNK, no pairing or
+network disconnect, SSH intact. All DONE/exit0 and workers terminated.
+UnknownChinese device names need glyphs beyond95UISubset: add openTakao
+fixed528byte CJKrecords on ext4, 16glyphcache (~8.5KiB), pread onlyusedglyphs,
+no fullfontload/mmap/fontengine. Preserve sourcefont+license+generation tool,
+fallback afterUI subset beforeASCII. Add actionallowlist; build/deploy GUI
+isolated after privatepage/keyboard smoke. Originalmenu61dfd292 retained.
+
+
 ## 2026-10-02 pending / network UI and helper build
 Sourcef3f5bc8/402537a; hostnetprotocol ASan/UBSan assertions passed and temp
 testbinary removed. Firstcompile TRUE/FALSE fixed to C99bool; oldGUI unchanged.

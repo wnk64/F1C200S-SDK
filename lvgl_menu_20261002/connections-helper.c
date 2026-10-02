@@ -368,6 +368,12 @@ static int bt_action(const char *action, const char *mac)
 int main(int argc, char **argv)
 {
     if (argc < 2) return 1;
+    int valid = !strcmp(argv[1], "wifi-list") || !strcmp(argv[1], "wifi-scan") ||
+        !strcmp(argv[1], "wifi-connect") || !strcmp(argv[1], "wifi-disconnect") ||
+        !strcmp(argv[1], "wifi-forget") || !strcmp(argv[1], "bt-list") ||
+        !strcmp(argv[1], "bt-scan") || !strcmp(argv[1], "bt-connect") ||
+        !strcmp(argv[1], "bt-disconnect") || !strcmp(argv[1], "bt-forget");
+    if (!valid) return error("invalid-action");
     signal(SIGTERM, on_signal); signal(SIGINT, on_signal); signal(SIGPIPE, SIG_IGN);
     setvbuf(stdout, NULL, _IOLBF, 0);
     int result = 1;

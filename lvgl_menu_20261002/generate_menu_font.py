@@ -62,7 +62,7 @@ finally:
     gdi.DeleteObject(font)
     gdi.DeleteDC(dc)
 
-source = '#include "lvgl/lvgl.h"\n/* Generated 28px/4bpp UI-only glyph subset; do not edit. */\n'
+source = '#include "lvgl/lvgl.h"\nLV_FONT_DECLARE(menu_font_stream);\n/* Generated 28px/4bpp UI-only glyph subset; do not edit. */\n'
 source += 'static const uint8_t bitmap[] = {\n' + ',\n'.join(
     ','.join('0x%02x' % b for b in bitmap[i:i+24]) for i in range(0, len(bitmap), 24)) + '\n};\n'
 source += 'static const lv_font_fmt_txt_glyph_dsc_t glyphs[] = {\n' + ',\n'.join(descriptors) + '\n};\n'
@@ -79,7 +79,7 @@ const lv_font_t menu_font_28 = {
  .get_glyph_dsc = lv_font_get_glyph_dsc_fmt_txt,
  .get_glyph_bitmap = lv_font_get_bitmap_fmt_txt,
  .line_height = 36, .base_line = 8, .dsc = &descriptor,
- .fallback = &lv_font_montserrat_24
+ .fallback = &menu_font_stream
 };
 ''' % (codes[0], codes[-1]-codes[0]+1, len(codes))
 target = Path(__file__).with_name('menu_font_28.c')

@@ -1,4 +1,5 @@
 #include "lvgl/lvgl.h"
+LV_FONT_DECLARE(menu_font_stream);
 /* Generated 28px/4bpp UI-only glyph subset; do not edit. */
 static const uint8_t bitmap[] = {
 0x00,0x4a,0xdf,0xfd,0xa3,0x00,0x00,0xaf,0xff,0xff,0xff,0xf8,0x00,0x0f,0xe8,0x44,0x5b,0xff,0xf5,0x00,0xb1,0x00,0x00,0x09,
@@ -1423,5 +1424,5 @@ const lv_font_t menu_font_28 = {
  .get_glyph_dsc = lv_font_get_glyph_dsc_fmt_txt,
  .get_glyph_bitmap = lv_font_get_bitmap_fmt_txt,
  .line_height = 36, .base_line = 8, .dsc = &descriptor,
- .fallback = &lv_font_montserrat_24
+ .fallback = &menu_font_stream
 };

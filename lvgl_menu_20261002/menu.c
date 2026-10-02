@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 LV_FONT_DECLARE(menu_font_28);
+void menu_font_stream_close(void);
 enum { MAX_APPS = 12, PER_PAGE = 3 };
 struct app { char id[32], title[80], subtitle[128], icon[16], command[256]; };
 static struct app apps[MAX_APPS];
@@ -247,5 +248,5 @@ int main(int argc, char **argv)
         label(content, apps[exit_code - 20].title, 64, 330, 352, 0x167A6F);
         lv_refr_now(NULL);
     }
-    platform_close(); return exit_code;
+    menu_font_stream_close(); platform_close(); return exit_code;
 }
