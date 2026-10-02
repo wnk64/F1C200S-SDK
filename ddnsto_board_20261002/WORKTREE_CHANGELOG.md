@@ -1,5 +1,18 @@
 # Worktree Change Log
 
+## 2026-10-02 rejected / three official ARM variants SIGILL, no enrollment
+Sourceplanned34883dd/903e85f. Actuallite4.2.2, officiallegacyarm2023 and
+ddnstox.arm20260227 --help all returned132/SIGILL with boundedresources.
+No credentials/cloudregistration/bootservice, no residentmemory result;
+exactillegalinstruction unproven duepackedproprietarybinary. Zig4.2.1 arm32
+ELFonly observed onhost, not claimed tested. Officialinstaller x64/aa64only.
+Reject boarddirectdeployment for these binaries. Remove three ownboardfiles
+and emptycandidate directory; hostdownload evidence retained. Router/VMtmp
+audit payloads/wrappers cleaned. Currentcast23857 retained/no kernelchanges.
+Nextneedsvendor ARMv5TEsoftfloat build; no external vendorcontact in thisturn.
+ExistingrouterDDNSTOcloudSSH/SCP intact; no claim boardcanroamindependently.
+
+
 ## 2026-10-02 rejected / lite4.2.2 initial execution SIGILL
 Firstguard BusyBoxtimeout absent, candidate not executed(rc127); replaced
 temporarywatchdog with exact /proc/exe check, no boardtoolinstall. Actual
