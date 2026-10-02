@@ -1,5 +1,20 @@
 # Worktree Change Log
 
+## 2026-10-02 pending / cloud native SSH and two binary SCP roundtrips
+Sourcecfe6c4c; persistentrouterprocd13903 running/enabled, relayRSS2080KiB,
+cloudunauth401/LuCI200. No routerreboot or alternate-WiFi acceptance.
+WindowsStartProcess PS policy denied and PATH/Path duplicate; no policy/env
+changes made. Dedicated Pythonstart_client.py spawns hidden verifiedclient
+PID9324, samePythonTLSvalidatedWSS/domain. Onlyloopback2222 active, LAN2223 stopped.
+Post-persist cloudSSH5.7.1/boot9868a347 matches pinnedboardkey, second256KiB
+SCPbothdirections exactSHA2562312394b...3a415e9 passed; boardpayload deleted.
+Remove unusedPSlauncher rather than changeExecutionPolicy. README has native
+ssh/scp-O/PuTTY usage, routerservice/rollback, permanenthostinstall stillblocked.
+Routertmp downloads/wrappers removed; Windows_tmp_websocat retained intentionally
+for current activeverification proxy until Dtool installallowed. No boardchanges.
+Temp testpayloads/localcommandwrappers removed, no secrets committed.
+
+
 Worktree: /home/wnk/tk032f8004-panel
 Component: router DDNSTO SSH relay, separate from board applications
 Base: 46712d5; board kernel/player/source archives retained
