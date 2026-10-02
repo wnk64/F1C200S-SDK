@@ -30,7 +30,10 @@ zImage 和 U-Boot 产物 SHA256 验证通过。没有新建 git worktree。
 Buildroot 完整目录约 6.9 GiB；Makefile、Config.in、package、board、.config、dl、
 output/host、output/build、output/target 均存在，没有按白名单裁剪。
 `.config` SHA256：`9b7f12245973997e63e4d18f2582e81de6291de771c03864c04a106ebe8c0455`。
-属于共享仓库的 Buildroot/U-Boot 保留原相对路径，分类入口使用链接，避免破坏 Git。
+最新修正：用户明确要求实体移动，不要映射。Buildroot 已从共享仓库实体搬出到
+`ROOTFS/buildroot-2018.02.11`，该入口是真实目录，旧位置不存在且未建立链接。
+源码就地保存提交 `91ff912`，全部320977条原文件元数据及目录inode核验一致。
+原共享仓库的历史保留；搬出后的删除状态不代表源码丢失。U-Boot等尚未按此修正实体搬出。
 
 Windows wiliwili LVGL 源码完整迁入 LVGL/wiliwili_lvgl，排除 Windows 构建目录，
 保留原 Git 历史和最新未提交代码，保存提交 `39695b1`。
@@ -47,7 +50,7 @@ running-rootfs.tar.gz 已删除，原板端数据保留。临时传输包和命�
 | 分类 | 入口 | 说明 |
 | --- | --- | --- |
 | KERNEL | linux-5.7.1 | 原内核完整仓库及现有增量构建产物 |
-| ROOTFS | buildroot-2018.02.11 | 完整 Buildroot；链接到 LicheePi_Nano 内的原目录 |
+| ROOTFS | buildroot-2018.02.11 | 实际完整 Buildroot 目录，不是链接，含 dl/output |
 | ROOTFS | LicheePi_Nano | 共享原仓库，历史资料及相对结构不拆散 |
 | UBOOT | u-boot | 原 U-Boot 仓库入口；保留共享仓库已跟踪文件 |
 | SCRCPT | cast-and-menu-source | 当前 CMA/菜单/投屏脚本源码 |
