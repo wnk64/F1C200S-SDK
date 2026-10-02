@@ -3,7 +3,7 @@ import ctypes as c
 from ctypes import wintypes as w
 from pathlib import Path
 
-TEXT = "应用无线投屏手机画面与声音触摸测试系统设置显示亮度返回上一页下一页启动失败请检查日志网络已连接未连接内存可用重试退出"
+TEXT = "应用无线投屏手机画面与声音触摸测试系统设置显示亮度返回上一页下一页启动失败请检查日志网络已连接未连接内存可用重试退出蓝牙选择设备暂无设备扫描已配对未配对已保存忘记此设备确认取消断开连接加密开放网络密码配对码正在扫描正在处理正在连接请稍候操作失败扫描失败不支持此认证密码需为8至63位"
 
 class Point(c.Structure):
     _fields_ = [("x", w.LONG), ("y", w.LONG)]

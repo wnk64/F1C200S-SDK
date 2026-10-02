@@ -1,5 +1,22 @@
 # Worktree Change Log
 
+## 2026-10-02 planned / on-screen BS Wi-Fi and BlueZ device management
+Base3ac7d66/menu61dfd292 retained. Original repo candidatebranch, no newtree
+or kernel/DTB/driver/LVGLlibrary changes. Settings adds largeWiFi/BT entries,
+pageddevices/connect/disconnect/forgetconfirmation/maskedkeyboard/PIN/confirm.
+Shortlived forkexec/pipe worker; WPA AF_UNIX onlyBSrtlwlan0, safeSSIDhex/PSK,
+existing SAVE_CONFIG/update_config1 and guardedBS DHCP renew. Failednewjoin
+restoresoldselection. Open/WPAPSK only; WEP/EAP/SAE-only rejected. No keylogs.
+BlueZ DBus objects/discovery/Agent1/Pair/trust/connect/disconnect/RemoveDevice;
+authorize selecteddevice only, user confirmscodes. ExistingA2DP routing intact.
+Private lv_conf btnmatrix/textarea, sameLVGL src in privateobjectdir; oldtest
+objects untouched. Chinese95glyph/31417bitmapbytes. Hostprotocolsanitizer,
+ARMcompile, realreadonlyscans, mockpage/keyboard smoke/screenshots planned.
+Never disconnect/forget SSH network or pair realdevices automatically.
+Deploy isolatedruntime; rollback existing61dfd292 menu/supervisor. Actual
+physicalconnect/audio/casting and threecold0/3 pending; no bootautoload.
+
+
 ## 2026-10-02 pending / headphone startup path verified and menu restored
 Sourcee6a4787, launcher6be8390d03a110d65a290133ad61821d,
 wrapper408bfac290de785a3458c56106457f08; sh-n and artifactpreflight passed.

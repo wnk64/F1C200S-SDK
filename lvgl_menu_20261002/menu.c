@@ -1,5 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "platform.h"
+#include "ui.h"
+#include "connections.h"
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,8 +18,9 @@ static volatile sig_atomic_t quit;
 static int exit_code, view;
 static lv_obj_t *content, *status_label, *touch_label, *marker, *brightness_label;
 static const char *config_path;
+static void (*back_action)(void);
 static void signal_stop(int n) { (void)n; quit = 1; }
-static lv_obj_t *label(lv_obj_t *parent, const char *text, int px, int py, int width, uint32_t color)
+lv_obj_t *label(lv_obj_t *parent, const char *text, int px, int py, int width, uint32_t color)
 {
     lv_obj_t *o = lv_label_create(parent);
     lv_obj_set_width(o, width); lv_label_set_long_mode(o, LV_LABEL_LONG_WRAP);
@@ -26,7 +29,7 @@ static lv_obj_t *label(lv_obj_t *parent, const char *text, int px, int py, int w
     lv_label_set_text(o, text); lv_obj_set_pos(o, px, py);
     return o;
 }
-static lv_obj_t *button(lv_obj_t *parent, int x, int y, int width, int height, uint32_t color)
+lv_obj_t *button(lv_obj_t *parent, int x, int y, int width, int height, uint32_t color)
 {
     lv_obj_t *b = lv_btn_create(parent); lv_obj_remove_style_all(b);
     lv_obj_set_pos(b, x, y); lv_obj_set_size(b, width, height);
@@ -41,9 +44,14 @@ static lv_obj_t *button(lv_obj_t *parent, int x, int y, int width, int height, u
 static void home(void);
 static void settings(void);
 static void touch_test(void);
-static void back(lv_event_t *e) { (void)e; home(); }
-static void header(const char *title, int can_back)
+static void back(lv_event_t *e) { (void)e; if (back_action) back_action(); }
+lv_obj_t *menu_content(void) { return content; }
+lv_obj_t *menu_status(void) { return status_label; }
+void menu_back_to(void (*callback)(void)) { back_action = callback; view = 3; }
+void menu_settings(void) { settings(); }
+void header(const char *title, int can_back)
 {
+    back_action = home;
     view = 0; touch_label = marker = brightness_label = NULL;
     lv_obj_clean(content);
     label(content, title, can_back ? 104 : 28, 34, can_back ? 320 : 424, 0x172329);
@@ -110,6 +118,10 @@ static void brightness(lv_event_t *e)
     if (current < 0 || next < 1 || next > 8) return;
     if (platform_brightness(next) >= 0) lv_label_set_text_fmt(brightness_label, "%d / 8", next);
 }
+static void network_open(lv_event_t *e)
+{
+    connections_show((int)(intptr_t)lv_event_get_user_data(e));
+}
 static void settings(void)
 {
     header("系统设置", 1); view = 1;
@@ -123,7 +135,14 @@ static void settings(void)
         lv_obj_center(s); lv_obj_set_style_text_align(s, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_add_event_cb(b, brightness, LV_EVENT_CLICKED, (void *)(intptr_t)(side ? 1 : -1));
     }
-    label(content, "LVGL 8.2.0\n480 x 800 / 60 Hz", 28, 448, 424, 0x66757E);
+    for (int kind = 0; kind < 2; kind++) {
+        lv_obj_t *b = button(content, 24, 410 + kind * 144, 432, 116, 0xFFFFFF);
+        label(b, kind ? LV_SYMBOL_BLUETOOTH : LV_SYMBOL_WIFI, 28, 40, 64, 0x167A6F);
+        label(b, kind ? "蓝牙" : "Wi-Fi", 112, 40, 272, 0x172329);
+        lv_obj_add_event_cb(b, network_open, LV_EVENT_CLICKED, (void *)(intptr_t)kind);
+    }
+    lv_obj_t *version = label(content, "LVGL 8.2.0 / 480 x 800", 28, 736, 424, 0x66757E);
+    lv_obj_set_style_text_font(version, &lv_font_montserrat_16, 0);
 }
 static void test_hit(lv_event_t *e)
 {
@@ -179,8 +198,10 @@ int main(int argc, char **argv)
     if (read_apps()) { fprintf(stderr, "menu: invalid apps config\n"); return 1; }
     if (argc > 2 && !strcmp(argv[2], "--validate")) return 0;
     int smoke = argc > 2 && !strcmp(argv[2], "--smoke");
+    int net_smoke = argc > 2 && !strcmp(argv[2], "--network-smoke");
     if (platform_open()) { platform_close(); return 2; }
     signal(SIGTERM, signal_stop); signal(SIGINT, signal_stop);
+    signal(SIGPIPE, SIG_IGN);
     content = lv_scr_act(); lv_obj_set_style_bg_color(content, lv_color_hex(0xF1F4F6), 0);
     lv_obj_set_style_bg_opa(content, LV_OPA_COVER, 0);
     lv_obj_clear_flag(content, LV_OBJ_FLAG_SCROLLABLE);
@@ -190,11 +211,12 @@ int main(int argc, char **argv)
     while (!quit) {
         uint64_t now = platform_ms(); lv_tick_inc((uint32_t)(now - previous)); previous = now;
         uint32_t idle_ms = lv_timer_handler();
+        connections_poll();
         if (idle_ms < 1) idle_ms = 1;
         if (idle_ms > 16) idle_ms = 16;
         if (now - update >= 250) {
             update = now;
-            lv_label_set_text(status_label, access("/sys/class/net/rtlwlan0", F_OK) ? "Wi-Fi --" : "Wi-Fi  /  F1C200S");
+            if (view < 3) lv_label_set_text(status_label, access("/sys/class/net/rtlwlan0", F_OK) ? "Wi-Fi --" : "Wi-Fi  /  F1C200S");
             if (view == 2) {
                 int x, y, down; platform_touch(&x, &y, &down);
                 lv_label_set_text_fmt(touch_label, "X %03d   Y %03d", x, y);
@@ -209,9 +231,17 @@ int main(int argc, char **argv)
             else quit = 1;
             smoke_stage++;
         }
+        if (net_smoke && now - start > (uint64_t)(smoke_stage + 1) * 1500) {
+            if (smoke_stage == 0) settings();
+            else if (smoke_stage < 7) connections_smoke(smoke_stage - 1);
+            else if (smoke_stage == 7) home();
+            else quit = 1;
+            smoke_stage++;
+        }
         struct timespec delay = {0, (long)idle_ms * 1000000}; nanosleep(&delay, NULL);
     }
     fprintf(stderr, "menu: exit=%d heap=%u\n", exit_code, (unsigned)LV_MEM_SIZE);
+    connections_close();
     if (exit_code >= 20 && exit_code < 20 + (int)count) {
         lv_obj_clean(content);
         label(content, apps[exit_code - 20].title, 64, 330, 352, 0x167A6F);
