@@ -29,3 +29,13 @@ Toolchain: relocated existing Buildroot GCC6.4 and matching sysroot, no SDK repl
 Rollback: stop isolated new candidate; existing board menu/player remain unchanged.
 Tests: coordinate/bounds/color compatibility; ARM link; isolated finite-time display after authorized cast exit.
 Acceptance: pending; cold boot cycles 0/3. No video-playback acceptance implied.
+
+## 2026-10-02 图片逐张显示与动态刷新候选（计划）
+
+基线：原工作树 candidate/f1c200s-fbdev-20261002，67ac5cb；完整源码和 build-arm 产物均在原目录。仅修改 wiliwili 应用，不修改内核、驱动、投屏及菜单服务。
+
+假设：封面整批发布造成等待；动态重进未清空旧数据和分页偏移，视频序号复用造成旧封面串用。崩溃尚无退出码证据，不能归因于 OOM。
+
+计划：有界单槽封面完成队列，主线程逐张解码和更新现存图片控件；请求代次和视频标识双校验；删除控件时解除注册；切换动态详情前释放旧图片；动态重新进入重置分页并刷新；启动器记录真实退出码。
+
+构建：board_linux/make -j2，原 Buildroot GCC6 工具链，tmux 持久会话。先提交再部署应用候选；保留 Git 历史及基线产物。三次冷启动验收未完成，不推送稳定归档。
