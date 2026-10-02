@@ -1,5 +1,23 @@
 # Worktree Change Log
 
+## 2026-10-02 planned / reclaim idle file-cache before contiguous arena
+Baseline originalmenu defaultaudio launcher6be8390d/wrapper408bfac2/player
+a683cf70/sink338c87bf; running9772/10037, boot9868a347/#250/CMA20/DTB7018246d.
+9MiB reservation failed EBUSY at5625s, bitmap4282/5120 free (16.727MiB),
+7 candidatePFN rangesbusy; sameboot earlier two9MiB allocations succeeded
+and released. Kernelmigration/compaction enabled; currentbusyarea has LRU
+file/anon mappedpages, failure-time owners unproven. No kernelchange needed
+for firsttest: after GUI and oldstream process exit, sync/drop_caches=1 only
+before rawplayer allocation. No slabdrop/compact/cmaresize/audio/networkchange.
+New cma_start_preflight_20261002 separate scripts in originalpanelrepo branch.
+ADB phone authorized, currentlyconnected; preserve media playback, disconnect,
+waitnormalcastcleanup/menu return, stop ownmenu for candidate test, start
+candidate session existingGO/AIC/BS/BT unchanged, reconnect usingADB.
+Compare arenareserved9MiB/actualframes/audio/memory and repeatedstarts.
+Baseline source complete archived; current scripts/oldmenu retained rollback.
+No source replacement until evidence, no stablepromotion/cold0/3.
+
+
 ## 2026-10-02 pending / live Wi-Fi and Bluetooth settings available
 Source2c87b6b/buildrecord2100a6a, deployeddb2d1b55/helperaca7bf18/CJK3ae39f36
 checked remotehash. Initialdeploy preflight refused absent/proc/.../children
