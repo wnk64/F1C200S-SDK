@@ -1,5 +1,20 @@
 # Worktree Change Log
 
+## 2026-10-02 pending / persistent LVGL touch test requested by user
+FTsource2855195/buildrecorde9bb157 loaded onboot3950ce0d/#250/CMA20,
+inputevent0 native0..479/0..799 nestedIRQ130/P06. Actualtapreader returned
+zeroevents/IRQzero; never claim touch passed. Probea332200 initially built
+with kernelLinaro failed userspace ABI, rebuilt with originalBuildrootSDK.
+User requests visibleLVGL instead of timedlogs. Source02b7e99 plus colorfix
+b74b39d uses existingfbdev32bit, LVGL8.2 complete source/license vendored,
+128KiB heap/two16lineRGB565 strips/no newCMA or SDL. Runtime3040,
+MD529db49c7f55dfb0021c9abe7c2a33420, RSS1064KiB, framebuffer screenshot
+480x800 nonblank/layout verified. Fourbuttons/marker/coordinates remainlive.
+Evdev preferred; bounded I2C readonlypoll fallback diagnostic only because
+IRQ stillzero. Rawreading count3669/no touches in capturedsample; no
+coordinate/physical screen acceptance. Program exit lv_deinit/unmap/close.
+Reusable hostcapture tool writes no boardfiles. No kernel/DTB/bootautoload.
+
 ## 2026-10-02 planned / upstream FT6236 software board registration
 Source2855195, externalmodules buildrc0 with originalLinaro7.2.1/LOCALVERSION=.
 EDT492e73bc93c06e5b20d8db8f114e9f3f/board7e0a5e11d3e1ad0ec3ad12d6a262f7ab,
