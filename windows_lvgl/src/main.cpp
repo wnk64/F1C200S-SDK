@@ -1768,7 +1768,9 @@ std::vector<DynamicItem> parse_dynamic_items(const std::string& body) {
         const wiliwili::string_view opus_summary = dynamic_member(opus, "summary");
         item.bvid = dynamic_text(archive, "bvid", 24);
         item.pic = dynamic_text(archive, "cover", 2048);
+        if (item.pic.empty()) item.pic = dynamic_text(legacy_archive, "cover", 2048);
         if (item.pic.empty()) item.pic = dynamic_text(legacy_archive, "pic", 2048);
+        if (item.pic.empty()) item.pic = dynamic_text(object, "pic", 2048);
         if (item.bvid.empty()) item.bvid = dynamic_text(legacy_archive, "bvid", 24);
         if (item.bvid.empty()) item.bvid = dynamic_text(object, "bvid", 24);
         item.title = dynamic_text(archive, "title", 192);
@@ -1807,6 +1809,7 @@ std::vector<DynamicItem> parse_dynamic_items(const std::string& body) {
             if (item.title.empty()) item.title = dynamic_text(original_legacy_description, "text", 192);
             if (item.title.empty()) item.title = dynamic_text(original_summary, "text", 192);
             if (item.bvid.empty()) item.bvid = dynamic_text(original_archive, "bvid", 24);
+            if (item.pic.empty()) item.pic = dynamic_text(original_archive, "cover", 2048);
             if (item.summary.empty()) item.summary = dynamic_text(original_archive, "desc", 120);
             if (item.summary.empty()) item.summary = dynamic_text(original_summary, "text", 120);
         }
