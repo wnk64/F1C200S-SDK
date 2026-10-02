@@ -404,6 +404,7 @@ struct CoverCompletion {
 CoverCompletion pending_cover;
 bool cover_ready = false;
 std::atomic<uint32_t> applied_feed_epoch{0};
+std::atomic<uint32_t> active_feed_epoch{0};
 std::array<lv_obj_t*, kMaxFeedVideos> cover_widgets{};
 
 void forget_cover_widget(lv_event_t* event) {
@@ -6406,6 +6407,9 @@ void build_shell() {
 
 void start_fetch() {
     const uint32_t request_epoch = ++navigation_epoch;
+#ifdef WILIWILI_BOARD
+    active_feed_epoch = request_epoch;
+#endif
     const FeedMode mode = feed_mode;
     const std::string query = search_term;
 #ifdef WILIWILI_BOARD
@@ -6416,6 +6420,14 @@ void start_fetch() {
     const int page = feed_page;
     const bool append = feed_append;
     std::thread([mode, query, image_threads, page, append, request_epoch] {
+#ifdef WILIWILI_BOARD
+        struct FetchGuard {
+            uint32_t epoch;
+            ~FetchGuard() {
+                if (active_feed_epoch.load() == epoch) fetch_in_flight = false;
+            }
+        } fetch_guard{request_epoch};
+#endif
         const uint32_t fetch_started = platform_ticks();
         std::string body;
         std::string error;
@@ -6435,6 +6447,7 @@ void start_fetch() {
             if (quit_requested.load() || request_epoch != navigation_epoch.load()) return;
             if (!append && !videos.empty()) {
                 std::lock_guard<std::mutex> lock(data_mutex);
+                if (quit_requested.load() || request_epoch != navigation_epoch.load()) return;
                 pending_videos = videos;
                 pending_error = error;
                 pending_feed_append = false;
