@@ -1,5 +1,15 @@
 # Worktree Change Log
 
+## 2026-10-02 planned / deploy connection UI after mock page smoke
+Source2c87b6b, menu db2d1b552887486b3874f06ebd30aa12,
+helper aca7bf187ef1cbcbd4f49884ede8e82d,
+CJK3ae39f360235a5ebcf731d761065dc76. Buildrc0; helper read-only scans passed.
+Deploy root/aic_miracast/candidates/lvgl_connections_20261002 with sameapps/
+supervisor referencing existing menu castwrapper408bfac2. Check only ownGUI
+child (not an activecast), orderly stop oldsupervisor, run network-smoke dummy
+devices/password/PIN layouts, then start normalmenu. Never testswitchSSH.
+
+
 ## 2026-10-02 pending / real read-only Wi-Fi and Bluetooth scans passed
 Menu74a63311/helper329d1af8 sourcea81abe6; helper tested onboard5.7.1.
 Wifi-list correctly current/savedwnk641_2.4G; wifi-scan12networks including
