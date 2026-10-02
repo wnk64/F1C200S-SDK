@@ -1,5 +1,18 @@
 # Worktree Change Log
 
+## 2026-10-02 pending / live application menu deployed
+Finalsourcee2f9269/buildrc0/f1-menu61dfd292bb53b358c7581d00906cda7f,
+shellsyntax/config checks pass; finalhome/settings/touch/home smokeexit0.
+Oldsupervisor3742/GUI3747 bothterminated and /run/f1-menu.lock removed before
+replacement; current supervisor4033/GUI4038. Snapshot480x800 Chinese/icon/
+all432x156 buttons fit; rootbackground/cornercursor corrected.
+GUI RSS1392KiB/PSS434KiB/anon104KiB; supervisor PSS195KiB/anon64KiB.
+Userland-only, unchanged LG4573DTB7018246d/#250/CMA20/BS/BT/FTmodules.
+Menu app selection uses reap-before-launch, but real casting/phone disconnect
+and physicaltouch/pagination/brightness acceptance not yet tested. No boot
+autoload or stablepromotion; threecold0/3. Temporary local wrappers removed.
+
+
 ## 2026-10-02 planned / final idle pacing and console cursor suppression
 Source6fa5d01/f1-menu6022abc4: normal/fourappconfig valid, invalid rejected;
 both4page smoke runs exited0. Persistent supervisor3742/GUI3747; actual
