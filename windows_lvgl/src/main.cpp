@@ -112,6 +112,7 @@ struct DynamicItem {
     std::string bvid;
     std::string title;
     std::string summary;
+    std::string pic;
 };
 
 struct DynamicUp {
@@ -289,7 +290,7 @@ std::string dynamic_video_offset;
 std::string selected_dynamic_mid;
 bool pending_dynamic_append = false;
 std::string pending_dynamic_next_offset;
-uint32_t dynamic_request_epoch = 0;
+std::atomic<uint32_t> dynamic_request_epoch{0};
 uint32_t pending_dynamic_epoch = 0;
 bool pending_dynamic_articles = false;
 std::string displayed_dynamic_error;
@@ -395,6 +396,7 @@ std::vector<lv_img_dsc_t> thumbnail_descriptors;
 #ifdef WILIWILI_BOARD
 // One compressed cover in transit; LVGL objects are touched only by main.
 struct CoverCompletion {
+    bool dynamic{};
     uint32_t epoch{};
     size_t index{};
     std::string bvid;
@@ -405,6 +407,9 @@ CoverCompletion pending_cover;
 bool cover_ready = false;
 std::atomic<uint32_t> applied_feed_epoch{0};
 std::atomic<uint32_t> active_feed_epoch{0};
+std::atomic<uint32_t> applied_dynamic_epoch{0};
+std::array<std::vector<uint8_t>, kMaxFeedVideos> dynamic_pixels;
+std::array<lv_img_dsc_t, kMaxFeedVideos> dynamic_descriptors{};
 std::array<lv_obj_t*, kMaxFeedVideos> cover_widgets{};
 
 void forget_cover_widget(lv_event_t* event) {
@@ -1762,6 +1767,8 @@ std::vector<DynamicItem> parse_dynamic_items(const std::string& body) {
         const wiliwili::string_view description = dynamic_member(dynamic, "desc");
         const wiliwili::string_view opus_summary = dynamic_member(opus, "summary");
         item.bvid = dynamic_text(archive, "bvid", 24);
+        item.pic = dynamic_text(archive, "cover", 2048);
+        if (item.pic.empty()) item.pic = dynamic_text(legacy_archive, "pic", 2048);
         if (item.bvid.empty()) item.bvid = dynamic_text(legacy_archive, "bvid", 24);
         if (item.bvid.empty()) item.bvid = dynamic_text(object, "bvid", 24);
         item.title = dynamic_text(archive, "title", 192);
@@ -1810,6 +1817,8 @@ std::vector<DynamicItem> parse_dynamic_items(const std::string& body) {
     return result;
 }
 
+bool fetch_thumbnail(const std::string& url, std::vector<uint8_t>& bytes, size_t byte_limit);
+
 void fetch_dynamic_items(bool articles = false, bool append = false) {
     if (bilibili_cookie.empty() || dynamic_fetch_in_flight.exchange(true)) return;
     if (!append) dynamic_fetch_requested = true;
@@ -1834,7 +1843,7 @@ void fetch_dynamic_items(bool articles = false, bool append = false) {
         json_string_at(body, "offset", next_offset);
         {
             std::lock_guard<std::mutex> lock(data_mutex);
-            pending_dynamic_items = std::move(result);
+            pending_dynamic_items = result;
             pending_dynamic_append = append;
             pending_dynamic_next_offset = std::move(next_offset);
             pending_dynamic_epoch = request_epoch;
@@ -1843,6 +1852,36 @@ void fetch_dynamic_items(bool articles = false, bool append = false) {
         }
         dynamic_fetch_in_flight = false;
         dynamic_fetch_complete = true;
+#ifdef WILIWILI_BOARD
+        if (!append) {
+            while (applied_dynamic_epoch.load() != request_epoch) {
+                if (quit_requested.load() || request_epoch != dynamic_request_epoch.load()) return;
+                platform_delay(5);
+            }
+            for (size_t index = 0; index < result.size() && index < 4; ++index) {
+                if (quit_requested.load() || request_epoch != dynamic_request_epoch.load()) return;
+                CoverCompletion cover;
+                cover.dynamic = true;
+                cover.epoch = request_epoch;
+                cover.index = index;
+                cover.bvid = result[index].bvid;
+                cover.pic = result[index].pic;
+                if (cover.pic.empty() || !fetch_thumbnail(cover.pic, cover.bytes, kMaxEncodedThumbnailBytes)) continue;
+                for (;;) {
+                    if (quit_requested.load() || request_epoch != dynamic_request_epoch.load()) return;
+                    {
+                        std::lock_guard<std::mutex> lock(data_mutex);
+                        if (!cover_ready) {
+                            pending_cover = std::move(cover);
+                            cover_ready = true;
+                            break;
+                        }
+                    }
+                    platform_delay(5);
+                }
+            }
+        }
+#endif
     }).detach();
 }
 
@@ -4008,6 +4047,7 @@ void open_dynamic_item(lv_event_t* event) {
         Video video;
         video.bvid = item.bvid;
         video.title = item.title;
+        video.pic = item.pic;
         ++navigation_epoch;
         if (content) { lv_obj_del(content); content = nullptr; }
         displayed_videos.clear();
@@ -5712,9 +5752,22 @@ void show_board_section(MainSection section) {
                 if (!item.bvid.empty() || !item.id.empty())
                     lv_obj_add_event_cb(row, open_dynamic_item, LV_EVENT_CLICKED,
                                         reinterpret_cast<void*>(static_cast<uintptr_t>(index + 1)));
-                dynamic_row_line(row, item.title, 14, ui_color(0xf3f5f8), 610, 7);
+#ifdef WILIWILI_BOARD
+                lv_obj_t* image = lv_img_create(row);
+                register_cover_widget(image, index);
+                if (dynamic_descriptors[index].data) lv_img_set_src(image, &dynamic_descriptors[index]);
+                lv_img_set_zoom(image, (88 * LV_IMG_ZOOM_NONE) / 186);
+                lv_img_set_pivot(image, 0, 0);
+                lv_obj_set_pos(image, 8, 5);
+                lv_obj_clear_flag(image, LV_OBJ_FLAG_CLICKABLE);
+#endif
+                dynamic_row_line(row, item.title, 14, ui_color(0xf3f5f8), 490, 7);
                 if (!item.summary.empty())
-                    dynamic_row_line(row, item.summary, 11, ui_color(0xaeb8c6), 610, 35);
+                    dynamic_row_line(row, item.summary, 11, ui_color(0xaeb8c6), 490, 35);
+                for (uint32_t child = 0; child < lv_obj_get_child_cnt(row); ++child) {
+                    lv_obj_t* label = lv_obj_get_child(row, child);
+                    if (lv_obj_check_type(label, &lv_label_class)) lv_obj_set_x(label, 108);
+                }
                 if (!item.id.empty()) {
                     lv_obj_t* like = lv_btn_create(row);
                     lv_obj_set_size(like, 48, 24);
@@ -6831,25 +6884,29 @@ int main(int argc, char** argv) {
                 }
             }
             const size_t index = cover.index;
-            if (ready && cover.epoch == navigation_epoch.load() && main_section == MainSection::Home &&
+            const bool dynamic_current = cover.dynamic && main_section == MainSection::Dynamic && !detail_visible &&
+                cover.epoch == dynamic_request_epoch.load() && index < displayed_dynamic_items.size() &&
+                displayed_dynamic_items[index].bvid == cover.bvid && displayed_dynamic_items[index].pic == cover.pic;
+            const bool home_current = !cover.dynamic && cover.epoch == navigation_epoch.load() && main_section == MainSection::Home &&
                 !detail_visible && index < displayed_videos.size() && index < thumbnail_descriptors.size() &&
-                index < cover_widgets.size() && cover_widgets[index] &&
-                displayed_videos[index].bvid == cover.bvid && displayed_videos[index].pic == cover.pic) {
+                displayed_videos[index].bvid == cover.bvid && displayed_videos[index].pic == cover.pic;
+            if (ready && index < cover_widgets.size() && cover_widgets[index] && (home_current || dynamic_current)) {
                 std::vector<uint8_t> pixels;
                 bool alpha = false;
                 if (platform_decode_thumbnail_lvgl(cover.bytes, 186, 104, pixels, &alpha)) {
-                    lv_img_dsc_t& descriptor = thumbnail_descriptors[index];
+                    lv_img_dsc_t& descriptor = cover.dynamic ? dynamic_descriptors[index] : thumbnail_descriptors[index];
+                    std::vector<uint8_t>& storage = cover.dynamic ? dynamic_pixels[index] : thumbnail_pixels[index];
                     lv_img_cache_invalidate_src(&descriptor);
-                    thumbnail_pixels[index] = std::move(pixels);
+                    storage = std::move(pixels);
                     descriptor.header.always_zero = 0;
                     descriptor.header.w = 186;
                     descriptor.header.h = 104;
                     descriptor.header.cf = alpha ? LV_IMG_CF_TRUE_COLOR_ALPHA : LV_IMG_CF_TRUE_COLOR;
-                    descriptor.data_size = static_cast<uint32_t>(thumbnail_pixels[index].size());
-                    descriptor.data = thumbnail_pixels[index].data();
+                    descriptor.data_size = static_cast<uint32_t>(storage.size());
+                    descriptor.data = storage.data();
                     lv_img_set_src(cover_widgets[index], &descriptor);
-                    lv_obj_center(cover_widgets[index]);
-                    std::fprintf(stderr, "COVER epoch=%u index=%zu applied_ms=%u\n", cover.epoch, index, platform_ticks());
+                    if (!cover.dynamic) lv_obj_center(cover_widgets[index]);
+                    std::fprintf(stderr, "COVER route=%s epoch=%u index=%zu applied_ms=%u\n", cover.dynamic ? "dynamic" : "home", cover.epoch, index, platform_ticks());
                 }
             }
         }
@@ -6968,12 +7025,23 @@ int main(int argc, char** argv) {
                         displayed_dynamic_items.push_back(std::move(item));
                 }
             } else {
+#ifdef WILIWILI_BOARD
+                if (content && main_section == MainSection::Dynamic) { lv_obj_del(content); content = nullptr; }
+                for (size_t i = 0; i < dynamic_descriptors.size(); ++i) {
+                    lv_img_cache_invalidate_src(&dynamic_descriptors[i]);
+                    dynamic_descriptors[i] = {};
+                    std::vector<uint8_t>().swap(dynamic_pixels[i]);
+                }
+#endif
                 displayed_dynamic_items = std::move(pending_dynamic_items);
             }
             if (current) {
                 displayed_dynamic_error = std::move(pending_dynamic_error);
                 if (dynamic_showing_articles && displayed_dynamic_error.empty()) ++dynamic_article_page;
                 else if (!pending_dynamic_next_offset.empty()) dynamic_video_offset = std::move(pending_dynamic_next_offset);
+#ifdef WILIWILI_BOARD
+                applied_dynamic_epoch = pending_dynamic_epoch;
+#endif
             }
             pending_dynamic_append = false;
             if (current && main_section == MainSection::Dynamic) {
