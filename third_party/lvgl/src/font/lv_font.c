@@ -77,7 +77,7 @@ bool lv_font_get_glyph_dsc(const lv_font_t * font_p, lv_font_glyph_dsc_t * dsc_o
         }
         f = f->fallback;
     }
-    return found;
+    return dsc_out->resolved_font != NULL;
 }
 
 /**
