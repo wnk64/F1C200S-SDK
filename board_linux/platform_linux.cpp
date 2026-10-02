@@ -166,7 +166,8 @@ bool platform_display_init(int width, int height, const char *) {
         const int fd = open(path.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
         char name[128]{};
         if (fd >= 0 && ioctl(fd, EVIOCGNAME(sizeof(name)), name) >= 0 &&
-            (std::strstr(name, "ft6") || std::strstr(name, "FT6") || std::strstr(name, "Focal"))) { input_fd = fd; break; }
+            (std::strstr(name, "ft6") || std::strstr(name, "FT6") ||
+             std::strstr(name, "ft5x06") || std::strstr(name, "Focal"))) { input_fd = fd; break; }
         if (fd >= 0) close(fd);
     }
     i2c_fd = open("/dev/i2c-0", O_RDWR | O_CLOEXEC);
