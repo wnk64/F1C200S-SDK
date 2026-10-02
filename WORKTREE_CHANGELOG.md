@@ -1,5 +1,25 @@
 # Worktree Change Log
 
+## 2026-10-02 pending / managed pool allocation and menu recovery verified
+Source98f6254, same helper/launcher f3333ad4/fe515f1c and supervisorc4a414cf.
+Validround3 Cma9120->16084KiB, pool9MiB, actual phone video. Normaldisconnect
+final33alloc/peak8437760/fallback0/live0, supervisor22513 restoresGUI23464.
+Round3firstSCP failed because finallog grew duringtransfer; retried afterclose,
+full155xx-byte log acquired. No baseline/candidate artifacts removed.
+Fourthvalid start managed23663/player23857/watch23858/sink23976; Cma9448->16224
+preflight, one9437184arena. ADBconnected true, realcommits2566/246per5sec/
+errors0, socketdrops0/FIFOfull0, available18820/Cma5092KiB. Defaultaudioheadphone,
+not Bluetoothaudible acceptance. MenuGUI/helper absent duringcasting.
+Current managedsession retained, next phoneclose restores ordinarymenu with
+newpreflight config. OriginalnetworkGUI/defaultaudio scripts intact rollback.
+No kernel/player edit; allocator reliability improved, no RAMsavingclaim.
+Fourvalidwarm allocations/threecleanreleases, interruptedpermissionattempt
+separate, cold0/3/longvisual/BT regression pending. Do not stablepromote.
+Remoteaccess user: noVPS/recommendonly/nopaidservice; no accounts/tunnelinstall.
+Recommend existing board-LAN Tailscale gateway, not boardresident VPN.
+Official pricing fetch unavailable; no currentquota claims. Tmpwrappers cleaned.
+
+
 ## 2026-10-02 rejected / managed deploy missing execute bit, corrected
 Two warmarena runs reserved9MiB and finalpeak8437760/33alloc/fallback0/live0.
 Firstmanagedtest GUIreaped but exec cast-app denied(mode644 afterWindowsSCP),
