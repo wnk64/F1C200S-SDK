@@ -1,6 +1,11 @@
 # Worktree Change Log
 
 ## 2026-10-02 planned / upstream FT6236 software board registration
+Source2855195, externalmodules buildrc0 with originalLinaro7.2.1/LOCALVERSION=.
+EDT492e73bc93c06e5b20d8db8f114e9f3f/board7e0a5e11d3e1ad0ec3ad12d6a262f7ab,
+bothvermagic5.7.1 mod_unload ARMv5 p2v8. No kernelimage/DTB change.
+Deploy newisolatedcandidate, verify hashes/release/unownedaddress38, register
+board afterEDT. Bindingfailure rollback both modules; preserve existingcast.
 Basepanel1c14066/full source snapshot preserved; kernelb3d8ed3/#250/
 zImagebffc71e8/config3e4a7d09 preflight and exactrelease5.7.1 passed.
 SchematicI2C1 PE11SCL/PE12SDA, Linuxbus0/address38/A3=64; PCA P05reset/
