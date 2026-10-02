@@ -1,6 +1,12 @@
 # Worktree Change Log
 
 ## 2026-10-02 planned / LG4573 timing-only flicker comparison
+Source7577c7c; bash build-lg4573-timing.sh rc0/exactrelease5.7.1.
+Baseline reproduced50499cb0527d269e0da7e436c092f643 byte-for-byte;
+candidate7018246d33a30340690f9a4edd6406e7. Sorted DT diff only seven
+planned properties; kernel/other DT properties unchanged. Deploy DTB only,
+software reboot then reload unchanged touch modules/portrait testGUI.
+Rollback uses existing50499cb0 display.dtb, no additional backup.
 Base: panel1c14066 archived in verified full snapshot; current repo e227f98.
 Running DTB50499cb0527d269e0da7e436c092f643, zImagebffc71e8, #250/5.7.1.
 Reference: kernel panel-lg-lg4573.c default_mode, clock28341000,
