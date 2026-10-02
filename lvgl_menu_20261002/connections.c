@@ -229,7 +229,7 @@ static int start_job(const char *operation, const char *key, const char *secret)
     if (!worker) {
         dup2(input[0], STDIN_FILENO); dup2(output[1], STDOUT_FILENO);
         close(output[0]); close(output[1]); close(input[0]); close(input[1]);
-        int log = open("/root/aic_miracast/candidates/lvgl_menu_20261002/connections.log", O_CREAT | O_WRONLY | O_APPEND, 0600);
+        int log = open("/root/aic_miracast/candidates/lvgl_connections_20261002/connections.log", O_CREAT | O_WRONLY | O_APPEND, 0600);
         if (log >= 0) { dup2(log, STDERR_FILENO); close(log); }
         for (int fd = 3; fd < 64; fd++) close(fd);
         if (key) execl(helper_path, helper_path, operation, key, (char *)NULL);

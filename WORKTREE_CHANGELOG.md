@@ -1,5 +1,15 @@
 # Worktree Change Log
 
+## 2026-10-02 pending / network UI and helper build
+Sourcef3f5bc8/402537a; hostnetprotocol ASan/UBSan assertions passed and temp
+testbinary removed. Firstcompile TRUE/FALSE fixed to C99bool; oldGUI unchanged.
+Newmenu27638c0b/helpera705a5c built successfully with originalBuildrootGCC6.4.
+Fix ownhelper indentation/zero-init warnings and isolate connectionlog path;
+upstream LVGL tlsf-unused/drawlabel warning left unchanged (same library).
+Nextdeploy helper only first, read-onlywifi-list/bt-list and explicitscans;
+then verify GUI-page/keyboard mocksmoke before ownsupervisor transition.
+
+
 ## 2026-10-02 planned / on-screen BS Wi-Fi and BlueZ device management
 Base3ac7d66/menu61dfd292 retained. Original repo candidatebranch, no newtree
 or kernel/DTB/driver/LVGLlibrary changes. Settings adds largeWiFi/BT entries,

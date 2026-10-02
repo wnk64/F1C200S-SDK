@@ -53,7 +53,7 @@ static int ok(const char *command)
 struct network { char ssid[33], flags[160]; int id, signal, current; };
 static int wifi_list(int scan)
 {
-    struct network items[32] = {{0}}; int count = 0;
+    struct network items[32]; memset(items, 0, sizeof(items)); int count = 0;
     char reply[16000], *save, *line;
     int active = -1;
     if (!request("STATUS", reply, sizeof(reply)) && strstr(reply, "wpa_state=COMPLETED\n")) {
@@ -332,11 +332,13 @@ static int bt_action(const char *action, const char *mac)
     for (char *p = pair_target + 19; *p; p++) { if (*p == ':') *p = '_'; else *p = (char)toupper((unsigned char)*p); }
     if (!strcmp(action, "bt-forget")) {
         DBusMessage *r = call("/org/bluez/hci0", "org.bluez.Adapter1", "RemoveDevice", pair_target, DBUS_TYPE_OBJECT_PATH);
-        if (!r) return error("forget-failed"); dbus_message_unref(r); return 0;
+        if (!r) return error("forget-failed");
+        dbus_message_unref(r); return 0;
     }
     if (!strcmp(action, "bt-disconnect")) {
         DBusMessage *r = call(pair_target, "org.bluez.Device1", "Disconnect", NULL, 0);
-        if (!r) return error("disconnect-failed"); dbus_message_unref(r); return 0;
+        if (!r) return error("disconnect-failed");
+        dbus_message_unref(r); return 0;
     }
     (void)set_bool("/org/bluez/hci0", "org.bluez.Adapter1", "Powered", TRUE);
     if (!is_paired(pair_target)) {
@@ -347,7 +349,8 @@ static int bt_action(const char *action, const char *mac)
         dbus_message_append_args(m, DBUS_TYPE_OBJECT_PATH, &agent_path, DBUS_TYPE_STRING, &capability, DBUS_TYPE_INVALID);
         DBusError e; dbus_error_init(&e);
         DBusMessage *r = dbus_connection_send_with_reply_and_block(bus, m, 5000, &e); dbus_message_unref(m); dbus_error_free(&e);
-        if (!r) return error("agent-failed"); dbus_message_unref(r);
+        if (!r) return error("agent-failed");
+        dbus_message_unref(r);
         m = dbus_message_new_method_call("org.bluez", pair_target, "org.bluez.Device1", "Pair");
         DBusPendingCall *pending;
         if (!dbus_connection_send_with_reply(bus, m, &pending, 90000)) { dbus_message_unref(m); return error("pair-failed"); }
@@ -359,7 +362,8 @@ static int bt_action(const char *action, const char *mac)
     }
     (void)set_bool(pair_target, "org.bluez.Device1", "Trusted", TRUE);
     DBusMessage *r = call(pair_target, "org.bluez.Device1", "Connect", NULL, 0);
-    if (!r) return error("connect-failed"); dbus_message_unref(r); return 0;
+    if (!r) return error("connect-failed");
+    dbus_message_unref(r); return 0;
 }
 int main(int argc, char **argv)
 {
