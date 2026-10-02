@@ -209,5 +209,10 @@ int main(int argc, char **argv)
         struct timespec delay = {0, 5000000}; nanosleep(&delay, NULL);
     }
     fprintf(stderr, "menu: exit=%d heap=%u\n", exit_code, (unsigned)LV_MEM_SIZE);
+    if (exit_code >= 20 && exit_code < 20 + (int)count) {
+        lv_obj_clean(content);
+        label(content, apps[exit_code - 20].title, 64, 330, 352, 0x167A6F);
+        lv_refr_now(NULL);
+    }
     platform_close(); return exit_code;
 }

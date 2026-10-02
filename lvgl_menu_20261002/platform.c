@@ -68,8 +68,10 @@ static void pointer_read(lv_indev_drv_t *driver, lv_indev_data_t *data)
             }
         }
     }
-    if (x < 0) x = 0; if (x > 479) x = 479;
-    if (y < 0) y = 0; if (y > 799) y = 799;
+    if (x < 0) x = 0;
+    if (x > 479) x = 479;
+    if (y < 0) y = 0;
+    if (y > 799) y = 799;
     data->point.x = x; data->point.y = y;
     data->state = pressed ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
 }
