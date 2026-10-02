@@ -392,6 +392,32 @@ bool open_media_search_on_start = false;
 bool open_qr_on_start = false;
 std::vector<std::vector<uint8_t>> thumbnail_pixels;
 std::vector<lv_img_dsc_t> thumbnail_descriptors;
+#ifdef WILIWILI_BOARD
+// One compressed cover in transit; LVGL objects are touched only by main.
+struct CoverCompletion {
+    uint32_t epoch{};
+    size_t index{};
+    std::string bvid;
+    std::string pic;
+    std::vector<uint8_t> bytes;
+};
+CoverCompletion pending_cover;
+bool cover_ready = false;
+std::atomic<uint32_t> applied_feed_epoch{0};
+std::array<lv_obj_t*, kMaxFeedVideos> cover_widgets{};
+
+void forget_cover_widget(lv_event_t* event) {
+    const size_t index = reinterpret_cast<uintptr_t>(lv_event_get_user_data(event));
+    if (index < cover_widgets.size() && cover_widgets[index] == lv_event_get_target(event))
+        cover_widgets[index] = nullptr;
+}
+
+void register_cover_widget(lv_obj_t* image, size_t index) {
+    if (index >= cover_widgets.size()) return;
+    cover_widgets[index] = image;
+    lv_obj_add_event_cb(image, forget_cover_widget, LV_EVENT_DELETE, reinterpret_cast<void*>(index));
+}
+#endif
 
 std::string format_duration(const std::string& seconds) {
     if (seconds.empty()) return {};
@@ -3817,6 +3843,10 @@ void request_video_detail(size_t video_index, size_t part_index) {
             }
             std::string title;
             if (json_video_title(body, title) && !title.empty()) detail.title = title;
+#ifdef WILIWILI_BOARD
+            json_string_at(body, "pic", detail.pic);
+            fetch_thumbnail(detail.pic, detail.image_bytes, kMaxEncodedThumbnailBytes);
+#endif
             if (!detail.cid.empty()) {
                 std::string play_body;
                 std::string play_error;
@@ -3977,8 +4007,11 @@ void open_dynamic_item(lv_event_t* event) {
         Video video;
         video.bvid = item.bvid;
         video.title = item.title;
+        ++navigation_epoch;
+        if (content) { lv_obj_del(content); content = nullptr; }
         displayed_videos.clear();
         displayed_videos.push_back(std::move(video));
+        prepare_thumbnails(displayed_videos);
         active_video_index = 0;
         active_part_index = 0;
         open_player_after_detail = false;
@@ -4033,9 +4066,13 @@ void build_video_card(lv_obj_t* parent, const Video& video, size_t index) {
     lv_obj_set_style_border_width(preview, 0, 0);
     lock_static_canvas(preview);
     lv_obj_clear_flag(preview, LV_OBJ_FLAG_CLICKABLE);
-    if (index < thumbnail_descriptors.size() && thumbnail_descriptors[index].data) {
+    if (board_preview || (index < thumbnail_descriptors.size() && thumbnail_descriptors[index].data)) {
         lv_obj_t* image = lv_img_create(preview);
-        lv_img_set_src(image, &thumbnail_descriptors[index]);
+        if (index < thumbnail_descriptors.size() && thumbnail_descriptors[index].data)
+            lv_img_set_src(image, &thumbnail_descriptors[index]);
+#ifdef WILIWILI_BOARD
+        register_cover_widget(image, index);
+#endif
         lv_img_set_zoom(image, (240 * LV_IMG_ZOOM_NONE) / 186);
         lv_obj_center(image);
         lv_obj_clear_flag(image, LV_OBJ_FLAG_CLICKABLE);
@@ -4116,9 +4153,13 @@ void build_search_result_card(lv_obj_t* parent, const Video& video, size_t index
     lv_obj_set_style_border_width(preview, 0, 0);
     lock_static_canvas(preview);
     lv_obj_clear_flag(preview, LV_OBJ_FLAG_CLICKABLE);
-    if (index < thumbnail_descriptors.size() && thumbnail_descriptors[index].data) {
+    if (board_preview || (index < thumbnail_descriptors.size() && thumbnail_descriptors[index].data)) {
         lv_obj_t* image = lv_img_create(preview);
-        lv_img_set_src(image, &thumbnail_descriptors[index]);
+        if (index < thumbnail_descriptors.size() && thumbnail_descriptors[index].data)
+            lv_img_set_src(image, &thumbnail_descriptors[index]);
+#ifdef WILIWILI_BOARD
+        register_cover_widget(image, index);
+#endif
         lv_img_set_zoom(image, (preview_width * LV_IMG_ZOOM_NONE) / 186);
         lv_obj_center(image);
         lv_obj_clear_flag(image, LV_OBJ_FLAG_CLICKABLE);
@@ -4294,9 +4335,13 @@ void show_board_home(const std::vector<Video>& videos, const std::string& error)
         lv_obj_set_style_border_width(preview, 0, 0);
         lock_static_canvas(preview);
         lv_obj_clear_flag(preview, LV_OBJ_FLAG_CLICKABLE);
-        if (i < thumbnail_descriptors.size() && thumbnail_descriptors[i].data) {
+        {
             lv_obj_t* image = lv_img_create(preview);
-            lv_img_set_src(image, &thumbnail_descriptors[i]);
+            if (i < thumbnail_descriptors.size() && thumbnail_descriptors[i].data)
+                lv_img_set_src(image, &thumbnail_descriptors[i]);
+#ifdef WILIWILI_BOARD
+            register_cover_widget(image, i);
+#endif
             lv_img_set_zoom(image, (156 * LV_IMG_ZOOM_NONE) / 186);
             lv_obj_center(image);
             lv_obj_clear_flag(image, LV_OBJ_FLAG_CLICKABLE);
@@ -4594,8 +4639,11 @@ void open_mine_video(lv_event_t* event) {
     const std::vector<Video>* list = source == 0 ? &displayed_history_videos :
                                      source == 1 ? &displayed_favorite_videos : &displayed_later_videos;
     if (index >= list->size()) return;
+    ++navigation_epoch;
+    if (content) { lv_obj_del(content); content = nullptr; }
     displayed_videos.clear();
     displayed_videos.push_back((*list)[index]);
+    prepare_thumbnails(displayed_videos);
     active_video_index = 0;
     open_player_after_detail = false;
     detail_return_to_dynamic = false;
@@ -6079,6 +6127,10 @@ void show_main_section(MainSection section) {
 void select_main_section(lv_event_t* event) {
     const auto section = static_cast<MainSection>(reinterpret_cast<uintptr_t>(lv_event_get_user_data(event)));
     if (section == MainSection::Dynamic) {
+        ++dynamic_request_epoch;
+        dynamic_article_page = 1;
+        dynamic_video_offset.clear();
+        displayed_dynamic_items.clear();
         dynamic_fetch_requested = false;
         dynamic_up_fetch_requested = false;
     } else if (section == MainSection::Mine && mine_active_tab < mine_fetch_requested.size()) {
@@ -6381,7 +6433,7 @@ void start_fetch() {
             if (videos.empty()) error = "Bilibili response could not be parsed";
 #ifdef WILIWILI_BOARD
             if (quit_requested.load() || request_epoch != navigation_epoch.load()) return;
-            if (!append && mode != FeedMode::Search && !videos.empty()) {
+            if (!append && !videos.empty()) {
                 std::lock_guard<std::mutex> lock(data_mutex);
                 pending_videos = videos;
                 pending_error = error;
@@ -6393,6 +6445,34 @@ void start_fetch() {
                              platform_ticks() - fetch_started, videos.size());
             }
             const size_t thumbnail_count = mode == FeedMode::Search ? videos.size() : std::min<size_t>(4, videos.size());
+            if (!append && !videos.empty()) {
+                while (applied_feed_epoch.load() != request_epoch) {
+                    if (quit_requested.load() || request_epoch != navigation_epoch.load()) return;
+                    platform_delay(5);
+                }
+                for (size_t index = 0; index < thumbnail_count; ++index) {
+                    if (quit_requested.load() || request_epoch != navigation_epoch.load()) return;
+                    CoverCompletion cover;
+                    cover.epoch = request_epoch;
+                    cover.index = index;
+                    cover.bvid = videos[index].bvid;
+                    cover.pic = videos[index].pic;
+                    if (!fetch_thumbnail(cover.pic, cover.bytes, kMaxEncodedThumbnailBytes)) continue;
+                    for (;;) {
+                        if (quit_requested.load() || request_epoch != navigation_epoch.load()) return;
+                        {
+                            std::lock_guard<std::mutex> lock(data_mutex);
+                            if (!cover_ready) {
+                                pending_cover = std::move(cover);
+                                cover_ready = true;
+                                break;
+                            }
+                        }
+                        platform_delay(5);
+                    }
+                }
+                return;
+            }
 #else
             const size_t thumbnail_count = videos.size();
 #endif
@@ -6720,8 +6800,47 @@ int main(int argc, char** argv) {
                 }
                 pending_videos.clear();
                 displayed = true;
+#ifdef WILIWILI_BOARD
+                applied_feed_epoch = pending_feed_epoch;
+#endif
             }
         }
+#ifdef WILIWILI_BOARD
+        {
+            CoverCompletion cover;
+            bool ready = false;
+            {
+                std::lock_guard<std::mutex> lock(data_mutex);
+                if (cover_ready) {
+                    cover = std::move(pending_cover);
+                    cover_ready = false;
+                    ready = true;
+                }
+            }
+            const size_t index = cover.index;
+            if (ready && cover.epoch == navigation_epoch.load() && main_section == MainSection::Home &&
+                !detail_visible && index < displayed_videos.size() && index < thumbnail_descriptors.size() &&
+                index < cover_widgets.size() && cover_widgets[index] &&
+                displayed_videos[index].bvid == cover.bvid && displayed_videos[index].pic == cover.pic) {
+                std::vector<uint8_t> pixels;
+                bool alpha = false;
+                if (platform_decode_thumbnail_lvgl(cover.bytes, 186, 104, pixels, &alpha)) {
+                    lv_img_dsc_t& descriptor = thumbnail_descriptors[index];
+                    lv_img_cache_invalidate_src(&descriptor);
+                    thumbnail_pixels[index] = std::move(pixels);
+                    descriptor.header.always_zero = 0;
+                    descriptor.header.w = 186;
+                    descriptor.header.h = 104;
+                    descriptor.header.cf = alpha ? LV_IMG_CF_TRUE_COLOR_ALPHA : LV_IMG_CF_TRUE_COLOR;
+                    descriptor.data_size = static_cast<uint32_t>(thumbnail_pixels[index].size());
+                    descriptor.data = thumbnail_pixels[index].data();
+                    lv_img_set_src(cover_widgets[index], &descriptor);
+                    lv_obj_center(cover_widgets[index]);
+                    std::fprintf(stderr, "COVER epoch=%u index=%zu applied_ms=%u\n", cover.epoch, index, platform_ticks());
+                }
+            }
+        }
+#endif
         if (detail_fetch_complete.exchange(false)) {
             std::lock_guard<std::mutex> lock(data_mutex);
             if (pending_detail_epoch != navigation_epoch.load()) {
@@ -6730,6 +6849,11 @@ int main(int argc, char** argv) {
                 if (status_label) lv_label_set_text(status_label, pending_detail_error.c_str());
             } else if (pending_detail_index < displayed_videos.size()) {
                 displayed_videos[pending_detail_index] = std::move(pending_detail);
+#ifdef WILIWILI_BOARD
+                // Delete all users before replacing descriptor storage.
+                if (content) { lv_obj_del(content); content = nullptr; }
+                prepare_thumbnails(displayed_videos);
+#endif
                 active_part_index = displayed_videos[pending_detail_index].parts.empty() ? 0 :
                                     std::min(pending_detail_part_index,
                                              displayed_videos[pending_detail_index].parts.size() - 1);

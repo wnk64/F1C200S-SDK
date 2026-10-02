@@ -23,6 +23,8 @@ child=$!
 printf '%s\n' "$child" > "$self/ui-live.pid"
 rc=0
 wait "$child" || rc=$?
+printf 'WILIWILI exit pid=%s rc=%s time=%s\n' "$child" "$rc" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >&2
+printf '%s\n' "$rc" > "$self/ui-live.rc"
 child=
 trap - INT TERM
 [ "$rc" = 0 ] || exit "$rc"
