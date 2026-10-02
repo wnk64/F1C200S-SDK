@@ -1,6 +1,7 @@
 #!/bin/sh
 set -eu
-START=/root/aic_miracast/candidates/audio_reopen_20261002/start-cast.sh
+SELF=$(CDPATH= cd "$(dirname "$0")" && pwd)
+START=$SELF/start-cast-default-audio.sh
 R=/tmp/manual_miracast_20260920
 PLAYER=/root/aic_miracast/candidates/player_frame_gap_20261001/player-frame-gap
 SINK=/root/aic_miracast/candidates/audio_reopen_20261002/sink-audio-reopen

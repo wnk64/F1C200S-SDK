@@ -28,9 +28,10 @@ apps.conf每行五列：id|中文标题|副标题|图标类型|绝对可执行�
 
 ## 投屏
 
-cast-app.sh仅调用已有audio_reopen_20261002/start-cast.sh的cold/session，
-不改其内容、驱动、播放器、音频或协议。既有启动器要求蓝牙音响可用；
-没有音响时会返回错误，当前不扩展其音频策略。无手机连接180秒返回菜单。
+cast-app.sh调用本目录start-cast-default-audio.sh的cold/session，
+该候选从已有audio_reopen启动器派生，只去掉强制蓝牙在线的启动条件；
+使用ALSA default由S35audio-route自动选择蓝牙/耳机，不改原启动器、
+音频守护、驱动、播放器或协议。无手机连接180秒返回菜单。
 投屏期间只留轻量shell管理；断开/失败后结束自己启动的watch/player/sink，
 按PID及启动时间防止误杀复用PID，再创建菜单。独立投屏已运行时拒绝接管。
 

@@ -1,5 +1,20 @@
 # Worktree Change Log
 
+## 2026-10-02 planned / optional Bluetooth for menu cast launch
+Userclicked twice; application.log preflightpassed/wlan1registered then
+Bluetoothconnectionfailed; bt-connect.log Hostisdown, currentrouteheadphone.
+GO5745 COMPLETED valid; no driver/USB/RTSP failure evidence.
+Original audio-reopen launcher9168c75b requires fixedspeaker unconditionally.
+Add separate start-cast-default-audio.sh derivedfrom original; preserve original
+assets/pbc/sink/player/hashes. Only audio readiness uses current ALSA default
+instead of forcedBlueZConnect; S35audio-route already provides Codec fallback.
+Point menu castwrapper to localcandidate launcher; existingmenu binaryunchanged.
+Rollback originalwrapper2a1db860 and originallauncher unchanged. No driver,
+DTB/kernel/sink/player/audio-daemon changes. Test shellsyntax/read-onlypreflight,
+headphone session startup after GUIexit, then returnmenu if not streaming.
+Real phone and threecold regression pending.
+
+
 ## 2026-10-02 pending / live application menu deployed
 Finalsourcee2f9269/buildrc0/f1-menu61dfd292bb53b358c7581d00906cda7f,
 shellsyntax/config checks pass; finalhome/settings/touch/home smokeexit0.
