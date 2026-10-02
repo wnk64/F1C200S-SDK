@@ -1,5 +1,20 @@
 # Worktree Change Log
 
+## 2026-10-02 pending / user confirms flicker absent after timing switch
+Deployed candidate7018246d33a30340690f9a4edd6406e7, checked FAT target,
+sync/unmount/software reboot. Boot9868a347-aab7-4a9d-877c-e13ce0be6a47,
+unchanged kernel#250/5.7.1/CMA20; BS automatically associated and SSH works.
+LVGL portrait47b2884f PID322 and same EDT/board modules restored.
+User: visible flicker disappeared. Only seven timing properties changed;
+backlight4/8, PWM0x5DBF2F0F, FRM0x80000000, polarity0x03000000 unchanged.
+TCON H0x022E0044/V0x069A001D/sync0x003A000E => totals559x845.
+PLL0x91006E01/DCLK0x8000002F => about28.340426MHz/~60Hz, register-derived.
+Supports timing-set hypothesis; does not isolate any individual porch/clock
+or prove a manufacturer-spec match. No Miracast/BTaudio regression this boot;
+three complete cold cycles0/3. Keep as visual-pass candidate, not stable tag.
+Source7577c7c/build-deploy-recordc28edaa; rollback existing50499cb0 DTB.
+
+
 ## 2026-10-02 planned / LG4573 timing-only flicker comparison
 Source7577c7c; bash build-lg4573-timing.sh rc0/exactrelease5.7.1.
 Baseline reproduced50499cb0527d269e0da7e436c092f643 byte-for-byte;
