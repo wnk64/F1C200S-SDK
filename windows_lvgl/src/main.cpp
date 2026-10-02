@@ -203,7 +203,7 @@ std::atomic_bool fetch_in_flight{false};
 std::atomic_bool detail_fetch_complete{false};
 std::atomic_bool detail_fetch_in_flight{false};
 std::atomic_bool detail_aux_fetch_complete{false};
-std::atomic_uint32_t navigation_epoch{0};
+std::atomic<uint32_t> navigation_epoch{0};
 uint32_t pending_detail_epoch = 0;
 uint32_t pending_detail_aux_epoch = 0;
 uint32_t pending_feed_epoch = 0;
@@ -1521,7 +1521,9 @@ bool sign_wbi_path(const std::string& path, std::string& signed_path, std::strin
     }
     parameters["wts"] = std::to_string(std::time(nullptr));
     std::string canonical;
-    for (const auto& [key, source_value] : parameters) {
+    for (const auto& parameter : parameters) {
+        const auto& key = parameter.first;
+        const auto& source_value = parameter.second;
         std::string value = source_value;
         value.erase(std::remove_if(value.begin(), value.end(), [](char c) {
             return c == '!' || c == '\'' || c == '(' || c == ')' || c == '*';
@@ -1708,7 +1710,7 @@ std::vector<DynamicItem> parse_dynamic_items(const std::string& body) {
         if (item.id.empty()) item.id = dynamic_text(object, "dynamic_id", 32);
         if (item.id.empty()) {
             const wiliwili::string_view numeric_id = dynamic_member(object, "id");
-            if (numeric_id.size() <= 32) item.id = numeric_id;
+            if (numeric_id.size() <= 32) item.id.assign(numeric_id.data(), numeric_id.size());
         }
         const wiliwili::string_view modules = dynamic_member(object, "modules");
         const wiliwili::string_view dynamic = dynamic_module(modules, "module_dynamic");
@@ -3849,7 +3851,7 @@ void request_video_detail(size_t video_index, size_t part_index) {
         std::thread([detail, video_index, request_epoch] {
             Video auxiliary;
             auxiliary.bvid = detail.bvid;
-            auto comments = std::async(std::launch::async, [detail] {
+            auto get_comments = [detail] {
                 std::vector<VideoComment> result;
                 if (detail.aid.empty()) return result;
                 std::string body;
@@ -3858,8 +3860,8 @@ void request_video_detail(size_t video_index, size_t part_index) {
                                          "&type=1&mode=3&next=0&ps=4";
                 if (fetch_feed(path, body, error)) result = parse_video_comments(body);
                 return result;
-            });
-            auto related = std::async(std::launch::async, [detail] {
+            };
+            auto get_related = [detail] {
                 std::vector<RelatedVideo> result;
                 std::string body;
                 std::string error;
@@ -3868,9 +3870,16 @@ void request_video_detail(size_t video_index, size_t part_index) {
                     result = parse_related_videos(body);
                 }
                 return result;
-            });
+            };
+#ifdef WILIWILI_BOARD
+            auxiliary.comments = get_comments();
+            auxiliary.related = get_related();
+#else
+            auto comments = std::async(std::launch::async, std::move(get_comments));
+            auto related = std::async(std::launch::async, std::move(get_related));
             auxiliary.comments = comments.get();
             auxiliary.related = related.get();
+#endif
             std::lock_guard<std::mutex> lock(data_mutex);
             pending_detail_aux = std::move(auxiliary);
             pending_detail_aux_index = video_index;
@@ -6340,7 +6349,11 @@ void start_fetch() {
     const uint32_t request_epoch = ++navigation_epoch;
     const FeedMode mode = feed_mode;
     const std::string query = search_term;
+#ifdef WILIWILI_BOARD
+    const int image_threads = 1;
+#else
     const int image_threads = setting_image_threads;
+#endif
     const int page = feed_page;
     const bool append = feed_append;
     std::thread([mode, query, image_threads, page, append, request_epoch] {
@@ -6363,19 +6376,29 @@ void start_fetch() {
             size_t retained_cover_bytes = 0;
             for (size_t first = 0; first < videos.size(); first += static_cast<size_t>(image_threads)) {
                 if (request_epoch != navigation_epoch.load() || retained_cover_bytes >= kEncodedThumbnailBatchBytes) break;
+#ifndef WILIWILI_BOARD
                 std::vector<std::future<void>> jobs;
+#endif
                 const size_t end = std::min(videos.size(), first + static_cast<size_t>(image_threads));
+#ifndef WILIWILI_BOARD
                 jobs.reserve(end - first);
+#endif
                 size_t remaining = kEncodedThumbnailBatchBytes - retained_cover_bytes;
                 for (size_t index = first; index < end; ++index) {
                     const size_t byte_limit = std::min(kMaxEncodedThumbnailBytes, remaining);
                     if (!byte_limit) break;
                     remaining -= byte_limit;
+#ifdef WILIWILI_BOARD
+                    fetch_thumbnail(videos[index].pic, videos[index].image_bytes, byte_limit);
+#else
                     jobs.emplace_back(std::async(std::launch::async, [&videos, index, byte_limit] {
                         fetch_thumbnail(videos[index].pic, videos[index].image_bytes, byte_limit);
                     }));
+#endif
                 }
+#ifndef WILIWILI_BOARD
                 for (auto& job : jobs) job.get();
+#endif
                 for (size_t index = first; index < end; ++index) retained_cover_bytes += videos[index].image_bytes.capacity();
             }
         }

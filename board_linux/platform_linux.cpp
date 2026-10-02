@@ -5,8 +5,7 @@ extern const lv_font_t menu_font_stream;
 void menu_font_stream_close(void);
 int board_jpeg_thumbnail(const uint8_t *, size_t, int, int, uint16_t *);
 }
-#define CPPHTTPLIB_OPENSSL_SUPPORT
-#include "vendor/httplib.h"
+#include <curl/curl.h>
 #include "geometry.h"
 #include <algorithm>
 #include <chrono>
@@ -20,12 +19,14 @@ int board_jpeg_thumbnail(const uint8_t *, size_t, int, int, uint16_t *);
 #include <linux/input.h>
 #include <mutex>
 #include <openssl/md5.h>
+#include <openssl/crypto.h>
 #include <sstream>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <thread>
 #include <unistd.h>
+#include <pthread.h>
 
 namespace {
 int fb_fd = -1, input_fd = -1, i2c_fd = -1;
@@ -42,69 +43,98 @@ NetworkConfig network;
 std::mutex network_mutex;
 void signal_stop(int) { stopped = 1; }
 
+pthread_once_t curl_once = PTHREAD_ONCE_INIT;
+pthread_mutex_t ssl_locks[128];
+bool curl_ready = false;
+void ssl_lock(int mode, int n, const char *, int) {
+    if (n < 0 || n >= 128) return;
+    if (mode & CRYPTO_LOCK) pthread_mutex_lock(&ssl_locks[n]);
+    else pthread_mutex_unlock(&ssl_locks[n]);
+}
+unsigned long ssl_thread_id() { return static_cast<unsigned long>(pthread_self()); }
+void initialize_curl() {
+    if (CRYPTO_num_locks() > 128) return;
+    for (int i = 0; i < CRYPTO_num_locks(); ++i) pthread_mutex_init(&ssl_locks[i], nullptr);
+    if (!CRYPTO_get_locking_callback()) {
+        CRYPTO_set_locking_callback(ssl_lock); CRYPTO_set_id_callback(ssl_thread_id);
+    }
+    curl_ready = curl_global_init(CURL_GLOBAL_DEFAULT) == CURLE_OK;
+}
+struct Transfer {
+    std::vector<uint8_t> *body;
+    std::string *headers;
+    size_t cap, header_bytes = 0;
+    bool overflow = false;
+};
+size_t receive_body(char *data, size_t size, size_t count, void *context) {
+    auto& t = *static_cast<Transfer *>(context);
+    if (count && size > SIZE_MAX / count) return 0;
+    const size_t length = size * count;
+    if (length > t.cap - t.body->size()) { t.overflow = true; return 0; }
+    try {
+        const size_t required = t.body->size() + length;
+        if (required > t.body->capacity()) t.body->reserve(std::min(t.cap, std::max(required, t.body->capacity() + t.body->capacity() / 2)));
+        t.body->insert(t.body->end(), data, data + length);
+    } catch (...) { return 0; }
+    return length;
+}
+size_t receive_headers(char *data, size_t size, size_t count, void *context) {
+    auto& t = *static_cast<Transfer *>(context);
+    if (count && size > SIZE_MAX / count) return 0;
+    const size_t length = size * count;
+    if (length > 32768 - t.header_bytes) { t.overflow = true; return 0; }
+    t.header_bytes += length;
+    try { if (t.headers) t.headers->append(data, length); } catch (...) { return 0; }
+    return length;
+}
+
 bool request(const std::string& url, const std::string& raw_headers,
-             std::vector<uint8_t>& body, std::string& error, std::string *out_headers, size_t cap) {
+             const std::string *post, std::vector<uint8_t>& body, std::string& error, std::string *out_headers, size_t cap) {
     body.clear(); error.clear(); if (out_headers) out_headers->clear();
     if (url.compare(0, 8, "https://") != 0 || url.find_first_of("\r\n") != std::string::npos ||
         cap == 0 || cap > 2U * 1024U * 1024U) { error = "Invalid HTTPS request"; return false; }
-    const size_t slash = url.find('/', 8);
-    const std::string host = url.substr(8, slash == std::string::npos ? slash : slash - 8);
-    if (host.empty() || host.find_first_of("@:?# ") != std::string::npos) { error = "Invalid HTTPS host"; return false; }
-    const std::string path = slash == std::string::npos ? "/" : url.substr(slash);
     NetworkConfig config;
     { std::lock_guard<std::mutex> lock(network_mutex); config = network; }
-    httplib::SSLClient client(host, 443);
-    client.enable_server_certificate_verification(config.verify);
+    pthread_once(&curl_once, initialize_curl);
+    if (!curl_ready) { error = "TLS initialization failed"; return false; }
+    CURL *client = curl_easy_init();
+    if (!client) { error = "HTTPS initialization failed"; return false; }
+    Transfer transfer{&body, out_headers, cap};
     const char *ca = std::getenv("F1_CA_FILE");
-    client.set_ca_cert_path(ca ? ca : "/etc/ssl/certs/ca-certificates.crt");
-    client.set_connection_timeout(config.connect_ms / 1000, (config.connect_ms % 1000) * 1000);
-    client.set_read_timeout(config.receive_ms / 1000, (config.receive_ms % 1000) * 1000);
-    client.set_write_timeout(config.receive_ms / 1000, (config.receive_ms % 1000) * 1000);
-    client.set_follow_location(false);
-    if (config.proxy_enabled) {
-        const size_t colon = config.proxy.rfind(':');
-        if (colon == std::string::npos) { error = "Proxy must be host:port"; return false; }
-        const std::string port_text = config.proxy.substr(colon + 1);
-        if (port_text.empty() || port_text.find_first_not_of("0123456789") != std::string::npos || port_text.size() > 5) {
-            error = "Invalid proxy port"; return false;
-        }
-        const int port = std::atoi(port_text.c_str());
-        if (port < 1 || port > 65535) { error = "Invalid proxy port"; return false; }
-        client.set_proxy(config.proxy.substr(0, colon), port);
-    }
-    httplib::Headers headers;
+    curl_easy_setopt(client, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(client, CURLOPT_PROTOCOLS_STR, "https");
+    curl_easy_setopt(client, CURLOPT_SSL_VERIFYPEER, config.verify ? 1L : 0L);
+    curl_easy_setopt(client, CURLOPT_SSL_VERIFYHOST, config.verify ? 2L : 0L);
+    curl_easy_setopt(client, CURLOPT_CAINFO, ca ? ca : "/etc/ssl/certs/ca-certificates.crt");
+    curl_easy_setopt(client, CURLOPT_CONNECTTIMEOUT_MS, static_cast<long>(config.connect_ms));
+    curl_easy_setopt(client, CURLOPT_TIMEOUT_MS, static_cast<long>(config.receive_ms));
+    curl_easy_setopt(client, CURLOPT_NOSIGNAL, 1L);
+    curl_easy_setopt(client, CURLOPT_FOLLOWLOCATION, 0L);
+    curl_easy_setopt(client, CURLOPT_PROXY, config.proxy_enabled ? config.proxy.c_str() : "");
+    curl_easy_setopt(client, CURLOPT_WRITEFUNCTION, receive_body);
+    curl_easy_setopt(client, CURLOPT_WRITEDATA, &transfer);
+    curl_easy_setopt(client, CURLOPT_HEADERFUNCTION, receive_headers);
+    curl_easy_setopt(client, CURLOPT_HEADERDATA, &transfer);
+    curl_easy_setopt(client, CURLOPT_MAXFILESIZE_LARGE, static_cast<curl_off_t>(cap));
+    curl_slist *headers = nullptr;
     std::istringstream lines(raw_headers);
     for (std::string line; std::getline(lines, line);) {
         if (!line.empty() && line.back() == '\r') line.pop_back();
-        const size_t colon = line.find(':');
-        if (colon == std::string::npos) continue;
-        const size_t value = line.find_first_not_of(" \t", colon + 1);
-        headers.emplace(line.substr(0, colon), value == std::string::npos ? "" : line.substr(value));
+        if (line.empty() || line.find(':') == std::string::npos) continue;
+        curl_slist *next = curl_slist_append(headers, line.c_str());
+        if (!next) { curl_slist_free_all(headers); curl_easy_cleanup(client); error = "Header allocation failed"; return false; }
+        headers = next;
     }
-    bool overflow = false;
-    auto receiver = [&](const char *data, size_t size) {
-        if (size > cap - body.size()) { overflow = true; return false; }
-        body.insert(body.end(), data, data + size); return true;
-    };
-    auto handler = [&](const httplib::Response& response) {
-        if (out_headers) {
-            for (const auto& item : response.headers) {
-                if (out_headers->size() + item.first.size() + item.second.size() + 4 > 32768) { overflow = true; return false; }
-                *out_headers += item.first + ": " + item.second + "\r\n";
-            }
-        }
-        if (response.has_header("Content-Length")) {
-            const auto text = response.get_header_value("Content-Length");
-            if (text.empty() || text.find_first_not_of("0123456789") != std::string::npos ||
-                text.size() > 10 || std::strtoull(text.c_str(), nullptr, 10) > cap) { overflow = true; return false; }
-        }
-        return true;
-    };
-    httplib::Result result = client.Get(path.c_str(), headers, handler, receiver);
-    if (!result || overflow) { body.clear(); error = overflow ? "HTTPS response exceeds limit" : "HTTPS transport failed"; return false; }
-    if (result->status < 200 || result->status >= 300) {
-        body.clear(); error = "HTTP status " + std::to_string(result->status); return false;
+    curl_easy_setopt(client, CURLOPT_HTTPHEADER, headers);
+    if (post) {
+        curl_easy_setopt(client, CURLOPT_POSTFIELDS, post->data());
+        curl_easy_setopt(client, CURLOPT_POSTFIELDSIZE_LARGE, static_cast<curl_off_t>(post->size()));
     }
+    const CURLcode result = curl_easy_perform(client);
+    long status = 0; curl_easy_getinfo(client, CURLINFO_RESPONSE_CODE, &status);
+    curl_slist_free_all(headers); curl_easy_cleanup(client);
+    if (result != CURLE_OK || transfer.overflow) { body.clear(); error = transfer.overflow ? "HTTPS response exceeds limit" : curl_easy_strerror(result); return false; }
+    if (status < 200 || status >= 300) { body.clear(); error = "HTTP status " + std::to_string(status); return false; }
     return true;
 }
 }
@@ -220,10 +250,10 @@ void platform_set_gamepad_ab_swap(bool) {}
 void platform_open_external_url(const std::string&) {}
 bool platform_https_get(const std::string& url, const std::string& headers, std::vector<uint8_t>& body,
                         std::string& error, std::string *response_headers, size_t cap) {
-    return request(url, headers, body, error, response_headers, cap);
+    return request(url, headers, nullptr, body, error, response_headers, cap);
 }
-bool platform_https_post(const std::string&, const std::string&, const std::string&, std::vector<uint8_t>& body, std::string& error) {
-    body.clear(); error = "POST adapter not enabled in this candidate"; return false;
+bool platform_https_post(const std::string& url, const std::string& headers, const std::string& form, std::vector<uint8_t>& body, std::string& error) {
+    return request(url, headers, &form, body, error, nullptr, 512U * 1024U);
 }
 bool platform_md5_hex(const std::string& input, std::string& digest, std::string&) {
     unsigned char bytes[MD5_DIGEST_LENGTH]; MD5(reinterpret_cast<const unsigned char *>(input.data()), input.size(), bytes);
