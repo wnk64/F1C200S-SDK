@@ -31,7 +31,8 @@ locations = '''location = /f1-ssh {
     limit_conn f1_ssh_connections 4;
 }
 '''
-config = '''map $http_authorization $f1_ssh_authorized {
+config = '''map_hash_bucket_size 128;
+map $http_authorization $f1_ssh_authorized {
     default 0;
     "Basic %s" 1;
 }
