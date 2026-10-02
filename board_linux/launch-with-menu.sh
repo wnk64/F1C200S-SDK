@@ -1,5 +1,6 @@
 #!/bin/sh
 set -eu
+unset F1_UI_TEST_MS
 self=$(CDPATH= cd "$(dirname "$0")" && pwd)
 test -f "$self/cacert.pem"
 test -f "$self/cjk28.bin"
