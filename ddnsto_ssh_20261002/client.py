@@ -2,6 +2,11 @@
 import argparse
 import hashlib
 import subprocess
+import select
+import socket
+import ssl
+import threading
+from urllib.parse import urlsplit
 from pathlib import Path
 
 root = Path(__file__).parent
@@ -24,8 +29,57 @@ command = [str(binary), '--binary', '--exit-on-eof', '--buffer-size', '65536',
            '--ping-interval', '20', '--ping-timeout', '60',
            '--basic-auth-file', str(credentials),
            'tcp-l:127.0.0.1:%d' % args.port, args.url]
+tls_listener = None
+def tls_forward(client, host, port, semaphore):
+    remote = None
+    try:
+        context = ssl.create_default_context()
+        remote = context.wrap_socket(socket.create_connection((host, port), 15), server_hostname=host)
+        remote.settimeout(None)
+        while True:
+            ready, _, _ = select.select([client, remote], [], [], 30)
+            if remote.pending() and remote not in ready:
+                ready.append(remote)
+            for source in ready:
+                data = source.recv(65536)
+                if not data:
+                    return
+                (remote if source is client else client).sendall(data)
+    except (OSError, ssl.SSLError) as error:
+        print('TLS relay:', type(error).__name__, str(error), flush=True)
+    finally:
+        client.close()
+        if remote is not None:
+            remote.close()
+        semaphore.release()
+def accept_tls(listener, host, port):
+    semaphore = threading.BoundedSemaphore(4)
+    while True:
+        try:
+            client, _ = listener.accept()
+        except OSError:
+            return
+        if not semaphore.acquire(False):
+            client.close()
+            continue
+        threading.Thread(target=tls_forward, args=(client, host, port, semaphore), daemon=True).start()
+if args.url.startswith('wss://'):
+    endpoint = urlsplit(args.url)
+    if endpoint.username or endpoint.password or not endpoint.hostname:
+        parser.error('No credentials are allowed in URL')
+    tls_listener = socket.socket()
+    tls_listener.bind(('127.0.0.1', 0))
+    tls_listener.listen(4)
+    tls_port = tls_listener.getsockname()[1]
+    threading.Thread(target=accept_tls, args=(tls_listener, endpoint.hostname, endpoint.port or 443), daemon=True).start()
+    # Websocat handles RFC6455; Python supplies verified TLS without Schannel.
+    command[-1] = 'ws-c:tcp:127.0.0.1:%d' % tls_port
+    command[1:1] = ['--ws-c-uri', args.url]
 print('Local SSH endpoint: 127.0.0.1:%d; TLS and SSH host verification remain enabled.' % args.port, flush=True)
 try:
     raise SystemExit(subprocess.call(command))
 except KeyboardInterrupt:
     pass
+finally:
+    if tls_listener is not None:
+        tls_listener.close()
