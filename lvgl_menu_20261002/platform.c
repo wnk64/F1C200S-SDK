@@ -100,11 +100,11 @@ int platform_open(void)
     lv_init();
     static lv_disp_draw_buf_t draw;
     lv_disp_draw_buf_init(&draw, strips[0], strips[1], 480 * 16);
-    lv_disp_drv_t display; lv_disp_drv_init(&display);
+    static lv_disp_drv_t display; lv_disp_drv_init(&display);
     display.hor_res = 480; display.ver_res = 800;
     display.draw_buf = &draw; display.flush_cb = flush;
     lv_disp_drv_register(&display);
-    lv_indev_drv_t pointer; lv_indev_drv_init(&pointer);
+    static lv_indev_drv_t pointer; lv_indev_drv_init(&pointer);
     pointer.type = LV_INDEV_TYPE_POINTER; pointer.read_cb = pointer_read;
     lv_indev_drv_register(&pointer);
     return 0;

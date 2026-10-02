@@ -1,5 +1,13 @@
 # Worktree Change Log
 
+## 2026-10-02 rejected / stack-local LVGL driver lifetime
+Firstcandidatecb0dae00 configvalid/4valid/invalidrejected passed. GUI322 exited
+normally, firstsmoke then SIGSEGV. No kerneloops or caststarted. Root cause:
+LVGL8.2 registration retainsdriver pointers; platform_open locals expired.
+Fix: bothdisplay/input driver descriptors static until lv_deinit; onlymenu
+backend changed. Rebuild and rerun bothsmokes before starting supervisor.
+
+
 ## 2026-10-02 planned / extensible low-memory 3.2-inch application menu
 Source3600861/b69f0ef, originalBuildroot make-j4/strip rc0, warning-free final.
 f1-menucb0dae00b883b05ef85626cf275d0fa9 (~234KiB), appsb9db6d8c,
