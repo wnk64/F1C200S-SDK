@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR X11)
+#include "suniv-f1c200s-newboard-display.dts"
+
+/* Linux 5.7 panel-lg-lg4573.c default_mode, timing-only comparison.
+ * Preserve verified board wiring, bus format, polarity and panel init.
+ */
+&panel {
+    panel-timing {
+        clock-frequency = <28341000>;
+        hfront-porch = <10>;
+        hback-porch = <10>;
+        hsync-len = <59>;
+        vfront-porch = <15>;
+        vback-porch = <15>;
+        vsync-len = <15>;
+    };
+};

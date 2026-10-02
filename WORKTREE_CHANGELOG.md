@@ -1,5 +1,22 @@
 # Worktree Change Log
 
+## 2026-10-02 planned / LG4573 timing-only flicker comparison
+Base: panel1c14066 archived in verified full snapshot; current repo e227f98.
+Running DTB50499cb0527d269e0da7e436c092f643, zImagebffc71e8, #250/5.7.1.
+Reference: kernel panel-lg-lg4573.c default_mode, clock28341000,
+H480+10+59+10=559, V800+15+15+15=845, nominal60Hz (roundedclock).
+Hypothesis: EDID-derived porches may differ from native LG4573 timing.
+Separate DTS overrides only seven clock/porch/sync-length properties.
+Keep HS/VS positive, DE high, falling pixel clock, RGB666/FRM,
+backlight1kHz/brightness4, init, kernel, touch, player, networking and audio.
+Original repo candidate branch; preserve unrelated dirty historical DTB.
+Build DTB only after exact5.7.1 preflight and reproduce baseline50499cb0.
+Rollback: existing board newboard_panel_20260930/display.dtb (same50499cb0).
+No new backup copies; existing full source/config/kernel outputs archived.
+Dependencies: native LCD/LVGL/touch, BS15MHz SSH, Bluetooth and Miracast.
+One visual comparison is not acceptance; all three cold cycles pending.
+
+
 ## 2026-10-02 planned / measured portrait touch orientation
 Deploy7018213 plan completed: oldGUI3040 terminated normally and oldboard
 unregistered; newboarda7922bd1/UI47b2884f verified and launchedPID4211.
