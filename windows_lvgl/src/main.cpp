@@ -5748,6 +5748,8 @@ void show_board_section(MainSection section) {
                 const DynamicItem& item = displayed_dynamic_items[index];
                 lv_obj_t* row = item.bvid.empty() && item.id.empty() ? lv_obj_create(pane) : lv_btn_create(pane);
                 lv_obj_set_size(row, 690, 62);
+                lv_obj_set_style_pad_all(row, 0, 0);
+                lock_static_canvas(row);
                 lv_obj_set_pos(row, 14, 8 + static_cast<int>(index) * 70);
                 lv_obj_set_style_bg_color(row, ui_color(0x202735), 0);
                 lv_obj_set_style_border_width(row, 0, 0);
@@ -5759,7 +5761,7 @@ void show_board_section(MainSection section) {
                 lv_obj_t* image = lv_img_create(row);
                 register_cover_widget(image, index);
                 if (dynamic_descriptors[index].data) lv_img_set_src(image, &dynamic_descriptors[index]);
-                lv_img_set_zoom(image, (88 * LV_IMG_ZOOM_NONE) / 186);
+                lv_img_set_zoom(image, LV_IMG_ZOOM_NONE);
                 lv_img_set_pivot(image, 0, 0);
                 lv_obj_set_pos(image, 8, 5);
                 lv_obj_clear_flag(image, LV_OBJ_FLAG_CLICKABLE);
@@ -6896,19 +6898,22 @@ int main(int argc, char** argv) {
             if (ready && index < cover_widgets.size() && cover_widgets[index] && (home_current || dynamic_current)) {
                 std::vector<uint8_t> pixels;
                 bool alpha = false;
-                if (platform_decode_thumbnail_lvgl(cover.bytes, 186, 104, pixels, &alpha)) {
+                const int width = cover.dynamic ? 88 : 186;
+                const int height = cover.dynamic ? 50 : 104;
+                if (platform_decode_thumbnail_lvgl(cover.bytes, width, height, pixels, &alpha)) {
                     lv_img_dsc_t& descriptor = cover.dynamic ? dynamic_descriptors[index] : thumbnail_descriptors[index];
                     std::vector<uint8_t>& storage = cover.dynamic ? dynamic_pixels[index] : thumbnail_pixels[index];
                     lv_img_cache_invalidate_src(&descriptor);
                     storage = std::move(pixels);
                     descriptor.header.always_zero = 0;
-                    descriptor.header.w = 186;
-                    descriptor.header.h = 104;
+                    descriptor.header.w = width;
+                    descriptor.header.h = height;
                     descriptor.header.cf = alpha ? LV_IMG_CF_TRUE_COLOR_ALPHA : LV_IMG_CF_TRUE_COLOR;
                     descriptor.data_size = static_cast<uint32_t>(storage.size());
                     descriptor.data = storage.data();
                     lv_img_set_src(cover_widgets[index], &descriptor);
-                    if (!cover.dynamic) lv_obj_center(cover_widgets[index]);
+                    if (cover.dynamic) lv_obj_set_pos(cover_widgets[index], 8, 5);
+                    else lv_obj_center(cover_widgets[index]);
                     std::fprintf(stderr, "COVER route=%s epoch=%u index=%zu applied_ms=%u\n", cover.dynamic ? "dynamic" : "home", cover.epoch, index, platform_ticks());
                 }
             }
