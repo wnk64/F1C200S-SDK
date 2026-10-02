@@ -1,5 +1,21 @@
 # Worktree Change Log
 
+## 2026-10-02 planned / extensible low-memory 3.2-inch application menu
+Base panelb016002 with complete unchanged LVGL8.2 source. Original repo branch
+only, preserve unrelated dirty historicalDTB. No kernel/DTB/module changes.
+New lvgl_menu_20261002: nativefbdev backend/GUI/app registry/shellsupervisor,
+cast wrapper calls unchanged audio-reopen launcher. Three432x156 targets,
+Chinese28px4bpp/52glyph subset17250bitmapbytes generated using hostGDI.
+Reuse existing LVGL128KiB heap/two16line strips30KiB; no SDL/fontengine/CMA.
+External app selection exitsGUI/waitreaped then starts app; endreleases own
+processes before reconstructUI. PIDstarttime guards; independentcast refused.
+Internaltouch/brightness1..8 pages; up to12apps/3perpage registry extension.
+Build originalBuildrootGCC6.4; testconfig/smokepages/screenshots/RSS and exit.
+No bootautoload. Rollback stop only own supervisor/GUI and restore existing
+portraitGUI47b2884f. Protect LG4573DTB/BS/BT/800cast/audio/FTorientation.
+Actual app/casting lifecycle and threecold acceptance pending; do not promote.
+
+
 ## 2026-10-02 pending / user confirms flicker absent after timing switch
 Deployed candidate7018246d33a30340690f9a4edd6406e7, checked FAT target,
 sync/unmount/software reboot. Boot9868a347-aab7-4a9d-877c-e13ce0be6a47,
