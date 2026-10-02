@@ -1,6 +1,12 @@
 # Worktree Change Log
 
 ## 2026-10-02 planned / extensible low-memory 3.2-inch application menu
+Source3600861/b69f0ef, originalBuildroot make-j4/strip rc0, warning-free final.
+f1-menucb0dae00b883b05ef85626cf275d0fa9 (~234KiB), appsb9db6d8c,
+supervisor2520d456, castwrapper2a1db860; shellsyntax checks passed.
+Added config validation/four-app pagination fixtures; no originalsource edits.
+Deploy isolatedcandidate only; stop own portraitGUI322 after executable/config
+checks, run smoke without launcher, verify exit then start persistentmenu.
 Base panelb016002 with complete unchanged LVGL8.2 source. Original repo branch
 only, preserve unrelated dirty historicalDTB. No kernel/DTB/module changes.
 New lvgl_menu_20261002: nativefbdev backend/GUI/app registry/shellsupervisor,
