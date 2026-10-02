@@ -1,5 +1,15 @@
 # Worktree Change Log
 
+## 2026-10-02 planned / one-shot managed lifecycle regression
+Candidate supervisor adds --test-cast-once only for automated regression:
+start realunchangedGUI, wait2sec/SIGTERM/reap it, selectfirstcast application
+once, then ordinarymenu return on app exit. No GUIbinary/input/driver changes.
+Production(noargument) still requires actualtouch selection. Validatefirst
+registryentrycast; new supervisor/appsfaed868b/ccd30cdf already staged, new
+testoption hash will be recorded. Thirdwarm run via managedwrapper, ADBphone
+reconnect, verify frames/pool and menu restoration. Keep original supervisor.
+
+
 ## 2026-10-02 pending / two warm contiguous-pool starts verified
 Sourcededa9d6/scriptsfe515f1c/f3333ad4; samekernel/player/sink/GO throughout.
 Round1: beforeCma8692KiB/cache18172; after15644/cache7828. Pool9437184

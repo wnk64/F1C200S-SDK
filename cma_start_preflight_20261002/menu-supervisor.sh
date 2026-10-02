@@ -2,6 +2,12 @@
 set -eu
 SELF=$(CDPATH= cd "$(dirname "$0")" && pwd)
 UI=/root/aic_miracast/candidates/lvgl_connections_20261002/f1-menu
+test_once=0
+case "${1:-}" in
+    '') ;;
+    --test-cast-once) test_once=1 ;;
+    *) echo 'usage: menu-supervisor.sh [--test-cast-once]' >&2; exit 1 ;;
+esac
 LOCK=/run/f1-menu.lock
 mkdir "$LOCK" 2>/dev/null || { echo 'menu supervisor already active' >&2; exit 1; }
 child=
@@ -21,8 +27,16 @@ while :; do
         "$UI" "$SELF/apps.conf" &
     fi
     child=$!
+    if [ "$test_once" -eq 1 ]; then
+        sleep 2
+        kill -TERM "$child" 2>/dev/null || true
+    fi
     wait "$child" || rc=$?
     child=
+    if [ "$test_once" -eq 1 ]; then
+        test_once=0
+        [ "$rc" -ne 0 ] || rc=20
+    fi
     [ "$rc" -ne 0 ] || exit 0
     if [ "$rc" -lt 20 ] || [ "$rc" -gt 31 ]; then
         echo "menu failed: $rc" >&2; exit "$rc"
