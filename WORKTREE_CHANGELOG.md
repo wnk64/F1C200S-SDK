@@ -380,3 +380,9 @@ Rollback at board candidates/newboard_panel_20260930/rollback (old DTB/startup/m
 网络恢复：板子新网络wnl64，IP10.21.174.124；电脑仍在家庭网10.0.0.129，暂时无法连接wnl64。通过COM4的wpa控制添加临时家庭2.4G网络，利用电脑已保存密码在内存推导对应SSID的PSK；恢复板端SSH10.0.0.234。未保存临时网络、没有删除wnl64。旧5G哈希不能直接用于2.4G，因为PSK推导包含SSID；已纠正，日志不保存密钥。
 
 验证计划：增量构建、源码提交后SCP部署并核验；菜单重复启动不重复进程；模拟内核日志后framebuffer保持；停止恢复文本模式、重启恢复菜单；冷启动、网络SSH回归。三轮完整依赖验收前不称稳定版。
+
+## 2026-10-03 / pending完整回归 / 菜单图形控制台修复结果
+
+源码提交96b4c2c；实际根因是fbcon日志覆盖运行中的菜单，不是服务未启动。platform.c保存/切换KD_GRAPHICS、退出恢复，Makefile与头文件路径适配实体迁移；在原LVGL/menu中make -j2 f1-menu增量rc0。部署及哈希、回退入口详见SCRCPT/cast-and-menu-source/menu-boot-change-20261003.md。新GUI bc7f3fd5c37771143038f11609c50897cf071c2b1eccf7b3ff488cc3291b5171，服务adf6a5eb29b6c04e5f3fd7f79f9029ba7b2a02c40dfb43e816d85937f532c57f，管理器e724a70d8f7804c9a4f4d7d58f179e6caf4b29861ef11bba2f695c1d55bfac36。
+
+板端候选menu_graphics_boot_20261003，原候选保留；apps.conf不变。网络过程状态已更新：最终保存wnl64优先级0和家庭2.4G优先级10，冷启动自动SSH10.0.0.234。三轮实际断电菜单/SSH/日志覆盖测试均通过，boot_id分别75faa115-7d7e-41aa-bbd4-d91470eea675、a8beb893-bc68-4601-8e14-642703aab959、798b510a-1f70-4bbb-8048-2901bcf2b66f。每轮fb0 MD5在日志注入前后均a0a288720b64b2765f44dc403dbab569。未重测投屏/蓝牙音频/wiliwili播放，完整基线验收仍pending。未重建rootfs镜像、未改kernel/驱动/播放器，未推稳定标签。
