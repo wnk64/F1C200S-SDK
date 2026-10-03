@@ -19,7 +19,7 @@ SYSROOT := $(shell $(CC) --print-sysroot)
 net-player: build-arm/cedar-net-player
 build-arm/net-player/%.o: $(PLAYER_SRC)/%.c
 	@mkdir -p $(@D)
-	$(CC) -Os -std=gnu11 -Wall -Wextra -Wno-unused-parameter -D_GNU_SOURCE -DHAVE_CEDARX=1 -I$(PLAYER_SRC) -I$(SYSROOT)/usr/include/drm -MMD -MP -c -o $@ $<
+	$(CC) -Os -std=gnu11 -Wall -Wextra -Wno-unused-parameter -D_GNU_SOURCE -DHAVE_CEDARX=1 -I$(PLAYER_SRC) -I$(SYSROOT)/usr/include/drm -I../../../ROOTFS/buildroot-2018.02.11/output/build/libcedarx-custom -MMD -MP -c -o $@ $<
 build-arm/cdx_https.o: cdx_https.c
 	$(CC) -Os -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -Ivendor/curl-8.16.0/include -c -o $@ $<
 build-arm/cedar-net-player: $(PLAYER_OBJ) build-arm/cdx_https.o build-curl/lib/.libs/libcurl.a
