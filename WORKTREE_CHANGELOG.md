@@ -17,6 +17,12 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / pending / Actual loop-reset verified
+
+新专用源码34a75f7，UI黑底源码c64596d；运行UI SHA256 406869169d80673cb498ace27a0a5cfa97c1bb5db8257aa278213f02a340fc61、播放器c8f496bf2a12828fa22dc85f6080505d5b1238f27a6c466bc3a37674c1ace7df，SSH部署一致。原SDK make -C board_linux -j2 net-player rc0。
+2026-10-03 10:24:23 UTC自然播放完整MV后，播放器日志出现PLAYER loop-to-zero: seek_rc=0 UI_event_bytes=8；UI日志随即PLAYER rewind: time and progress reset。不靠视频duration或文件seek猜测，实际解析器时间回绕事件已传达。回绕后帧仍持续，最新total6310/window126/errors0。旧字节回绕判断候选已否定并删除。
+本轮同时部署去掉播放页放大缩略图的纯黑背景。首页与详情封面保留。未修改原投屏播放器、内核、驱动或声卡服务。仅一次同启动自然循环验证，不代替三冷验收，整体候选仍pending。软件时间不是解码PTS精确进度，后续还应接实际播放时钟。无新增临时脚本。
+
 ## 2026-10-03 / rejected then planned / Correct loop event location
 
 用户再次确认进度未归零；完整自然循环监测无rewind日志。字节seek=0不等于MP4时间seek=0，上一检测候选被否定。去掉HTTP字节回绕推断，新增应用专用loop_mediaplayer.c，包含原完整mediaplayer.c并仅拦截它调用CdxParserSeekTo(parser,0)的返回结果；成功后发送事件4并记录真实发送字节数。原cedar-player工作树源文件不修改，原投屏二进制不变。同时保留上一请求的黑底播放页，待实机自然循环验证。
