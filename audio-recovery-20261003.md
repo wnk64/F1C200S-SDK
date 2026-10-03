@@ -17,3 +17,13 @@
 用户报告声音正常、画面及进度卡住。正式入口核验仍是旧loop播放器37785e3，应用仍wiliwili-loop-lvgl，本候选未接入正式菜单。随后自动候选测试两轮均从200ms到恢复1066ms，20秒进度观察超时，测试失败后退出回菜单，不部署候选。BlueALSA日志此次无断链错误，不能归咎蓝牙。
 
 关键现场：第二轮候选PID2208，显示线程2211阻塞drm_wait_vblank_ioctl；decoder持续VDECODE_RESULT_NO_FRAME_BUFFER（统计results[4]增长），网络继续预读。LCD IRQ26计数连续间隔1秒均12692，无增长；TCON GINT0读取0x00008000（vblank状态位存在但使能位31关闭），GCTL0x80000000、TCON0_CTL0x808001E0，DRM crtc active=1。明确显示刷新中断等待阻塞帧回收，音频仍可运行，因此进度（实际提交帧PTS）也不增长。是谁关闭使能仍未定位，不改寄存器、不关闭vsync、不推测硬件。下一步查DRM vblank使能/引用生命周期及OSD并发提交，必要时加可关闭内核探针前先执行kernel baseline guard；原kernel保持不动。
+
+## 最新结论 / 最小帧预留修正
+
+上段“显示中断等待导致卡死”的结论不成立，后续OSD隔离fe569f5仍卡1.066秒，LCD IRQ正常增长、GINT0=0xC8000000。idle显示没有提交帧后中断关闭可为DRM正常节能，不能当成根因。新增探针ef250d5/fd026e9：valid0/display_queue0/free_queue0，借帧29还帧28（只保留正常扫描帧1），audio_pts继续增长而video_pts停1066625。没有发现借还泄漏，问题在解码FBM预留。
+
+当前保护播放器config.h的BUF_CNT_4_LIST/ROTATE/SMOOTH均0，H264参考DPB占满且硬件旋转/扫描输出还需帧。0622d18仅在wiliwili InitializeVideoDecoder wrapper配置display预留1、rotate预留1，不改保护源码或CMA总量。对应文件本次总共四个探针/最小修正，全部默认debug关闭或显式诊断开启。
+
+同一蓝牙先连接、同一在线视频、同一测试：OSD隔离帧166→暂停冻结→恢复1066→19100，rc0；完整OSD帧166→暂停冻结→恢复1133→19133，rc0。两轮均蓝牙default输出正常，借还差2为显示排队/扫描持有，video_pts持续增长，audio/video差几十毫秒；退出正常，返回菜单。MemAvailable24988KiB/CmaFree7212KiB，没有增加整屏UI缓存。新播放器SHA256ba2a8b87c119a361072d1ec3f6636a45cecf44a6abdc6be34a0a8b00d2a92b0f。声音是否耳听、长时/循环/seek195/冷启动完整依赖尚未验证，不称稳定。
+
+部署计划：新增launch-audio-recovery-with-menu.sh，仅正式菜单wiliwili入口切至新应用8815dc7和上述播放器，默认F1_PLAYER_DEBUG=0；无OSD禁用变量、不自动selftest，不修改投屏入口。原loop应用、播放器、启动器完整保留。回退apps.conf最后一行至launch-loop-with-menu.sh。修正自动测试结尾文字，audio测试不再错误声称two seek-loop cycles。

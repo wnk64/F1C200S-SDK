@@ -75,5 +75,6 @@ int main() {
     }
     platform_player_stop();
     platform_display_shutdown();
-    std::cout << "SELFTEST PASS: two seek-loop cycles, pause, resume, frozen progress" << std::endl;
+    std::cout << (audio_test ? "SELFTEST PASS: pause, resume, frozen progress, audio-route playback window" :
+        "SELFTEST PASS: two seek-loop cycles, pause, resume, frozen progress") << std::endl;
 }
