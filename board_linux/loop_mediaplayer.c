@@ -97,12 +97,14 @@ static snd_pcm_sframes_t wiliwili_pcm_write(snd_pcm_t *pcm, const void *samples,
         usleep(2000);
     }
     int64_t first_video = atomic_load(&wiliwili_first_video_pts);
-    if (audio_packet_pts >= 0 && first_video >= 0 && audio_packet_pts < first_video) {
+    static int startup_audio_aligned;
+    if (!startup_audio_aligned && audio_packet_pts >= 0 && first_video >= 0 && audio_packet_pts < first_video) {
         static int logged;
         if (!logged) { fprintf(stderr, "PLAYER discard early audio PCM pts_us=%lld video_us=%lld\n",
                               (long long)audio_packet_pts, (long long)first_video); logged = 1; }
         return frames;
     }
+    startup_audio_aligned = 1;
     int volume = atomic_load(&wiliwili_volume);
     if (volume >= 100) return snd_pcm_writei(pcm, samples, frames);
     snd_pcm_hw_params_t *params;
