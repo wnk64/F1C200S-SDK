@@ -84,6 +84,14 @@ void ip_settings_show(void)
         inputs[i] = lv_textarea_create(menu_content());
         lv_obj_set_pos(inputs[i], 148, 220 + i * 62); lv_obj_set_size(inputs[i], 304, 56);
         lv_obj_set_style_text_font(inputs[i], &lv_font_montserrat_24, 0);
+        lv_obj_set_style_text_color(inputs[i], lv_color_hex(0x172329), 0);
+        lv_obj_set_style_bg_color(inputs[i], lv_color_hex(0xFFFFFF), 0);
+        lv_obj_set_style_bg_opa(inputs[i], LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(inputs[i], 1, 0);
+        lv_obj_set_style_border_color(inputs[i], lv_color_hex(0xDDE3E7), 0);
+        lv_obj_set_style_border_color(inputs[i], lv_color_hex(0x167A6F), LV_STATE_FOCUSED);
+        lv_obj_set_style_radius(inputs[i], 8, 0);
+        lv_obj_set_style_pad_all(inputs[i], 8, 0);
         lv_textarea_set_one_line(inputs[i], true); lv_textarea_set_max_length(inputs[i], 24);
         lv_textarea_set_accepted_chars(inputs[i], "0123456789./");
         lv_textarea_set_text(inputs[i], values[i + 1]);
@@ -97,6 +105,11 @@ void ip_settings_show(void)
     lv_obj_set_style_text_font(keyboard, &lv_font_montserrat_24, LV_PART_ITEMS);
     lv_obj_set_style_bg_opa(keyboard, LV_OPA_COVER, LV_PART_ITEMS);
     lv_obj_set_style_bg_color(keyboard, lv_color_hex(0xFFFFFF), LV_PART_ITEMS);
+    lv_obj_set_style_pad_row(keyboard, 6, 0);
+    lv_obj_set_style_pad_column(keyboard, 6, 0);
+    lv_obj_set_style_border_width(keyboard, 1, LV_PART_ITEMS);
+    lv_obj_set_style_border_color(keyboard, lv_color_hex(0xDDE3E7), LV_PART_ITEMS);
+    lv_obj_set_style_radius(keyboard, 8, LV_PART_ITEMS);
     lv_obj_add_event_cb(keyboard, key, LV_EVENT_VALUE_CHANGED, NULL);
     save = button(menu_content(), 24, 700, 432, 76, 0xFFFFFF);
     label(save, LV_SYMBOL_SAVE, 28, 20, 64, 0x167A6F);
