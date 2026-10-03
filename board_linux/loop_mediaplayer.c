@@ -42,6 +42,7 @@ static int64_t audio_now(void)
     if (elapsed > 250000) elapsed = 250000;
     return atomic_load(&audio_played_pts) + elapsed;
 }
+#include "audio_output.h"
 static AAC_DECODER_ERROR wiliwili_aac_fill(HANDLE_AACDECODER decoder, UCHAR *buffers[],
                                           const UINT sizes[], UINT *valid, int64_t pts)
 {
@@ -56,6 +57,7 @@ int wiliwili_crop_left, wiliwili_crop_width, wiliwili_crop_height;
 
 static VideoPicture *wiliwili_request_picture(VideoDecoder *decoder, int stream)
 {
+    if (player_pause_wait()) return NULL;
     video_thread = 1;
     VideoPicture *picture = RequestPicture(decoder, stream);
     static int logged;
@@ -97,6 +99,12 @@ static VideoPicture *wiliwili_request_picture(VideoDecoder *decoder, int stream)
             return NULL;
         }
         while (picture->nPts > clock + 20000) {
+            if (!atomic_load(&audio_clock_active) ||
+                monotonic_us() - atomic_load(&audio_clock_wall) > 750000) {
+                atomic_store(&audio_clock_active, 0);
+                break;
+            }
+            if (player_pause_wait()) { ReturnPicture(decoder, picture); return NULL; }
             if (atomic_load(&loop_pending) && picture->nPts > 5000000) {
                 ReturnPicture(decoder, picture);
                 return NULL;
@@ -146,6 +154,7 @@ atomic_int wiliwili_volume = ATOMIC_VAR_INIT(100);
 static int initial_seek_applied;
 static cdx_int32 wiliwili_prefetch(CdxParserT *parser, CdxPacketT *packet)
 {
+    if (player_pause_wait()) return -1;
     if (!initial_seek_applied) {
         initial_seek_applied = 1;
         const char *value = getenv("F1_PLAYER_START_MS");
@@ -183,11 +192,9 @@ static snd_pcm_sframes_t wiliwili_pcm_write(snd_pcm_t *pcm, const void *samples,
     }
     startup_audio_aligned = 1;
     int volume = atomic_load(&wiliwili_volume);
-    snd_pcm_hw_params_t *params;
-    snd_pcm_hw_params_alloca(&params);
-    unsigned channels, rate;
-    if (snd_pcm_hw_params_current(pcm, params) || snd_pcm_hw_params_get_channels(params, &channels) ||
-        snd_pcm_hw_params_get_rate(params, &rate, NULL) || !rate) return -EINVAL;
+    (void)pcm;
+    unsigned channels = audio_channels, rate = audio_rate;
+    if (!rate) return -EINVAL;
     static int16_t scaled[8192];
     if (!channels || frames > 8192 / channels) return -EINVAL;
     const int16_t *input = samples;
@@ -196,11 +203,11 @@ static snd_pcm_sframes_t wiliwili_pcm_write(snd_pcm_t *pcm, const void *samples,
         for (unsigned i = 0; i < frames * channels; ++i) scaled[i] = (int32_t)input[i] * volume / 100;
         output = scaled;
     }
-    snd_pcm_sframes_t written = snd_pcm_writei(pcm, output, frames);
-    if (written > 0 && audio_packet_pts >= 0) {
+    snd_pcm_sframes_t written = audio_write(output, frames);
+    if (written > 0 && audio_packet_pts >= 0 && audio_pcm) {
         audio_packet_pts += (int64_t)written * 1000000 / rate;
         snd_pcm_sframes_t delay = 0;
-        if (snd_pcm_delay(pcm, &delay) < 0 || delay < 0) delay = 0;
+        if (snd_pcm_delay(audio_pcm, &delay) < 0 || delay < 0) delay = 0;
         atomic_store(&audio_played_pts, audio_packet_pts - (int64_t)delay * 1000000 / rate);
         atomic_store(&audio_clock_wall, monotonic_us());
         atomic_store(&audio_clock_active, 1);
@@ -225,6 +232,11 @@ static cdx_int32 wiliwili_seek_to(CdxParserT *parser, cdx_int64 time_us, SeekMod
 #define CdxParserSeekTo wiliwili_seek_to
 #define CdxParserPrefetch wiliwili_prefetch
 #define snd_pcm_writei wiliwili_pcm_write
+#define snd_pcm_open wiliwili_pcm_open
+#define snd_pcm_set_params wiliwili_pcm_params
+#define snd_pcm_drain wiliwili_pcm_drop
+#define snd_pcm_close wiliwili_pcm_drop
+#define snd_pcm_recover wiliwili_pcm_recover
 #define RequestPicture wiliwili_request_picture
 #define usleep wiliwili_usleep
 #define aacDecoder_Fill(dec, buffers, sizes, valid) wiliwili_aac_fill(dec, buffers, sizes, valid, pkt->pts)

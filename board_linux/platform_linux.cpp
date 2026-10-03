@@ -313,7 +313,10 @@ bool platform_player_prepare(const PlatformPlayerSpec& spec, std::string& error)
 }
 bool platform_player_start(std::string& error) {
     if (player_pid > 0) {
-        if (player_paused && kill(player_pid, SIGCONT)) { error = "Cannot resume player"; return false; }
+        const uint64_t resume = 9;
+        if (player_paused && send(osd_event_fd, &resume, sizeof(resume), MSG_DONTWAIT | MSG_NOSIGNAL) != sizeof(resume)) {
+            error = "Cannot resume player"; return false;
+        }
         player_paused = false;
         return true;
     }
@@ -355,7 +358,10 @@ bool platform_player_start(std::string& error) {
     return true;
 }
 bool platform_player_pause(std::string& error) {
-    if (player_pid <= 0 || kill(player_pid, SIGSTOP)) { error = "Player is not active"; return false; }
+    const uint64_t pause = 8;
+    if (player_pid <= 0 || send(osd_event_fd, &pause, sizeof(pause), MSG_DONTWAIT | MSG_NOSIGNAL) != sizeof(pause)) {
+        error = "Player is not active"; return false;
+    }
     player_paused = true;
     return true;
 }

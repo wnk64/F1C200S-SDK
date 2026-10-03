@@ -27,6 +27,7 @@ static unsigned long updates;
 static int osd_drm_fd;
 static int desired_visibility;
 extern atomic_int wiliwili_volume;
+extern atomic_int wiliwili_paused;
 extern atomic_int wiliwili_first_frame_visible;
 extern atomic_llong wiliwili_latest_video_pts;
 extern atomic_int wiliwili_crop_ready;
@@ -155,6 +156,11 @@ static void *update_controls(void *unused)
                     unsigned volume = count >> 32;
                     if (volume <= 100) atomic_store(&wiliwili_volume, volume);
                     fprintf(stderr, "PLAYER volume=%u\n", volume);
+                    continue;
+                }
+                if (count == 8 || count == 9) {
+                    atomic_store(&wiliwili_paused, count == 8);
+                    fprintf(stderr, "PLAYER cooperative pause=%d\n", count == 8);
                     continue;
                 }
                 if (count == 1 || count == 2) copy_controls();
