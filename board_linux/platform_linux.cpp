@@ -18,6 +18,7 @@ int board_jpeg_thumbnail(const uint8_t *, size_t, int, int, uint16_t *);
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
 #include <linux/input.h>
+#include <linux/kd.h>
 #include <mutex>
 #include <openssl/md5.h>
 #include <openssl/crypto.h>
@@ -36,6 +37,7 @@ extern char **environ;
 
 namespace {
 int fb_fd = -1, input_fd = -1, i2c_fd = -1;
+int tty_fd = -1, tty_mode = KD_TEXT;
 uint8_t *framebuffer = nullptr;
 fb_var_screeninfo screen{};
 fb_fix_screeninfo fixed{};
@@ -172,6 +174,10 @@ bool platform_display_init(int width, int height, const char *) {
     void *mapped = mmap(nullptr, fixed.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fb_fd, 0);
     if (mapped == MAP_FAILED) { platform_display_shutdown(); return false; }
     framebuffer = static_cast<uint8_t *>(mapped);
+    tty_fd = open("/dev/tty0", O_RDWR | O_CLOEXEC);
+    if (tty_fd < 0 || ioctl(tty_fd, KDGETMODE, &tty_mode) || ioctl(tty_fd, KDSETMODE, KD_GRAPHICS)) {
+        platform_display_shutdown(); return false;
+    }
     for (int n = 0; n < 8; ++n) {
         const std::string path = "/dev/input/event" + std::to_string(n);
         const int fd = open(path.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
@@ -189,6 +195,7 @@ bool platform_display_init(int width, int height, const char *) {
 }
 void platform_display_set_fullscreen(bool) {}
 void platform_display_shutdown() {
+    if (tty_fd >= 0) { (void)ioctl(tty_fd, KDSETMODE, tty_mode); close(tty_fd); tty_fd = -1; }
     if (framebuffer) munmap(framebuffer, fixed.smem_len);
     framebuffer = nullptr;
     for (int *fd : {&input_fd, &i2c_fd, &fb_fd}) { if (*fd >= 0) close(*fd); *fd = -1; }

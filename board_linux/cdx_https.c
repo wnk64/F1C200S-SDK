@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define WINDOW (256U * 1024U)
 typedef struct {
@@ -14,21 +15,35 @@ typedef struct {
     CURL *curl;
     char *uri;
     unsigned char *buffer;
+    unsigned char *next_buffer;
     size_t length;
+    size_t next_length;
     int64_t position, start, total;
+    int64_t next_start, next_total, requested;
+    int pending, busy, next_valid, next_error, shutdown, worker_started;
+    pthread_mutex_t mutex;
+    pthread_cond_t changed;
+    pthread_t worker;
     CdxStreamProbeDataT probe;
     atomic_int cancelled;
     int state;
 } HttpsStream;
+
+static int64_t now_us(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (int64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+}
 
 static size_t receive(char *data, size_t size, size_t count, void *opaque)
 {
     HttpsStream *s = opaque;
     if (size && count > SIZE_MAX / size) return 0;
     size_t bytes = size * count;
-    if (bytes > WINDOW - s->length) return 0;
-    memcpy(s->buffer + s->length, data, bytes);
-    s->length += bytes;
+    if (bytes > WINDOW - s->next_length) return 0;
+    memcpy(s->next_buffer + s->next_length, data, bytes);
+    s->next_length += bytes;
     return bytes;
 }
 
@@ -38,7 +53,7 @@ static int progress(void *opaque, curl_off_t a, curl_off_t b, curl_off_t c, curl
     return atomic_load(&((HttpsStream *)opaque)->cancelled);
 }
 
-static int fetch(HttpsStream *s, int64_t start)
+static int download_range(HttpsStream *s, int64_t start)
 {
     if (start < 0 || atomic_load(&s->cancelled)) return -1;
     int64_t end = start + WINDOW - 1;
@@ -46,8 +61,9 @@ static int fetch(HttpsStream *s, int64_t start)
     if (end < start) return -1;
     char range[80];
     snprintf(range, sizeof(range), "%" PRId64 "-%" PRId64, start, end);
-    s->length = 0;
+    s->next_length = 0;
     curl_easy_setopt(s->curl, CURLOPT_RANGE, range);
+    int64_t begin = now_us();
     CURLcode result = curl_easy_perform(s->curl);
     long status = 0;
     curl_easy_getinfo(s->curl, CURLINFO_RESPONSE_CODE, &status);
@@ -57,28 +73,88 @@ static int fetch(HttpsStream *s, int64_t start)
         curl_easy_header(s->curl, "Content-Range", 0, CURLH_HEADER, -1, &header) != CURLHE_OK ||
         sscanf(header->value, "bytes %" SCNd64 "-%" SCNd64 "/%" SCNd64, &first, &last, &total) != 3 ||
         first != start || last != (end < total ? end : total - 1) || total <= last || total <= 0 ||
-        s->length != (size_t)(last - first + 1) ||
+        s->next_length != (size_t)(last - first + 1) ||
         (s->total >= 0 && total != s->total)) {
-        fprintf(stderr, "HTTPS range failed: curl=%d status=%ld bytes=%zu\n", result, status, s->length);
-        s->length = 0;
-        s->state = CDX_IO_STATE_ERROR;
+        fprintf(stderr, "HTTPS range failed: curl=%d status=%ld bytes=%zu\n", result, status, s->next_length);
+        s->next_length = 0;
         return -1;
     }
+    s->next_total = total;
+    fprintf(stderr, "HTTPS fetch start=%" PRId64 " bytes=%zu elapsed_us=%" PRId64 "\n",
+            start, s->next_length, now_us() - begin);
+    return 0;
+}
+
+/* CURL has one owner. The second fixed-size buffer fills while decoding uses the first. */
+static void *download(void *opaque)
+{
+    HttpsStream *s = opaque;
+    pthread_mutex_lock(&s->mutex);
+    while (!s->shutdown) {
+        while (!s->shutdown && (!s->pending || atomic_load(&s->cancelled)))
+            pthread_cond_wait(&s->changed, &s->mutex);
+        if (s->shutdown) break;
+        s->next_start = s->requested;
+        s->pending = 0;
+        s->busy = 1;
+        s->next_valid = 0;
+        pthread_mutex_unlock(&s->mutex);
+        int result = download_range(s, s->next_start);
+        pthread_mutex_lock(&s->mutex);
+        s->busy = 0;
+        s->next_error = result;
+        s->next_valid = result == 0;
+        pthread_cond_broadcast(&s->changed);
+    }
+    pthread_mutex_unlock(&s->mutex);
+    return NULL;
+}
+
+static int fetch(HttpsStream *s, int64_t position)
+{
+    int64_t start = position / WINDOW * WINDOW;
+    int64_t begin = now_us();
+    pthread_mutex_lock(&s->mutex);
+    while (s->busy || !s->next_valid || s->next_start != start) {
+        if (s->shutdown || atomic_load(&s->cancelled) ||
+            (!s->busy && !s->pending && s->next_start == start && s->next_error)) {
+            pthread_mutex_unlock(&s->mutex); s->state = CDX_IO_STATE_ERROR; return -1;
+        }
+        if (!s->busy) {
+            s->requested = start;
+            s->pending = 1;
+            pthread_cond_signal(&s->changed);
+        }
+        pthread_cond_wait(&s->changed, &s->mutex);
+    }
+    unsigned char *old = s->buffer;
+    s->buffer = s->next_buffer;
+    s->next_buffer = old;
+    s->length = s->next_length;
     s->start = start;
-    s->total = total;
+    s->total = s->next_total;
     s->state = CDX_IO_STATE_OK;
+    s->next_valid = 0;
+    s->next_error = 0;
+    s->requested = start + WINDOW < s->total ? start + WINDOW : 0;
+    if (s->requested != start) { s->pending = 1; pthread_cond_signal(&s->changed); }
+    pthread_mutex_unlock(&s->mutex);
+    int64_t waited = now_us() - begin;
+    if (waited > 10000) fprintf(stderr, "HTTPS decoder_wait start=%" PRId64 " wait_us=%" PRId64 "\n", start, waited);
     return 0;
 }
 
 static int connect_stream(CdxStreamT *stream)
 {
     HttpsStream *s = (HttpsStream *)stream;
+    if (pthread_create(&s->worker, NULL, download, s)) return -1;
+    s->worker_started = 1;
     if (fetch(s, 0)) return -1;
     s->probe.len = s->length < 2048 ? s->length : 2048;
     s->probe.buf = malloc(s->probe.len);
     if (!s->probe.buf) return -1;
     memcpy(s->probe.buf, s->buffer, s->probe.len);
-    fprintf(stderr, "HTTPS range connected: total=%" PRId64 " cache=%u\n", s->total, WINDOW);
+    fprintf(stderr, "HTTPS async connected: total=%" PRId64 " cache=%u\n", s->total, WINDOW * 2);
     return 0;
 }
 
@@ -111,8 +187,16 @@ static int read_stream(CdxStreamT *stream, void *buffer, cdx_uint32 length)
 static int close_stream(CdxStreamT *stream)
 {
     HttpsStream *s = (HttpsStream *)stream;
+    atomic_store(&s->cancelled, 1);
+    pthread_mutex_lock(&s->mutex);
+    s->shutdown = 1;
+    pthread_cond_broadcast(&s->changed);
+    pthread_mutex_unlock(&s->mutex);
+    if (s->worker_started) pthread_join(s->worker, NULL);
     curl_easy_cleanup(s->curl);
-    free(s->probe.buf); free(s->uri); free(s->buffer); free(s);
+    pthread_cond_destroy(&s->changed);
+    pthread_mutex_destroy(&s->mutex);
+    free(s->probe.buf); free(s->uri); free(s->buffer); free(s->next_buffer); free(s);
     return 0;
 }
 static int io_state(CdxStreamT *stream) { return ((HttpsStream *)stream)->state; }
@@ -122,12 +206,15 @@ static int control(CdxStreamT *stream, int command, void *parameter)
     HttpsStream *s = (HttpsStream *)stream;
     if (command == STREAM_CMD_SET_FORCESTOP || command == STREAM_CMD_CLR_FORCESTOP) {
         atomic_store(&s->cancelled, command == STREAM_CMD_SET_FORCESTOP);
+        pthread_mutex_lock(&s->mutex);
+        pthread_cond_broadcast(&s->changed);
+        pthread_mutex_unlock(&s->mutex);
         return 0;
     }
     if (command == STREAM_CMD_GET_CACHESTATE && parameter) {
         struct StreamCacheStateS *state = parameter;
         memset(state, 0, sizeof(*state));
-        state->nCacheCapacity = WINDOW;
+        state->nCacheCapacity = WINDOW * 2;
         state->nCacheSize = s->length;
         return 0;
     }
@@ -164,10 +251,14 @@ static CdxStreamT *create_stream(CdxDataSourceT *source)
     s->total = -1;
     s->state = CDX_IO_STATE_INVALID;
     atomic_init(&s->cancelled, 0);
+    s->next_start = -1;
+    if (pthread_mutex_init(&s->mutex, NULL)) { free(s); return NULL; }
+    if (pthread_cond_init(&s->changed, NULL)) { pthread_mutex_destroy(&s->mutex); free(s); return NULL; }
     s->uri = strdup(source->uri);
     s->buffer = malloc(WINDOW);
+    s->next_buffer = malloc(WINDOW);
     s->curl = curl_easy_init();
-    if (!s->uri || !s->buffer || !s->curl) { close_stream(&s->base); return NULL; }
+    if (!s->uri || !s->buffer || !s->next_buffer || !s->curl) { close_stream(&s->base); return NULL; }
     curl_easy_setopt(s->curl, CURLOPT_URL, s->uri);
     curl_easy_setopt(s->curl, CURLOPT_PROTOCOLS_STR, "https");
     curl_easy_setopt(s->curl, CURLOPT_REDIR_PROTOCOLS_STR, "https");

@@ -17,6 +17,13 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / pending / OSD first test and bounded prefetch plan
+
+源码da08463/f79ff73，UI174a16c7、专用播放器e4e546b8；真实B站640x360/25fps硬解与AAC音频同时运行。新增RGB565缓冲137600字节，内核读数显示层0和层1都启用，优先级分别0/1；用户确认无控制UI，因此不能以plane创建成功宣称显示成功。
+用户确认声音正常后又出现偶发音频卡顿；帧日志多次有0.3至1.3秒间隔，循环边界有7.2秒间隔。系统MemAvailable约24MiB/CmaFree约9.5MiB，没有已知OOM证据。
+下一假设：同步HTTPS Range下载阻塞解复用，导致两条输出队列耗尽。修改范围仅cdx_https读取适配器：单独下载线程、双256KiB缓存、总512KiB固定上限和提前读取下一块；不改音视频解码核心、内核、驱动或音频服务。记录HTTP等待与耗时，验证是否与实际帧间隙对应。
+固定测试视频已按用户要求写入board_linux/TEST_PROTOCOL.md，BV1GJ411x7h7。当前仍pending，旧原播放器与UI保留，不推稳定。
+
 ## 2026-10-03 / Planned / Small independent RGB playback controls
 
 基线48577e6：专用HTTPS网络播放器已读取B站360p MP4并硬解90度旋转；播放器与UI同时显示尚未验收。旧UI程序9e43a1a7及投屏player-aud-resume保留。
