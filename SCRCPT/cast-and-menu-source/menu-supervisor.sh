@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 SELF=$(CDPATH= cd "$(dirname "$0")" && pwd)
-UI=/root/aic_miracast/candidates/menu_graphics_boot_20261003/f1-menu-time
+UI=/root/aic_miracast/candidates/menu_graphics_boot_20261003/f1-menu-power
 test_once=0
 case "${1:-}" in
     '') ;;
@@ -38,6 +38,19 @@ while :; do
         [ "$rc" -ne 0 ] || rc=20
     fi
     [ "$rc" -ne 0 ] || exit 0
+    if [ "$rc" -eq 32 ] || [ "$rc" -eq 33 ]; then
+        if [ "$rc" -eq 32 ] && [ ! -d /sys/module/f1_board_power ]; then
+            echo 'Poweroff driver is not loaded' >&2
+            error=1
+            continue
+        fi
+        sync
+        if [ "$rc" -eq 32 ]; then /sbin/poweroff || true; else /sbin/reboot || true; fi
+        # Normal init shutdown stops this supervisor; recover UI if it never begins.
+        sleep 20
+        error=1
+        continue
+    fi
     if [ "$rc" -lt 20 ] || [ "$rc" -gt 31 ]; then
         echo "menu failed: $rc" >&2; exit "$rc"
     fi

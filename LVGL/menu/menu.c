@@ -3,6 +3,7 @@
 #include "ui.h"
 #include "connections.h"
 #include "time-settings.h"
+#include "system-status.h"
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,6 +20,8 @@ static unsigned count, page;
 static volatile sig_atomic_t quit;
 static int exit_code, view;
 static lv_obj_t *content, *status_label, *touch_label, *marker, *brightness_label;
+static lv_obj_t *battery_label, *ssh_label;
+static int requested_power;
 static const char *config_path;
 static void (*back_action)(void);
 static void signal_stop(int n) { (void)n; quit = 1; }
@@ -46,6 +49,7 @@ lv_obj_t *button(lv_obj_t *parent, int x, int y, int width, int height, uint32_t
 static void home(void);
 static void settings(void);
 static void touch_test(void);
+static void power_settings(void);
 static void back(lv_event_t *e) { (void)e; if (back_action) back_action(); }
 lv_obj_t *menu_content(void) { return content; }
 lv_obj_t *menu_status(void) { return status_label; }
@@ -56,6 +60,7 @@ void header(const char *title, int can_back)
     time_settings_close();
     back_action = home;
     view = 0; touch_label = marker = brightness_label = NULL;
+    battery_label = ssh_label = NULL;
     lv_obj_clean(content);
     label(content, title, can_back ? 104 : 28, 34, can_back ? 320 : 424, 0x172329);
     if (can_back) {
@@ -86,7 +91,8 @@ static void change_page(lv_event_t *e)
 static void home(void)
 {
     header("应用", 0);
-    label(content, "F1C200S", 312, 39, 144, 0x66757E);
+    battery_label = label(content, LV_SYMBOL_BATTERY_3 " --% ?", 286, 39, 170, 0x66757E);
+    lv_obj_set_style_text_font(battery_label, &lv_font_montserrat_24, 0);
     for (unsigned row = 0; row < PER_PAGE && page * PER_PAGE + row < count; row++) {
         unsigned i = page * PER_PAGE + row;
         uint32_t accent = i == 0 ? 0x167A6F : i == 1 ? 0x3473A1 : 0x6C687D;
@@ -126,9 +132,14 @@ static void network_open(lv_event_t *e)
     connections_show((int)(intptr_t)lv_event_get_user_data(e));
 }
 static void time_open(lv_event_t *e) { (void)e; time_settings_show(); }
+static void power_open(lv_event_t *e) { (void)e; power_settings(); }
 static void settings(void)
 {
     header("系统设置", 1); view = 1;
+    ssh_label = label(content, "", 28, 130, 424, 0x66757E);
+    lv_obj_set_style_text_font(ssh_label, &lv_font_montserrat_16, 0);
+    char address[80]; system_ssh_address(address, sizeof(address));
+    lv_label_set_text(ssh_label, address);
     label(content, "显示亮度", 28, 162, 424, 0x172329);
     brightness_label = label(content, "", 150, 246, 180, 0x172329);
     lv_obj_set_style_text_align(brightness_label, LV_TEXT_ALIGN_CENTER, 0);
@@ -149,8 +160,42 @@ static void settings(void)
     label(time, LV_SYMBOL_SETTINGS, 28, 32, 64, 0x167A6F);
     label(time, "日期与时间", 112, 32, 272, 0x172329);
     lv_obj_add_event_cb(time, time_open, LV_EVENT_CLICKED, NULL);
-    lv_obj_t *version = label(content, "LVGL 8.2.0 / 480 x 800", 28, 736, 424, 0x66757E);
-    lv_obj_set_style_text_font(version, &lv_font_montserrat_16, 0);
+    lv_obj_t *power = button(content, 24, 700, 432, 76, 0xFFFFFF);
+    label(power, LV_SYMBOL_POWER, 28, 20, 64, 0xB84545);
+    label(power, "关机与重启", 112, 20, 272, 0x172329);
+    lv_obj_add_event_cb(power, power_open, LV_EVENT_CLICKED, NULL);
+}
+static void power_commit(lv_event_t *event)
+{
+    (void)event;
+    if (requested_power == 32 && access("/sys/module/f1_board_power", F_OK)) {
+        lv_obj_set_style_text_font(status_label, &menu_font_28, 0);
+        lv_label_set_text(status_label, "关机驱动未就绪"); return;
+    }
+    exit_code = requested_power; quit = 1;
+}
+static void power_confirm(lv_event_t *event)
+{
+    requested_power = (int)(intptr_t)lv_event_get_user_data(event);
+    header(requested_power == 32 ? "确认关机" : "确认重启", 1);
+    view = 4; back_action = power_settings;
+    label(content, requested_power == 32 ? "关闭设备电源？" : "重新启动设备？", 28, 264, 424, 0x172329);
+    lv_obj_t *cancel = button(content, 24, 440, 204, 104, 0xFFFFFF);
+    lv_obj_t *ok = button(content, 252, 440, 204, 104, 0xFFFFFF);
+    label(cancel, "取消", 62, 32, 120, 0x172329);
+    label(ok, "确认", 62, 32, 120, 0xB84545);
+    lv_obj_add_event_cb(cancel, back, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(ok, power_commit, LV_EVENT_CLICKED, NULL);
+}
+static void power_settings(void)
+{
+    header("关机与重启", 1); view = 4; back_action = settings;
+    for (int i = 0; i < 2; ++i) {
+        lv_obj_t *b = button(content, 24, 204 + i * 180, 432, 148, 0xFFFFFF);
+        label(b, i ? LV_SYMBOL_REFRESH : LV_SYMBOL_POWER, 28, 54, 64, i ? 0x167A6F : 0xB84545);
+        label(b, i ? "重启" : "关机", 112, 54, 272, 0x172329);
+        lv_obj_add_event_cb(b, power_confirm, LV_EVENT_CLICKED, (void *)(intptr_t)(32 + i));
+    }
 }
 static void test_hit(lv_event_t *e)
 {
@@ -210,6 +255,9 @@ int main(int argc, char **argv)
     int time_smoke = argc > 2 && !strcmp(argv[2], "--time-smoke");
     int time_preview = argc > 2 && !strcmp(argv[2], "--time-preview");
     int time_test = argc > 2 && !strcmp(argv[2], "--time-selftest");
+    int system_smoke = argc > 2 && !strcmp(argv[2], "--system-smoke");
+    int power_preview = argc > 2 && !strcmp(argv[2], "--power-preview");
+    int settings_preview = argc > 2 && !strcmp(argv[2], "--settings-preview");
     if (platform_open()) { platform_close(); return 2; }
     signal(SIGTERM, signal_stop); signal(SIGINT, signal_stop);
     signal(SIGPIPE, SIG_IGN);
@@ -218,13 +266,31 @@ int main(int argc, char **argv)
     lv_obj_clear_flag(content, LV_OBJ_FLAG_SCROLLABLE);
     home();
     if (time_preview || time_test) time_settings_show();
+    if (power_preview) power_settings();
+    if (settings_preview) settings();
     uint64_t previous = platform_ms(), start = previous, update = 0;
     int smoke_stage = 0;
+    uint64_t system_update = 0;
     while (!quit) {
         uint64_t now = platform_ms(); lv_tick_inc((uint32_t)(now - previous)); previous = now;
         uint32_t idle_ms = lv_timer_handler();
         connections_poll();
         time_settings_poll();
+        if (now - system_update >= 5000 || !system_update) {
+            system_update = now;
+            if (battery_label) {
+                char battery[40], text[64]; int charging;
+                system_battery(battery, sizeof(battery), &charging);
+                snprintf(text, sizeof(text), "%s %s%s", LV_SYMBOL_BATTERY_3, battery,
+                    charging > 0 ? " " LV_SYMBOL_CHARGE : charging < 0 ? " ?" : "");
+                lv_label_set_text(battery_label, text);
+                lv_obj_set_style_text_color(battery_label, lv_color_hex(charging > 0 ? 0x167A6F : 0x66757E), 0);
+            }
+            if (ssh_label) {
+                char address[80]; system_ssh_address(address, sizeof(address));
+                lv_label_set_text(ssh_label, address);
+            }
+        }
         if (time_test) {
             int result = time_settings_test_step();
             if (result || now - start > 60000) {
@@ -251,6 +317,13 @@ int main(int argc, char **argv)
         if (time_smoke && now - start > (uint64_t)(smoke_stage + 1) * 1000) {
             if (smoke_stage == 0) settings();
             else if (smoke_stage == 1) time_settings_show();
+            else if (smoke_stage == 2) home();
+            else quit = 1;
+            smoke_stage++;
+        }
+        if (system_smoke && now - start > (uint64_t)(smoke_stage + 1) * 1200) {
+            if (smoke_stage == 0) settings();
+            else if (smoke_stage == 1) power_settings();
             else if (smoke_stage == 2) home();
             else quit = 1;
             smoke_stage++;
