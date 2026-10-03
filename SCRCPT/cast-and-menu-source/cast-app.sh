@@ -6,6 +6,7 @@ R=/tmp/manual_miracast_20260920
 PLAYER=/root/aic_miracast/candidates/player_frame_gap_20261001/player-frame-gap
 SINK=/root/aic_miracast/candidates/audio_reopen_20261002/sink-audio-reopen
 owned=
+touch_pid=
 same_process() {
     [ -r "/proc/$1/stat" ] && [ "$(awk '{print $3}' "/proc/$1/stat")" != Z ] &&
         [ "$(awk '{print $22}' "/proc/$1/stat")" = "$2" ]
@@ -21,6 +22,11 @@ remember() {
 }
 cleanup() {
     trap - EXIT INT TERM
+    if [ -n "$touch_pid" ]; then
+        kill -TERM "$touch_pid" 2>/dev/null || true
+        wait "$touch_pid" 2>/dev/null || true
+        touch_pid=
+    fi
     for pair in $owned; do
         pid=${pair%%:*}; stamp=${pair#*:}
         if same_process "$pid" "$stamp"; then kill -TERM "$pid" 2>/dev/null || true; fi
@@ -51,6 +57,15 @@ sh "$START" "$mode" || rc=$?
 remember player.pid
 remember rtsp-watch.pid
 [ "$rc" -eq 0 ] || exit "$rc"
+TOUCH=$SELF/cast-wait-touch
+if [ -x "$TOUCH" ]; then
+    if [ "${F1_CAST_EXIT_PROBE:-0}" = 1 ]; then
+        "$TOUCH" --simulate-triple &
+    else
+        "$TOUCH" &
+    fi
+    touch_pid=$!
+fi
 watch=$(cat "$R/rtsp-watch.pid")
 watch_stamp=$(awk '{print $22}' "/proc/$watch/stat")
 sink_seen=0
@@ -60,6 +75,21 @@ while same_process "$watch" "$watch_stamp"; do
         candidate=$(cat "$R/sink.pid")
         if [ "$(readlink "/proc/$candidate/exe" 2>/dev/null || true)" = "$SINK" ]; then
             remember sink.pid; sink_seen=1
+        fi
+    fi
+    if [ -n "$touch_pid" ] && ! kill -0 "$touch_pid" 2>/dev/null; then
+        touch_rc=0
+        wait "$touch_pid" || touch_rc=$?
+        touch_pid=
+        if [ "$touch_rc" -eq 10 ] && [ "$sink_seen" -eq 0 ]; then
+            # Recheck the connection after the helper exits to close the race.
+            candidate=$(cat "$R/sink.pid" 2>/dev/null || true)
+            if [ -n "$candidate" ] && [ "$(readlink "/proc/$candidate/exe" 2>/dev/null || true)" = "$SINK" ]; then
+                remember sink.pid; sink_seen=1
+            else
+                echo 'triple center touch: returning to menu'
+                exit 0
+            fi
         fi
     fi
     n=$((n + 1))
