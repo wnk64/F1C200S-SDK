@@ -7257,6 +7257,14 @@ int main(int argc, char** argv) {
             fetch_later_videos();
         }
         if (player_page_visible && player_playing && player_seek_label) {
+#ifdef WILIWILI_BOARD
+            if (platform_player_rewound()) {
+                player_elapsed_offset_ms = 0;
+                player_started_tick = platform_ticks();
+                if (board_player_slider) lv_slider_set_value(board_player_slider, 0, LV_ANIM_OFF);
+                std::fprintf(stderr, "PLAYER rewind: time and progress reset\n");
+            }
+#endif
             const uint32_t elapsed_ms = player_elapsed_offset_ms +
                 (platform_ticks() - player_started_tick) * static_cast<uint32_t>(setting_playback_speed) / 100U;
             const uint32_t elapsed_sec = elapsed_ms / 1000U;

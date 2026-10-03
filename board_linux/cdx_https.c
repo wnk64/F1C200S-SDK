@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/socket.h>
 
 #define WINDOW (256U * 1024U)
 typedef struct {
@@ -228,7 +229,13 @@ static int seek_stream(CdxStreamT *stream, int64_t offset, int whence)
     if (base < 0 || (offset > 0 && base > INT64_MAX - offset) || offset < -base) return -1;
     int64_t position = base + offset;
     if (position > s->total) return -1;
+    int rewind = position == 0 && s->position > s->total / 2;
     s->position = position;
+    if (rewind && getenv("F1_OSD_EVENT_FD")) {
+        const uint64_t notification = 4;
+        (void)send(3, &notification, sizeof(notification), MSG_DONTWAIT | MSG_NOSIGNAL);
+        fprintf(stderr, "HTTPS rewind: UI progress reset requested\n");
+    }
     s->state = position == s->total ? CDX_IO_STATE_EOS : CDX_IO_STATE_OK;
     return 0;
 }

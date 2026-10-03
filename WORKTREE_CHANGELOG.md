@@ -17,6 +17,10 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / Planned / Reset UI progress on actual stream rewind
+
+用户反馈循环结束后UI时间和进度继续递增。原Cedar循环在PSR_EOS执行CdxParserSeekTo(parser,0)，UI没有收到回绕通知。仅修改wiliwili专用HTTPS流seek适配与UI平台接口：从文件后半段实际seek到0时，经已有双向Unix数据报发送回绕事件，UI重置软件计时和进度。不依据duration自行猜循环，不改原投屏播放器。初始MP4索引读取若回到0也可产生重置，初始计时归零无害；不是解码输出PTS精确同步。
+
 ## 2026-10-03 / pending / Hidden black-strip candidate deployed
 
 源码5358305，专用播放器SHA256 4af2c4480a0e7c84d5938afd597d7df00683bc92871bab6e833bd68ed3831a8a；原SDK增量make net-player成功，SSH部署哈希一致。仅重启本轮wiliwili应用，未重启板子、未修改投屏/驱动。隐藏时使用屏幕外x480、alpha255，显示时x0、alpha255。显示坐标修改仅作用UI层1，视频层0保持不变。实际黑条消失与触摸十秒切换待用户确认，状态pending。

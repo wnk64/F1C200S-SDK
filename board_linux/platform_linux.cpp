@@ -352,6 +352,14 @@ void platform_player_controls_visible(bool visible) {
     const uint64_t command = visible ? 2 : 3;
     (void)send(osd_event_fd, &command, sizeof(command), MSG_DONTWAIT | MSG_NOSIGNAL);
 }
+bool platform_player_rewound() {
+    if (osd_event_fd < 0) return false;
+    bool rewound = false;
+    uint64_t notification;
+    while (recv(osd_event_fd, &notification, sizeof(notification), MSG_DONTWAIT) == sizeof(notification))
+        if (notification == 4) rewound = true;
+    return rewound;
+}
 bool platform_player_seek(uint32_t, std::string& error) { error = "Seek controls are not connected yet"; return false; }
 bool platform_player_set_volume(uint8_t, std::string& error) { error = "Use the system audio volume for this candidate"; return false; }
 bool platform_player_set_speed(uint16_t percent, std::string& error) {
