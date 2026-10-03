@@ -22,8 +22,10 @@ build-arm/net-player/%.o: $(PLAYER_SRC)/%.c
 	$(CC) -Os -std=gnu11 -Wall -Wextra -Wno-unused-parameter -D_GNU_SOURCE -DHAVE_CEDARX=1 -I$(PLAYER_SRC) -I$(SYSROOT)/usr/include/drm -I../../../ROOTFS/buildroot-2018.02.11/output/build/libcedarx-custom -MMD -MP -c -o $@ $<
 build-arm/cdx_https.o: cdx_https.c
 	$(CC) -Os -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -Ivendor/curl-8.16.0/include -c -o $@ $<
-build-arm/cedar-net-player: $(PLAYER_OBJ) build-arm/cdx_https.o build-curl/lib/.libs/libcurl.a
-	$(CC) -Wl,--gc-sections -L../../../ROOTFS/buildroot-2018.02.11/output/target/usr/lib -o $@ $^ -ldrm -lMemAdapter -lvdecoder -lVE -lvideoengine -lcdc_base -lcdx_parser -lcdx_stream -lcdx_base -lcdx_common -lfdk-aac -lasound -lssl -lcrypto -lz -lpthread -lrt -ldl -lm
+build-arm/cedar_osd.o: cedar_osd.c
+	$(CC) -Os -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -I$(PLAYER_SRC) -I$(SYSROOT)/usr/include/drm -c -o $@ $<
+build-arm/cedar-net-player: $(PLAYER_OBJ) build-arm/cdx_https.o build-arm/cedar_osd.o build-curl/lib/.libs/libcurl.a
+	$(CC) -Wl,--gc-sections,--wrap=drm_warpper_init,--wrap=drm_warpper_destroy -L../../../ROOTFS/buildroot-2018.02.11/output/target/usr/lib -o $@ $^ -ldrm -lMemAdapter -lvdecoder -lVE -lvideoengine -lcdc_base -lcdx_parser -lcdx_stream -lcdx_base -lcdx_common -lfdk-aac -lasound -lssl -lcrypto -lz -lpthread -lrt -ldl -lm
 -include $(PLAYER_OBJ:.o=.d)
 build-arm/wiliwili-lvgl: $(OBJ) build-curl/lib/.libs/libcurl.a
 	$(CXX) -Wl,--gc-sections -o $@ $^ -lssl -lcrypto -ljpeg -pthread -lm

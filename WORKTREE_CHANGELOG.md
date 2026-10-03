@@ -17,6 +17,13 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / Planned / Small independent RGB playback controls
+
+基线48577e6：专用HTTPS网络播放器已读取B站360p MP4并硬解90度旋转；播放器与UI同时显示尚未验收。旧UI程序9e43a1a7及投屏player-aud-resume保留。
+上一轮UI没有解码子进程：用户配置为125%播放速度，后端仅支持100%，因此prepare拒绝；先将板端支持范围明确限制为正常速度，不宣称已实现倍速或拖动。
+计划仅修改wiliwili应用和应用专用播放器适配模块：视频保持DRM层0；控制条用DRM层1、RGB565、86x800小缓冲，新增CMA约136KiB；直接取现有fb0控制条像素，eventfd只在UI刷新后通知复制，不分配新整屏UI缓冲、不持续轮询整屏。退出恢复原fbdev层并释放新增缓冲。
+保持kernel、DTB、原投屏播放器、无线和蓝牙服务不变。验证持续真实帧提交、播放/暂停/返回、GUI与播放器同时运行的RAM/CPU、CMA退出回收、菜单恢复。候选状态pending，三冷0/3。
+
 ## 2026-10-03 / Planned / Bilibili HTTPS hardware playback
 
 基线：原工作树 39806ed，完整 LVGL/curl 源码与匹配产物保留，未新建工作树。

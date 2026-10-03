@@ -6712,6 +6712,9 @@ int main(int argc, char** argv) {
     window_height = kBoardHeight;
 #endif
     load_lvgl_config();
+#ifdef WILIWILI_BOARD
+    setting_playback_speed = 100;
+#endif
     platform_set_http_proxy(setting_http_proxy, setting_http_proxy_enabled);
     platform_set_tls_verify(setting_tls_verify);
     platform_set_http_timeouts(static_cast<uint32_t>(setting_http_connect_timeout_seconds * 1000),

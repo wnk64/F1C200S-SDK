@@ -30,6 +30,7 @@ int board_jpeg_thumbnail(const uint8_t *, size_t, int, int, uint16_t *);
 #include <pthread.h>
 #include <spawn.h>
 #include <sys/wait.h>
+#include <sys/eventfd.h>
 #include <cerrno>
 extern char **environ;
 
@@ -52,6 +53,8 @@ pthread_once_t curl_once = PTHREAD_ONCE_INIT;
 pthread_mutex_t ssl_locks[128];
 bool curl_ready = false;
 pid_t player_pid = -1;
+int osd_event_fd = -1;
+bool controls_dirty = false;
 bool player_paused = false;
 PlatformPlayerSpec player_spec;
 void ssl_lock(int mode, int n, const char *, int) {
@@ -190,7 +193,7 @@ void platform_display_shutdown() {
     framebuffer = nullptr;
     for (int *fd : {&input_fd, &i2c_fd, &fb_fd}) { if (*fd >= 0) close(*fd); *fd = -1; }
 }
-bool platform_display_flush_pixels(const void *data, int x, int y, int width, int height, bool) {
+bool platform_display_flush_pixels(const void *data, int x, int y, int width, int height, bool present) {
     if (!framebuffer || !data || !board::rectangle(x, y, width, height)) return false;
     static_assert(sizeof(lv_color_t) == 2, "board requires RGB565 strips");
     const auto *pixels = static_cast<const lv_color_t *>(data);
@@ -200,6 +203,12 @@ bool platform_display_flush_pixels(const void *data, int x, int y, int width, in
             auto *out = reinterpret_cast<uint32_t *>(framebuffer + (py + screen.yoffset) * fixed.line_length);
             out[px + screen.xoffset] = board::rgb565(pixels[row * width + col].full);
         }
+    }
+    if (y + height > 394) controls_dirty = true;
+    if (present && controls_dirty && osd_event_fd >= 0) {
+        const uint64_t notification = 1;
+        (void)write(osd_event_fd, &notification, sizeof(notification));
+        controls_dirty = false;
     }
     return true;
 }
@@ -297,23 +306,28 @@ bool platform_player_start(std::string& error) {
     if (!executable || player_spec.stream_uri.empty()) { error = "No prepared stream"; return false; }
     std::vector<std::string> environment;
     for (char **entry = environ; *entry; ++entry) {
-        if (!std::strncmp(*entry, "CEDAR_ROTATE=", 13) || !std::strncmp(*entry, "CEDAR_AUDIODEV=", 15)) continue;
+        if (!std::strncmp(*entry, "CEDAR_ROTATE=", 13) || !std::strncmp(*entry, "CEDAR_AUDIODEV=", 15) ||
+            !std::strncmp(*entry, "F1_OSD_EVENT_FD=", 16)) continue;
         environment.emplace_back(*entry);
     }
     environment.emplace_back("CEDAR_ROTATE=90");
     environment.emplace_back("CEDAR_AUDIODEV=default");
+    environment.emplace_back("F1_OSD_EVENT_FD=3");
     std::vector<char *> envp;
     for (auto& item : environment) envp.push_back(&item[0]);
     envp.push_back(nullptr);
     char *args[] = {const_cast<char *>(executable), &player_spec.stream_uri[0], nullptr};
+    osd_event_fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    if (osd_event_fd < 0) { error = std::strerror(errno); return false; }
     posix_spawn_file_actions_t actions;
     posix_spawn_file_actions_init(&actions);
     posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
     posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO, "/run/wiliwili-player.log", O_WRONLY | O_CREAT | O_TRUNC, 0600);
     posix_spawn_file_actions_adddup2(&actions, STDOUT_FILENO, STDERR_FILENO);
+    posix_spawn_file_actions_adddup2(&actions, osd_event_fd, 3);
     const int rc = posix_spawn(&player_pid, executable, &actions, nullptr, args, envp.data());
     posix_spawn_file_actions_destroy(&actions);
-    if (rc) { player_pid = -1; error = std::strerror(rc); return false; }
+    if (rc) { close(osd_event_fd); osd_event_fd = -1; player_pid = -1; error = std::strerror(rc); return false; }
     player_paused = false;
     std::fprintf(stderr, "CEDAR child started pid=%ld\n", static_cast<long>(player_pid));
     return true;
@@ -337,6 +351,7 @@ bool platform_player_finished() {
         if (result > 0) std::fprintf(stderr, "CEDAR child ended status=%d\n", status);
         player_pid = -1;
         player_paused = false;
+        if (osd_event_fd >= 0) { close(osd_event_fd); osd_event_fd = -1; }
         return true;
     }
     return false;
@@ -354,4 +369,5 @@ void platform_player_stop() {
     while (waitpid(player_pid, &status, 0) < 0 && errno == EINTR) {}
     player_pid = -1;
     player_paused = false;
+    if (osd_event_fd >= 0) { close(osd_event_fd); osd_event_fd = -1; }
 }
