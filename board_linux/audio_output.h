@@ -89,8 +89,11 @@ static snd_pcm_sframes_t audio_write(const void *samples, snd_pcm_uframes_t fram
     int64_t deadline = started + 5000000;
     unsigned waits = 0;
     static int injected;
+    static int64_t first_write;
+    if (!first_write) first_write = started;
     int64_t inject_until = 0;
-    if (!injected && wiliwili_debug_enabled() && getenv("F1_AUDIO_EAGAIN_TEST")) {
+    if (!injected && started - first_write > 3000000 &&
+        wiliwili_debug_enabled() && getenv("F1_AUDIO_EAGAIN_TEST")) {
         injected = 1; inject_until = started + 650000;
         fprintf(stderr, "DEBUG inject 650ms PCM backpressure\n");
     }
