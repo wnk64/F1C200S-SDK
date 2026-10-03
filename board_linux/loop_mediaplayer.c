@@ -11,11 +11,30 @@
 #include <fdk-aac/aacdecoder_lib.h>
 #include "render/mediaplayer.h"
 #include <unistd.h>
+#include <time.h>
 
 extern mediaplayer_t g_mediaplayer;
 atomic_int wiliwili_first_frame_visible = ATOMIC_VAR_INIT(0);
 atomic_llong wiliwili_first_video_pts = ATOMIC_VAR_INIT(-1);
 static int64_t audio_packet_pts = -1;
+static atomic_llong audio_played_pts = ATOMIC_VAR_INIT(-1);
+static atomic_llong audio_clock_wall = ATOMIC_VAR_INIT(0);
+static atomic_int audio_clock_active = ATOMIC_VAR_INIT(0);
+static _Thread_local int video_thread;
+static _Thread_local int64_t video_current_pts = -1;
+static int64_t monotonic_us(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (int64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+}
+static int64_t audio_now(void)
+{
+    int64_t elapsed = monotonic_us() - atomic_load(&audio_clock_wall);
+    if (elapsed < 0) elapsed = 0;
+    if (elapsed > 250000) elapsed = 250000;
+    return atomic_load(&audio_played_pts) + elapsed;
+}
 static AAC_DECODER_ERROR wiliwili_aac_fill(HANDLE_AACDECODER decoder, UCHAR *buffers[],
                                           const UINT sizes[], UINT *valid, int64_t pts)
 {
@@ -30,6 +49,7 @@ int wiliwili_crop_left, wiliwili_crop_width, wiliwili_crop_height;
 
 static VideoPicture *wiliwili_request_picture(VideoDecoder *decoder, int stream)
 {
+    video_thread = 1;
     VideoPicture *picture = RequestPicture(decoder, stream);
     static int logged;
     static int preroll_done;
@@ -49,6 +69,33 @@ static VideoPicture *wiliwili_request_picture(VideoDecoder *decoder, int stream)
         fprintf(stderr, "PLAYER first display pts_us=%lld preroll_frames=%u\n",
                 (long long)picture->nPts, preroll_frames);
     }
+    if (picture && picture->nPts >= 0 && g_mediaplayer.has_audio && atomic_load(&audio_clock_active)) {
+        static unsigned late_frames;
+        static int64_t last_report;
+        int64_t clock = audio_now();
+        if (picture->nPts + 100000 < clock) {
+            ++late_frames;
+            if (late_frames == 1 || late_frames % 50 == 0)
+                fprintf(stderr, "PLAYER AV late frame: video_us=%lld audio_us=%lld dropped=%u\n",
+                        (long long)picture->nPts, (long long)clock, late_frames);
+            ReturnPicture(decoder, picture);
+            return NULL;
+        }
+        while (picture->nPts > clock + 20000) {
+            pthread_rwlock_rdlock(&g_mediaplayer.thread.rwlock);
+            int stopped = g_mediaplayer.thread.requested_stop;
+            pthread_rwlock_unlock(&g_mediaplayer.thread.rwlock);
+            if (stopped) { ReturnPicture(decoder, picture); return NULL; }
+            usleep(2000);
+            clock = audio_now();
+        }
+        if (monotonic_us() - last_report > 5000000) {
+            fprintf(stderr, "PLAYER AV clock: video_us=%lld audio_us=%lld delta_us=%lld dropped=%u\n",
+                    (long long)picture->nPts, (long long)clock, (long long)(picture->nPts - clock), late_frames);
+            last_report = monotonic_us();
+        }
+    }
+    if (picture) video_current_pts = picture->nPts;
     if (picture && !logged) {
         logged = 1;
         fprintf(stderr, "PLAYER frame bounds: buffer=%dx%d stride=%d visible=L%d T%d R%d B%d\n",
@@ -64,6 +111,13 @@ static VideoPicture *wiliwili_request_picture(VideoDecoder *decoder, int stream)
         }
     }
     return picture;
+}
+
+static int wiliwili_usleep(useconds_t duration)
+{
+    if (video_thread && video_current_pts >= 0 && duration > 2000 &&
+        g_mediaplayer.has_audio && atomic_load(&audio_clock_active)) return 0;
+    return usleep(duration);
 }
 
 atomic_int wiliwili_volume = ATOMIC_VAR_INIT(100);
@@ -106,22 +160,36 @@ static snd_pcm_sframes_t wiliwili_pcm_write(snd_pcm_t *pcm, const void *samples,
     }
     startup_audio_aligned = 1;
     int volume = atomic_load(&wiliwili_volume);
-    if (volume >= 100) return snd_pcm_writei(pcm, samples, frames);
     snd_pcm_hw_params_t *params;
     snd_pcm_hw_params_alloca(&params);
-    unsigned channels;
-    if (snd_pcm_hw_params_current(pcm, params) || snd_pcm_hw_params_get_channels(params, &channels)) return -EINVAL;
+    unsigned channels, rate;
+    if (snd_pcm_hw_params_current(pcm, params) || snd_pcm_hw_params_get_channels(params, &channels) ||
+        snd_pcm_hw_params_get_rate(params, &rate, NULL) || !rate) return -EINVAL;
     static int16_t scaled[8192];
     if (!channels || frames > 8192 / channels) return -EINVAL;
     const int16_t *input = samples;
-    for (unsigned i = 0; i < frames * channels; ++i) scaled[i] = (int32_t)input[i] * volume / 100;
-    return snd_pcm_writei(pcm, scaled, frames);
+    const void *output = samples;
+    if (volume < 100) {
+        for (unsigned i = 0; i < frames * channels; ++i) scaled[i] = (int32_t)input[i] * volume / 100;
+        output = scaled;
+    }
+    snd_pcm_sframes_t written = snd_pcm_writei(pcm, output, frames);
+    if (written > 0 && audio_packet_pts >= 0) {
+        audio_packet_pts += (int64_t)written * 1000000 / rate;
+        snd_pcm_sframes_t delay = 0;
+        if (snd_pcm_delay(pcm, &delay) < 0 || delay < 0) delay = 0;
+        atomic_store(&audio_played_pts, audio_packet_pts - (int64_t)delay * 1000000 / rate);
+        atomic_store(&audio_clock_wall, monotonic_us());
+        atomic_store(&audio_clock_active, 1);
+    }
+    return written;
 }
 
 static cdx_int32 wiliwili_seek_to(CdxParserT *parser, cdx_int64 time_us, SeekModeType mode)
 {
     cdx_int32 result = CdxParserSeekTo(parser, time_us, mode);
     if (result == 0 && time_us == 0 && getenv("F1_OSD_EVENT_FD")) {
+        atomic_store(&audio_clock_active, 0);
         const uint64_t notification = 4;
         ssize_t sent = send(3, &notification, sizeof(notification), MSG_DONTWAIT | MSG_NOSIGNAL);
         fprintf(stderr, "PLAYER loop-to-zero: seek_rc=%d UI_event_bytes=%ld\n", result, (long)sent);
@@ -134,5 +202,6 @@ static cdx_int32 wiliwili_seek_to(CdxParserT *parser, cdx_int64 time_us, SeekMod
 #define CdxParserPrefetch wiliwili_prefetch
 #define snd_pcm_writei wiliwili_pcm_write
 #define RequestPicture wiliwili_request_picture
+#define usleep wiliwili_usleep
 #define aacDecoder_Fill(dec, buffers, sizes, valid) wiliwili_aac_fill(dec, buffers, sizes, valid, pkt->pts)
 #include "render/mediaplayer.c"

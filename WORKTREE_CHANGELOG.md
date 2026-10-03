@@ -17,6 +17,11 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / Planned / Audio-master pacing after seek
+
+用户确认仍画面滞后。实测target184000ms，audio first179967833us，video preroll180120000us，丢97帧后first display184000000us，证明上一候选确实丢了目标之前的视频，不能再把所有问题归为旧关键帧。
+原video按独立墙钟等帧，audio按ALSA队列输出，两者没有持续同步。专用适配增加音频已写入样本PTS减ALSA delay的播放时钟，结合单调时钟短期外推；视频在RequestPicture处按该时钟等待或丢弃滞后>100ms的已解码帧，取消原视频额外重复等待。只针对有音频且音频时钟有效的会话，无音频仍保留原节奏。记录A/V delta和丢帧计数，禁止以日志正常代替实际嘴型验收；保护裁剪、控制UI、原投屏不变。候选pending。
+
 ## 2026-10-03 / pending / Green edge confirmed and seek-sync deployed
 
 用户已确认绿条消失。有效区域修正944bfe0运行input360x640、tile_offset0x000f0008，解码pitch384保留，未新增CMA帧；中心点按切换源码a7aab1f及优先请求/明确回退也已部署在fb11360c UI。
