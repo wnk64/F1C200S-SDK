@@ -17,6 +17,10 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / Planned / Deploy volume and drag-seek candidate
+
+用户明确允许部署，反馈当前播放恢复正常。源码b86ab54，原工具链构建rc0；新UI36956249、新播放器6db4275f，使用独立controls文件名及启动入口，当前480文件40686916/c8f496bf保留可回退。只停止本轮记录PID9658及其自有子进程，不停止蓝牙/Wi-Fi或修改原投屏链路。新运行日志检查初始音量真实应用、解码连续性和资源占用；真实拖动/声音需用户验证。
+
 ## 2026-10-03 / Planned / Real volume and release-to-seek
 
 用户要求音量有效、按下拖动进度即暂停、松开按选定位置继续播放。原后端明确返回未实现，不能把可拖动UI当成功能。
