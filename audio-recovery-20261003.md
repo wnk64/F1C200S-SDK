@@ -27,3 +27,5 @@
 同一蓝牙先连接、同一在线视频、同一测试：OSD隔离帧166→暂停冻结→恢复1066→19100，rc0；完整OSD帧166→暂停冻结→恢复1133→19133，rc0。两轮均蓝牙default输出正常，借还差2为显示排队/扫描持有，video_pts持续增长，audio/video差几十毫秒；退出正常，返回菜单。MemAvailable24988KiB/CmaFree7212KiB，没有增加整屏UI缓存。新播放器SHA256ba2a8b87c119a361072d1ec3f6636a45cecf44a6abdc6be34a0a8b00d2a92b0f。声音是否耳听、长时/循环/seek195/冷启动完整依赖尚未验证，不称稳定。
 
 部署计划：新增launch-audio-recovery-with-menu.sh，仅正式菜单wiliwili入口切至新应用8815dc7和上述播放器，默认F1_PLAYER_DEBUG=0；无OSD禁用变量、不自动selftest，不修改投屏入口。原loop应用、播放器、启动器完整保留。回退apps.conf最后一行至launch-loop-with-menu.sh。修正自动测试结尾文字，audio测试不再错误声称two seek-loop cycles。
+
+部署已执行：应用源码cb2fc19，根入口eb55d01，板端最新apps.conf SHA2561e28b728936a047627d7867e5008093325b05a76ab213bd47bd3ed4143c438cb，应用与播放器哈希一致，菜单正常restart。一次性探针包装删除。正式入口保留完整OSD，未改原投屏。新候选只有针对性短测试通过，长时及完整冷启动仍pending。

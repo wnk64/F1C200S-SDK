@@ -176,3 +176,13 @@ Acceptance: pending; cold boot cycles 0/3. No video-playback acceptance implied.
 修改范围仅wiliwili应用：main.cpp逐张封面完成队列、动态独立缓存及重新进入刷新、过期完成校验、动态详情缓存隔离、取消请求释放加载状态；platform_linux.cpp识别generic ft5x06；launch-with-menu.sh记录真实退出码。
 
 源码提交2aa87d3至87b6315；原目录make -j2，tmux构建rc=0，产物SHA256 9e43a1a74c60dbf67095dd1002cd1e1703393edd5adf400736afddccedc97f73。板端逐张日志与截图通过，4轮快速切页测试未复现崩溃，正常退出rc=0并返回菜单。RSS约7.4MiB；动态4张缩略图约35KiB。先前用户报告的崩溃原因仍未捕获，未断言OOM。冷启动验收0/3。回退67ac5cb原完整源码，保护内核、驱动、投屏和联网。未新建工作树、未推送稳定归档。
+
+## 2026-10-03 / pending长时回归 / wiliwili蓝牙音频与帧预留修复
+
+本轮基线f7422a3，原独立仓库/分支不变；计划及逐步测试详见audio-recovery-20261003.md。745d5a9应用专属音频非阻塞重开/路由监听/耳机回退、协作暂停命令8/9，OSD保持运行。音频单独修正仍未解决视频卡住，诊断候选不入正式菜单。fe569f5隔离OSD、ef250d5/fd026e9默认关闭帧队列探针，纠正之前把DRM idle中断关闭误判根因的结论。
+
+0622d18在InitializeVideoDecoder wrapper最小预留display1/rotate1，解决此前video_pts固定1066625、返回NO_FRAME_BUFFER的问题。借还差1原本为扫描持有帧，不是泄漏；原BUF_CNT全部0不能保证参考DPB与扫描旋转同时有空闲帧。仅应用wrapper改动，原cedar源码、kernel/DTB、蓝牙、Miracast不改。原目录make -C board_linux -j2 all net-player selftest rc0。
+
+同一已连接蓝牙、同一视频测试：OSD隔离与完整OSD两轮暂停冻结/恢复/20秒播放/退出均rc0，帧分别166→1066→19100及166→1133→19133；尚不证明长时/循环/seek195/多次冷启动已验收。完整OSD音视频相差几十毫秒，MemAvailable24988KiB/CmaFree7212KiB。新程序8815dc7ad7d002bcb5abf62817827ad359cf85a62476a42f19e61abdbfaf1cb7，播放器ba2a8b87c119a361072d1ec3f6636a45cecf44a6abdc6be34a0a8b00d2a92b0f，SCP核验一致。
+
+cb2fc19新增launch-audio-recovery-with-menu.sh，eb55d01根仓库菜单入口切换，仅wiliwili一行，投屏/触摸/设置保留。板端apps.conf1e28b728936a047627d7867e5008093325b05a76ab213bd47bd3ed4143c438cb，重启菜单成功。正式入口默认debug0且unset OSD隔离/测试变量，不自动播放。旧loop应用、播放器、启动器保留；回退apps.conf最后一行至launch-loop-with-menu.sh。一次性执行包装删除；候选未标稳定、未推GitHub稳定标签。
