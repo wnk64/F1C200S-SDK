@@ -21,7 +21,7 @@ cleanup() {
     exit 143
 }
 trap cleanup INT TERM
-F1_CA_FILE="$self/cacert.pem" F1_CEDAR_PLAYER="$player" F1_CONFIG_DIR="$self/config" "$ui" "$@" &
+F1_CA_FILE="$self/cacert.pem" F1_CEDAR_PLAYER="$player" F1_CONFIG_DIR="$self/config" "$ui" "$@" > /run/wiliwili-ui.log 2>&1 &
 child=$!
 printf '%s\n' "$child" > "$self/ui-live.pid"
 rc=0
