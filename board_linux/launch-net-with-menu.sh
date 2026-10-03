@@ -4,8 +4,10 @@ unset F1_UI_TEST_MS
 self=$(CDPATH= cd "$(dirname "$0")" && pwd)
 test -f "$self/cacert.pem"
 test -f "$self/cjk28.bin"
-test -x "$self/wiliwili-net-lvgl"
-test -x "$self/cedar-net-player"
+ui=${F1_WILI_EXEC:-$self/wiliwili-net-lvgl}
+player=${F1_CEDAR_PLAYER:-$self/cedar-net-player}
+test -x "$ui"
+test -x "$player"
 ulimit -c 0
 child=
 from_menu=0
@@ -19,7 +21,7 @@ cleanup() {
     exit 143
 }
 trap cleanup INT TERM
-F1_CA_FILE="$self/cacert.pem" F1_CEDAR_PLAYER="$self/cedar-net-player" F1_CONFIG_DIR="$self/config" "$self/wiliwili-net-lvgl" "$@" &
+F1_CA_FILE="$self/cacert.pem" F1_CEDAR_PLAYER="$player" F1_CONFIG_DIR="$self/config" "$ui" "$@" &
 child=$!
 printf '%s\n' "$child" > "$self/ui-live.pid"
 rc=0
