@@ -17,6 +17,11 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / Planned / 480-line source and auto-hidden playback controls
+
+用户要求800x480视频及默认隐藏控制层，点击中心显示，10秒没有点击隐藏。B站API没有任意宽高参数；请求480p档qn=32、渐进MP4并以解码日志核对实际宽高，不将854x480宣称800x480，不下载转码补尺寸。
+UI和专用播放器以有界Unix数据报传递显示/隐藏/更新命令，默认控制层alpha=0。保留原菜单、播放器和投屏不动。进度条按计时更新，未接真实PTS前标为软件计时，不宣称精确解码进度。
+
 ## 2026-10-03 / pending / OSD first test and bounded prefetch plan
 
 源码da08463/f79ff73，UI174a16c7、专用播放器e4e546b8；真实B站640x360/25fps硬解与AAC音频同时运行。新增RGB565缓冲137600字节，内核读数显示层0和层1都启用，优先级分别0/1；用户确认无控制UI，因此不能以plane创建成功宣称显示成功。

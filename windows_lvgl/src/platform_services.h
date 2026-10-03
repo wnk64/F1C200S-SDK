@@ -89,3 +89,6 @@ bool platform_player_set_volume(uint8_t percent, std::string& error);
 bool platform_player_set_speed(uint16_t percent, std::string& error);
 bool platform_player_finished();
 void platform_player_stop();
+#ifdef WILIWILI_BOARD
+void platform_player_controls_visible(bool visible);
+#endif

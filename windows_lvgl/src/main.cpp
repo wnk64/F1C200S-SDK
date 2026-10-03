@@ -342,6 +342,13 @@ std::string h264_test_uri;
 std::string launch_bvid;
 std::string launch_season_id;
 lv_obj_t* player_seek_label = nullptr;
+#ifdef WILIWILI_BOARD
+lv_obj_t* board_player_controls = nullptr;
+lv_obj_t* board_player_slider = nullptr;
+bool board_controls_visible = false;
+uint32_t board_controls_last_click = 0;
+bool board_pointer_down = false;
+#endif
 lv_obj_t* player_volume_label = nullptr;
 std::string wbi_mixin_key;
 std::time_t wbi_key_update_time = 0;
@@ -3299,6 +3306,11 @@ void show_video_detail(size_t video_index) {
 }
 
 void clear_player_controls(lv_event_t*) {
+#ifdef WILIWILI_BOARD
+    board_player_controls = nullptr;
+    board_player_slider = nullptr;
+    board_controls_visible = false;
+#endif
     player_seek_label = nullptr;
     player_volume_label = nullptr;
     danmaku_label = nullptr;
@@ -3502,6 +3514,12 @@ void show_player_page(size_t video_index) {
         }
         danmaku_label = danmaku_tracks[0];
         lv_obj_t* controls = lv_obj_create(content);
+#ifdef WILIWILI_BOARD
+        board_player_controls = controls;
+        board_controls_visible = false;
+        lv_obj_add_flag(controls, LV_OBJ_FLAG_HIDDEN);
+        platform_player_controls_visible(false);
+#endif
         lv_obj_set_size(controls, kBoardWidth, 86);
         lv_obj_set_pos(controls, 0, 394);
         lv_obj_set_style_bg_color(controls, ui_color(0x101722), 0);
@@ -3526,6 +3544,9 @@ void show_player_page(size_t video_index) {
         lv_obj_add_event_cb(play, toggle_player_playback, LV_EVENT_CLICKED, nullptr);
         set_label(play, player_playing ? "Pause" : "Play", 15, ui_color(0xffffff), LV_ALIGN_CENTER, 0, 0);
         lv_obj_t* seek = lv_slider_create(controls);
+#ifdef WILIWILI_BOARD
+        board_player_slider = seek;
+#endif
         lv_obj_set_size(seek, 260, 12);
         lv_obj_set_pos(seek, 226, 38);
         lv_slider_set_range(seek, 0, 600);
@@ -3894,7 +3915,7 @@ void request_video_detail(size_t video_index, size_t part_index) {
                 std::string play_body;
                 std::string play_error;
 #ifdef WILIWILI_BOARD
-                const int requested_qn = 16;
+                const int requested_qn = 32;
                 const int requested_format = 1;
 #else
                 const int requested_qn = setting_low_quality ? 16 : setting_video_quality;
@@ -6819,6 +6840,18 @@ int main(int argc, char** argv) {
                 pointer_data.point.y = event.y;
             }
             if (event.type == PlatformEventType::PointerButton) {
+#ifdef WILIWILI_BOARD
+                const bool clicked = event.pressed && !board_pointer_down;
+                board_pointer_down = event.pressed;
+                if (player_page_visible && clicked) {
+                    if (!board_controls_visible && event.x >= 250 && event.x <= 550 && event.y >= 140 && event.y <= 340) {
+                        board_controls_visible = true;
+                        if (board_player_controls) lv_obj_clear_flag(board_player_controls, LV_OBJ_FLAG_HIDDEN);
+                        platform_player_controls_visible(true);
+                    }
+                    if (board_controls_visible) board_controls_last_click = platform_ticks();
+                }
+#endif
                 pointer_data.point.x = event.x;
                 pointer_data.point.y = event.y;
                 pointer_data.state = event.pressed ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
@@ -6833,6 +6866,13 @@ int main(int argc, char** argv) {
             }
         }
         const uint32_t now = platform_ticks();
+#ifdef WILIWILI_BOARD
+        if (player_page_visible && board_controls_visible && !board_pointer_down && now - board_controls_last_click >= 10000) {
+            board_controls_visible = false;
+            if (board_player_controls) lv_obj_add_flag(board_player_controls, LV_OBJ_FLAG_HIDDEN);
+            platform_player_controls_visible(false);
+        }
+#endif
         lv_tick_inc(now - last_tick);
         last_tick = now;
         if (fetch_complete.exchange(false)) {
@@ -7224,6 +7264,13 @@ int main(int argc, char** argv) {
                                          (elapsed_sec % 60U < 10U ? "0" : "") +
                                          std::to_string(elapsed_sec % 60U);
             set_label_text_if_changed(player_seek_label, position.c_str());
+#ifdef WILIWILI_BOARD
+            if (board_player_slider && active_video_index < displayed_videos.size()) {
+                const int duration = std::max(1, std::atoi(displayed_videos[active_video_index].duration.c_str()));
+                lv_slider_set_range(board_player_slider, 0, duration);
+                lv_slider_set_value(board_player_slider, std::min(duration, static_cast<int>(elapsed_sec)), LV_ANIM_OFF);
+            }
+#endif
         }
         refresh_danmaku_overlay();
         const uint32_t next_timer = lv_timer_handler();

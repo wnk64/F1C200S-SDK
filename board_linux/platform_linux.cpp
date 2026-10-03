@@ -32,6 +32,7 @@ int board_jpeg_thumbnail(const uint8_t *, size_t, int, int, uint16_t *);
 #include <spawn.h>
 #include <sys/wait.h>
 #include <sys/eventfd.h>
+#include <sys/socket.h>
 #include <cerrno>
 extern char **environ;
 
@@ -214,7 +215,7 @@ bool platform_display_flush_pixels(const void *data, int x, int y, int width, in
     if (y + height > 394) controls_dirty = true;
     if (present && controls_dirty && osd_event_fd >= 0) {
         const uint64_t notification = 1;
-        (void)write(osd_event_fd, &notification, sizeof(notification));
+        (void)send(osd_event_fd, &notification, sizeof(notification), MSG_DONTWAIT | MSG_NOSIGNAL);
         controls_dirty = false;
     }
     return true;
@@ -324,16 +325,18 @@ bool platform_player_start(std::string& error) {
     for (auto& item : environment) envp.push_back(&item[0]);
     envp.push_back(nullptr);
     char *args[] = {const_cast<char *>(executable), &player_spec.stream_uri[0], nullptr};
-    osd_event_fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
-    if (osd_event_fd < 0) { error = std::strerror(errno); return false; }
+    int channels[2];
+    if (socketpair(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0, channels)) { error = std::strerror(errno); return false; }
+    osd_event_fd = channels[0];
     posix_spawn_file_actions_t actions;
     posix_spawn_file_actions_init(&actions);
     posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
     posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO, "/run/wiliwili-player.log", O_WRONLY | O_CREAT | O_TRUNC, 0600);
     posix_spawn_file_actions_adddup2(&actions, STDOUT_FILENO, STDERR_FILENO);
-    posix_spawn_file_actions_adddup2(&actions, osd_event_fd, 3);
+    posix_spawn_file_actions_adddup2(&actions, channels[1], 3);
     const int rc = posix_spawn(&player_pid, executable, &actions, nullptr, args, envp.data());
     posix_spawn_file_actions_destroy(&actions);
+    close(channels[1]);
     if (rc) { close(osd_event_fd); osd_event_fd = -1; player_pid = -1; error = std::strerror(rc); return false; }
     player_paused = false;
     std::fprintf(stderr, "CEDAR child started pid=%ld\n", static_cast<long>(player_pid));
@@ -343,6 +346,11 @@ bool platform_player_pause(std::string& error) {
     if (player_pid <= 0 || kill(player_pid, SIGSTOP)) { error = "Player is not active"; return false; }
     player_paused = true;
     return true;
+}
+void platform_player_controls_visible(bool visible) {
+    if (osd_event_fd < 0) return;
+    const uint64_t command = visible ? 2 : 3;
+    (void)send(osd_event_fd, &command, sizeof(command), MSG_DONTWAIT | MSG_NOSIGNAL);
 }
 bool platform_player_seek(uint32_t, std::string& error) { error = "Seek controls are not connected yet"; return false; }
 bool platform_player_set_volume(uint8_t, std::string& error) { error = "Use the system audio volume for this candidate"; return false; }

@@ -23,6 +23,16 @@ static pthread_t worker;
 static atomic_int running;
 static int worker_started;
 static unsigned long updates;
+static int osd_drm_fd;
+
+static void visible(int show)
+{
+    struct drm_srgn_atomic_commit_data data = { .layer_id = 1,
+        .type = DRM_SRGN_ATOMIC_COMMIT_MOUNT_SET_ALPHA, .arg0 = show ? 255 : 0 };
+    struct drm_srgn_atomic_commit request = { .size = 1, .data = (uint32_t)(uintptr_t)&data };
+    if (drmIoctl(osd_drm_fd, DRM_IOCTL_SRGN_ATOMIC_COMMIT, &request))
+        fprintf(stderr, "OSD visibility failed: %s\n", strerror(errno));
+}
 
 int __real_drm_warpper_init(drm_warpper_t *drm);
 int __real_drm_warpper_destroy(drm_warpper_t *drm);
@@ -50,7 +60,10 @@ static void *update_controls(void *unused)
         if (ready < 0 && errno != EINTR) break;
         if (ready > 0 && event.revents & POLLIN) {
             uint64_t count;
-            if (read(event_fd, &count, sizeof(count)) == sizeof(count)) copy_controls();
+            if (read(event_fd, &count, sizeof(count)) == sizeof(count)) {
+                if (count == 1 || count == 2) copy_controls();
+                if (count == 2 || count == 3) visible(count == 2);
+            }
         }
     }
     return NULL;
@@ -108,6 +121,8 @@ static int prepare_osd(drm_warpper_t *drm)
     copy_controls();
     if (drmModeSetPlane(drm->fd, plane_id, crtc_id, osd.fb_id, 0, 0, 0, OSD_WIDTH, OSD_HEIGHT,
                         0, 0, OSD_WIDTH << 16, OSD_HEIGHT << 16)) return -1;
+    osd_drm_fd = drm->fd;
+    visible(0);
     atomic_store(&running, 1);
     if (pthread_create(&worker, NULL, update_controls, NULL)) return -1;
     worker_started = 1;
