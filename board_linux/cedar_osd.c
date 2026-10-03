@@ -24,9 +24,11 @@ static atomic_int running;
 static int worker_started;
 static unsigned long updates;
 static int osd_drm_fd;
+static int desired_visibility;
 
 static void visible(int show)
 {
+    desired_visibility = show;
     struct drm_srgn_atomic_commit_data data = { .layer_id = 1,
         .type = DRM_SRGN_ATOMIC_COMMIT_MOUNT_SET_ALPHA, .arg0 = show ? 255 : 0 };
     struct drm_srgn_atomic_commit request = { .size = 1, .data = (uint32_t)(uintptr_t)&data };
@@ -65,6 +67,8 @@ static void *update_controls(void *unused)
                 if (count == 2 || count == 3) visible(count == 2);
             }
         }
+        /* Initial video modesetting can overwrite the global-alpha register. */
+        visible(desired_visibility);
     }
     return NULL;
 }
