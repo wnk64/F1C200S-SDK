@@ -63,9 +63,10 @@ static int station_connected(int force)
         struct pollfd event = {.fd = fd, .events = POLLIN};
         if (poll(&event, 1, 100) > 0 && (event.revents & POLLIN)) {
             char reply[1024]; ssize_t count = recv(fd, reply, sizeof(reply) - 1, 0);
-            if (count > 0) {
+            if (count >= 0) {
                 reply[count] = 0;
-                if (!strncmp(reply, "FAIL", 4)) cached = 0;
+                reply[strcspn(reply, "\r\n")] = 0;
+                if (!reply[0] || !strncmp(reply, "FAIL", 4)) cached = 0;
             }
         }
     }
