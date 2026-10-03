@@ -257,6 +257,14 @@ static int wiliwili_decode(VideoDecoder *decoder, int eos, int keyframe, int dro
     }
     return rc;
 }
+static int wiliwili_initialize_decoder(VideoDecoder *decoder, VideoStreamInfo *info, VConfig *config)
+{
+    /* A zero reserve can deadlock a full reference DPB while scanout owns a frame. */
+    config->nDisplayHoldingFrameBufferNum = 1;
+    if (config->bRotationEn) config->nRotateHoldingFrameBufferNum = 1;
+    fprintf(stderr, "PLAYER frame reserve display=1 rotate=%d\n", config->bRotationEn ? 1 : 0);
+    return InitializeVideoDecoder(decoder, info, config);
+}
 
 /* Compile the original player without editing its protected source tree. */
 #define CdxParserSeekTo wiliwili_seek_to
@@ -269,6 +277,7 @@ static int wiliwili_decode(VideoDecoder *decoder, int eos, int keyframe, int dro
 #define snd_pcm_recover wiliwili_pcm_recover
 #define RequestPicture wiliwili_request_picture
 #define DecodeVideoStream wiliwili_decode
+#define InitializeVideoDecoder wiliwili_initialize_decoder
 #define usleep wiliwili_usleep
 #define aacDecoder_Fill(dec, buffers, sizes, valid) wiliwili_aac_fill(dec, buffers, sizes, valid, pkt->pts)
 #include "render/mediaplayer.c"
