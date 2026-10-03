@@ -17,6 +17,12 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / pending / Green edge confirmed and seek-sync deployed
+
+用户已确认绿条消失。有效区域修正944bfe0运行input360x640、tile_offset0x000f0008，解码pitch384保留，未新增CMA帧；中心点按切换源码a7aab1f及优先请求/明确回退也已部署在fb11360c UI。
+同步候选源码5d0dea2/ff6109f/64633a7；专用播放器SHA256 4c38dfd89965a70bc3199e99c8eda7d592654b55254ad5494f28675312287cd5，原SDK构建rc0、SSH哈希一致。当前17570启动：first audio packet PTS0，first display PTS120000us；音频等待首帧并抛弃其之前PCM，随后持续5秒125帧/errors0，绿条window保持。尚未取得用户新的拖动同步结果，不宣称根因已完全证实或同步已验收。
+旧visible播放器b69c7098保留可回退，原投屏播放器/驱动/内核未变。等待真实跳转后的首音频/视频PTS及用户体感；三冷0/3，整体pending。无新增临时脚本。
+
 ## 2026-10-03 / Planned / Seek preroll and first-frame audio gate
 
 用户确认拖动后画面比声音滞后。旧逻辑SeekClosest后视频从关键帧直接显示，音频独立输出，未对齐首帧时间。仅专用适配器增加首个视频PTS/音频包PTS日志；目标之前的视频仍解码但不送显示，首帧成功提交前音频PCM等待；音频早于首视频PTS的整块PCM不输出，确保不提前播旧时间声音。保持绿条有效窗口、控制UI、默认声卡和投屏不变。真实同步必须用户重拖确认，未将推测称已证实根因。
