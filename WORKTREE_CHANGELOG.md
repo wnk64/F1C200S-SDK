@@ -17,6 +17,11 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / pending / First-frame-gated clock deployed
+
+源码a9a5dd3/独立入口ca71aa7，UI37f3297b8eb2ce1cb85b70790bfd5edbeee275988f417436cf5c380d5eabb810、播放器13e327372402f0f2f6a5d7f2bd9fef13958f21de78b4cb8da39773dbf37ad903，原SDK增量构建rc0/无新警告，SSH校验一致。原controls文件保留，原投屏未改。
+实机播放器日志PLAYER ready event: first YUV commit succeeded，UI随后PLAYER ready: first video frame committed；当前player14715持续提交，total413/window126/errors0。软件计时在ready到达前反复保持起始tick，选定offset不变，首次实际YUV提交后走时。真实拖动加载阶段是否完全符合体验待用户验证。没有新增临时脚本，候选pending/三冷0/3。
+
 ## 2026-10-03 / Planned / Hold seek clock until first video frame
 
 用户确认音量和拖动可用，但松开后黑屏加载时UI先走时。改为专用播放器第一次成功提交实际YUV帧时发送ready事件6，UI在该事件前保持选定时间/滑块不走时，收到后启动软件计时。仅适配器/UI修改，不改变原投屏播放器。事件表示成功提交显示硬件，不冒充精确扫描输出PTS；seek仍有网络加载等待。
