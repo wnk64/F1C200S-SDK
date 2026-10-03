@@ -28,6 +28,7 @@ static int osd_drm_fd;
 static int desired_visibility;
 extern atomic_int wiliwili_volume;
 extern atomic_int wiliwili_first_frame_visible;
+extern atomic_llong wiliwili_latest_video_pts;
 extern atomic_int wiliwili_crop_ready;
 extern int wiliwili_crop_left, wiliwili_crop_width, wiliwili_crop_height;
 static volatile uint32_t *frontend_regs;
@@ -86,16 +87,23 @@ int __wrap_drmIoctl(int fd, unsigned long request, void *argument)
         fprintf(stderr, "PLAYER visible crop rejected: unsupported FE layout\n");
         return -1;
     }
-    if (!result && !first_frame_notified && event_fd >= 0 && request == DRM_IOCTL_SRGN_ATOMIC_COMMIT && argument) {
+    if (!result && event_fd >= 0 && request == DRM_IOCTL_SRGN_ATOMIC_COMMIT && argument) {
         struct drm_srgn_atomic_commit *commit = argument;
         struct drm_srgn_atomic_commit_data *items = (void *)(uintptr_t)commit->data;
         for (unsigned i = 0; i < commit->size; ++i) {
             if (items[i].layer_id == 0 && items[i].type == DRM_SRGN_ATOMIC_COMMIT_MOUNT_FB_YUV) {
                 atomic_store(&wiliwili_first_frame_visible, 1);
-                const uint64_t ready = 6;
-                if (send(event_fd, &ready, sizeof(ready), MSG_DONTWAIT | MSG_NOSIGNAL) == sizeof(ready)) {
-                    first_frame_notified = 1;
-                    fprintf(stderr, "PLAYER ready event: first YUV commit succeeded\n");
+                int64_t pts = atomic_load(&wiliwili_latest_video_pts);
+                if (pts >= 0) {
+                    const uint64_t position = 7 | ((uint64_t)(pts / 1000) << 32);
+                    (void)send(event_fd, &position, sizeof(position), MSG_DONTWAIT | MSG_NOSIGNAL);
+                }
+                if (!first_frame_notified) {
+                    const uint64_t ready = 6;
+                    if (send(event_fd, &ready, sizeof(ready), MSG_DONTWAIT | MSG_NOSIGNAL) == sizeof(ready)) {
+                        first_frame_notified = 1;
+                        fprintf(stderr, "PLAYER ready event: first YUV commit succeeded\n");
+                    }
                 }
                 break;
             }

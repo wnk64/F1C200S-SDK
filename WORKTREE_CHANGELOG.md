@@ -17,6 +17,12 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / rejected then planned / Automatic loop/seek probe and media-driven progress
+
+用户报告音频主时钟候选回放卡死且进度仍走时；实测seek184s后EOS，video total702连续多个窗口0帧，视频线程sleep/音频线程futex。已停止候选18141，回退上一sync入口恢复服务，不能把该音频主时钟候选称稳定。
+用户明确允许自动测试和可关闭debug探针。新增显式player-selftest程序，自动执行seek195s、跨越循环、再次seek195s和暂停/恢复；不需要用户手动拖动。诊断通过F1_PLAYER_DEBUG=1开启，默认关闭，无自动启动服务。
+修复循环epoch：回绕时丢弃上一轮尾部视频/音频，等待逻辑内也检查epoch，不能让末尾PTS等待新一轮0时钟。新增每帧提交反馈，UI按提交帧PTS而非墙钟更新进度，故卡帧时进度也停住。新增可关闭debug定位A/V delta、旧轮丢弃；保护原投屏/内核/声卡，使用固定BV1GJ411x7h7，三冷仍待验收。
+
 ## 2026-10-03 / pending / Audio-master runtime measurement
 
 源码69c2f16/独立入口48be03e，专用播放器SHA256 f4af89aa27947dfde62d94464b75be2d2d39f06fbc203632637149b5e11b6d37，原SDK编译rc0/无新警告，SSH校验一致。保持UI fb11360c（中心toggle、明确fallback）和绿色边界修复；旧sync播放器4c38dfd8保留。

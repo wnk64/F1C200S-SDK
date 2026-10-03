@@ -7318,8 +7318,13 @@ int main(int argc, char** argv) {
                 std::fprintf(stderr, "PLAYER rewind: time and progress reset\n");
             }
 #endif
+#ifdef WILIWILI_BOARD
+            uint32_t elapsed_ms = player_elapsed_offset_ms;
+            if (platform_player_video_position(elapsed_ms)) player_elapsed_offset_ms = elapsed_ms;
+#else
             const uint32_t elapsed_ms = player_elapsed_offset_ms +
                 (platform_ticks() - player_started_tick) * static_cast<uint32_t>(setting_playback_speed) / 100U;
+#endif
             const uint32_t elapsed_sec = elapsed_ms / 1000U;
             const std::string position = std::to_string(elapsed_sec / 60U) + ":" +
                                          (elapsed_sec % 60U < 10U ? "0" : "") +

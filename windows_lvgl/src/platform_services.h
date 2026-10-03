@@ -93,4 +93,5 @@ void platform_player_stop();
 void platform_player_controls_visible(bool visible);
 bool platform_player_rewound();
 bool platform_player_ready();
+bool platform_player_video_position(uint32_t& milliseconds);
 #endif

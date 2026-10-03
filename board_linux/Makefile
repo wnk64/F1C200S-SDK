@@ -10,6 +10,11 @@ LVOBJ := $(patsubst $(LV)/%.c,build-arm/lvgl/%.o,$(shell find $(LV)/src -name '*
 OBJ := build-arm/main.o build-arm/platform_linux.o build-arm/jpeg_thumbnail.o build-arm/board_font.o $(LVOBJ)
 .DEFAULT_GOAL := all
 all: build-arm/wiliwili-lvgl build-arm/platform-probe
+selftest: build-arm/player-selftest
+build-arm/player_selftest.o: player_selftest.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
+build-arm/player-selftest: build-arm/player_selftest.o $(filter-out build-arm/main.o,$(OBJ)) build-curl/lib/.libs/libcurl.a
+	$(CXX) -Wl,--gc-sections -o $@ $^ -lssl -lcrypto -ljpeg -pthread -lm
 
 # Keep the protected Miracast player and its object files untouched.
 PLAYER_SRC := $(abspath ../../../SOFTWARE/cedar-player/player-src)

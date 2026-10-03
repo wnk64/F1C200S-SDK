@@ -63,6 +63,8 @@ PlatformPlayerSpec player_spec;
 uint32_t player_start_ms = 0;
 int player_volume = 100;
 bool player_ready = false, player_rewind_pending = false;
+bool player_position_valid = false;
+uint32_t player_video_ms = 0, player_frame_tick = 0;
 void ssl_lock(int mode, int n, const char *, int) {
     if (n < 0 || n >= 128) return;
     if (mode & CRYPTO_LOCK) pthread_mutex_lock(&ssl_locks[n]);
@@ -336,6 +338,7 @@ bool platform_player_start(std::string& error) {
     osd_event_fd = channels[0];
     player_ready = false;
     player_rewind_pending = false;
+    player_position_valid = false;
     posix_spawn_file_actions_t actions;
     posix_spawn_file_actions_init(&actions);
     posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
@@ -365,6 +368,11 @@ static void poll_player_notifications() {
     if (osd_event_fd < 0) return;
     uint64_t notification;
     while (recv(osd_event_fd, &notification, sizeof(notification), MSG_DONTWAIT) == sizeof(notification)) {
+        if ((notification & 0xffffffffU) == 7) {
+            player_video_ms = notification >> 32;
+            player_frame_tick = platform_ticks();
+            player_position_valid = true;
+        }
         if (notification == 4) player_rewind_pending = true;
         if (notification == 6) {
             player_ready = true;
@@ -374,7 +382,13 @@ static void poll_player_notifications() {
 }
 bool platform_player_ready() {
     poll_player_notifications();
-    return player_ready;
+    return player_ready && player_position_valid && platform_ticks() - player_frame_tick < 750;
+}
+bool platform_player_video_position(uint32_t& milliseconds) {
+    poll_player_notifications();
+    if (!player_position_valid) return false;
+    milliseconds = player_video_ms;
+    return true;
 }
 bool platform_player_rewound() {
     poll_player_notifications();
