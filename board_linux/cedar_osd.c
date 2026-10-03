@@ -25,6 +25,7 @@ static int worker_started;
 static unsigned long updates;
 static int osd_drm_fd;
 static int desired_visibility;
+extern atomic_int wiliwili_volume;
 
 static void visible(int show)
 {
@@ -65,6 +66,12 @@ static void *update_controls(void *unused)
         if (ready > 0 && event.revents & POLLIN) {
             uint64_t count;
             if (read(event_fd, &count, sizeof(count)) == sizeof(count)) {
+                if ((count & 0xffffffffU) == 5) {
+                    unsigned volume = count >> 32;
+                    if (volume <= 100) atomic_store(&wiliwili_volume, volume);
+                    fprintf(stderr, "PLAYER volume=%u\n", volume);
+                    continue;
+                }
                 if (count == 1 || count == 2) copy_controls();
                 if (count == 2 || count == 3) visible(count == 2);
             }

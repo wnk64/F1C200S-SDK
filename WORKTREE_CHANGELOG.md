@@ -17,6 +17,12 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / Planned / Real volume and release-to-seek
+
+用户要求音量有效、按下拖动进度即暂停、松开按选定位置继续播放。原后端明确返回未实现，不能把可拖动UI当成功能。
+仅修改wiliwili专用适配：音量经已有有界Unix数据报设置0..100%，AAC PCM写ALSA前定点衰减；跳转前回收旧解码子进程/队列，新会话第一次Prefetch前执行CdxParserSeekTo目标时间，按原解析器最近可解码位置恢复，不改原投屏源码。拖动期间UI软件进度不覆盖手指位置，松开才一次跳转；实际网络重缓冲延迟如实记录。
+保护原播放器/内核/驱动/默认声卡服务。测试0%静音/100%原幅度、暂停/拖动/松开、解析器seek返回值、实际用户画面声音、资源释放；候选仍pending。
+
 ## 2026-10-03 / pending / Actual loop-reset verified
 
 新专用源码34a75f7，UI黑底源码c64596d；运行UI SHA256 406869169d80673cb498ace27a0a5cfa97c1bb5db8257aa278213f02a340fc61、播放器c8f496bf2a12828fa22dc85f6080505d5b1238f27a6c466bc3a37674c1ace7df，SSH部署一致。原SDK make -C board_linux -j2 net-player rc0。

@@ -348,6 +348,7 @@ lv_obj_t* board_player_slider = nullptr;
 bool board_controls_visible = false;
 uint32_t board_controls_last_click = 0;
 bool board_pointer_down = false;
+bool board_seek_dragging = false;
 #endif
 lv_obj_t* player_volume_label = nullptr;
 std::string wbi_mixin_key;
@@ -3310,6 +3311,7 @@ void clear_player_controls(lv_event_t*) {
     board_player_controls = nullptr;
     board_player_slider = nullptr;
     board_controls_visible = false;
+    board_seek_dragging = false;
 #endif
     player_seek_label = nullptr;
     player_volume_label = nullptr;
@@ -3365,6 +3367,30 @@ void toggle_player_playback(lv_event_t* event) {
 }
 
 void seek_player(lv_event_t* event) {
+#ifdef WILIWILI_BOARD
+    const lv_event_code_t code = lv_event_get_code(event);
+    if (code == LV_EVENT_PRESSED) {
+        board_seek_dragging = true;
+        if (player_playing) {
+            std::string error;
+            if (platform_player_pause(error)) {
+                player_elapsed_offset_ms += platform_ticks() - player_started_tick;
+                player_playing = false;
+            }
+        }
+        return;
+    }
+    if (code == LV_EVENT_VALUE_CHANGED) {
+        if (board_seek_dragging && player_seek_label) {
+            int seconds = lv_slider_get_value(static_cast<lv_obj_t*>(lv_event_get_target(event)));
+            std::string text = std::to_string(seconds / 60) + ":" + (seconds % 60 < 10 ? "0" : "") + std::to_string(seconds % 60);
+            lv_label_set_text(player_seek_label, text.c_str());
+        }
+        return;
+    }
+    if (code != LV_EVENT_RELEASED || !board_seek_dragging) return;
+    board_seek_dragging = false;
+#endif
     const int seconds = lv_slider_get_value(static_cast<lv_obj_t*>(lv_event_get_target(event)));
     std::string error;
     if (!platform_player_seek(static_cast<uint32_t>(seconds) * 1000, error)) {
@@ -3374,6 +3400,10 @@ void seek_player(lv_event_t* event) {
     }
     player_elapsed_offset_ms = static_cast<uint32_t>(seconds) * 1000U;
     player_started_tick = platform_ticks();
+#ifdef WILIWILI_BOARD
+    player_playing = true;
+    platform_player_controls_visible(board_controls_visible);
+#endif
     if (player_seek_label) {
         const std::string label = std::to_string(seconds / 60) + ":" +
                                   (seconds % 60 < 10 ? "0" : "") + std::to_string(seconds % 60);
@@ -3552,7 +3582,13 @@ void show_player_page(size_t video_index) {
         lv_obj_set_size(seek, 260, 12);
         lv_obj_set_pos(seek, 226, 38);
         lv_slider_set_range(seek, 0, 600);
+#ifdef WILIWILI_BOARD
+        lv_obj_add_event_cb(seek, seek_player, LV_EVENT_PRESSED, nullptr);
         lv_obj_add_event_cb(seek, seek_player, LV_EVENT_VALUE_CHANGED, nullptr);
+        lv_obj_add_event_cb(seek, seek_player, LV_EVENT_RELEASED, nullptr);
+#else
+        lv_obj_add_event_cb(seek, seek_player, LV_EVENT_VALUE_CHANGED, nullptr);
+#endif
         player_seek_label = lv_label_create(controls);
         lv_label_set_text(player_seek_label, "0:00");
         lv_obj_set_style_text_font(player_seek_label, font_for_text("0:00", 12), 0);

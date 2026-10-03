@@ -60,6 +60,8 @@ int osd_event_fd = -1;
 bool controls_dirty = false;
 bool player_paused = false;
 PlatformPlayerSpec player_spec;
+uint32_t player_start_ms = 0;
+int player_volume = 100;
 void ssl_lock(int mode, int n, const char *, int) {
     if (n < 0 || n >= 128) return;
     if (mode & CRYPTO_LOCK) pthread_mutex_lock(&ssl_locks[n]);
@@ -301,6 +303,8 @@ bool platform_player_prepare(const PlatformPlayerSpec& spec, std::string& error)
     if (spec.rotation_degrees != 90) { error = "Board playback requires 90-degree rotation"; return false; }
     if (spec.playback_speed_percent != 100) { error = "Board playback currently supports normal speed"; return false; }
     player_spec = spec;
+    player_start_ms = 0;
+    player_volume = std::max(0, std::min(100, spec.volume_percent));
     error.clear();
     return true;
 }
@@ -315,12 +319,13 @@ bool platform_player_start(std::string& error) {
     std::vector<std::string> environment;
     for (char **entry = environ; *entry; ++entry) {
         if (!std::strncmp(*entry, "CEDAR_ROTATE=", 13) || !std::strncmp(*entry, "CEDAR_AUDIODEV=", 15) ||
-            !std::strncmp(*entry, "F1_OSD_EVENT_FD=", 16)) continue;
+            !std::strncmp(*entry, "F1_OSD_EVENT_FD=", 16) || !std::strncmp(*entry, "F1_PLAYER_START_MS=", 19)) continue;
         environment.emplace_back(*entry);
     }
     environment.emplace_back("CEDAR_ROTATE=90");
     environment.emplace_back("CEDAR_AUDIODEV=default");
     environment.emplace_back("F1_OSD_EVENT_FD=3");
+    environment.emplace_back("F1_PLAYER_START_MS=" + std::to_string(player_start_ms));
     std::vector<char *> envp;
     for (auto& item : environment) envp.push_back(&item[0]);
     envp.push_back(nullptr);
@@ -339,6 +344,7 @@ bool platform_player_start(std::string& error) {
     close(channels[1]);
     if (rc) { close(osd_event_fd); osd_event_fd = -1; player_pid = -1; error = std::strerror(rc); return false; }
     player_paused = false;
+    (void)platform_player_set_volume(static_cast<uint8_t>(player_volume), error);
     std::fprintf(stderr, "CEDAR child started pid=%ld\n", static_cast<long>(player_pid));
     return true;
 }
@@ -360,8 +366,22 @@ bool platform_player_rewound() {
         if (notification == 4) rewound = true;
     return rewound;
 }
-bool platform_player_seek(uint32_t, std::string& error) { error = "Seek controls are not connected yet"; return false; }
-bool platform_player_set_volume(uint8_t, std::string& error) { error = "Use the system audio volume for this candidate"; return false; }
+bool platform_player_seek(uint32_t milliseconds, std::string& error) {
+    if (milliseconds > 86400000 || player_spec.stream_uri.empty()) { error = "Invalid seek position"; return false; }
+    platform_player_stop();
+    player_start_ms = milliseconds;
+    return platform_player_start(error);
+}
+bool platform_player_set_volume(uint8_t percent, std::string& error) {
+    if (percent > 100) { error = "Invalid volume"; return false; }
+    player_volume = percent;
+    if (osd_event_fd < 0) return true;
+    uint64_t command = 5 | (static_cast<uint64_t>(percent) << 32);
+    if (send(osd_event_fd, &command, sizeof(command), MSG_DONTWAIT | MSG_NOSIGNAL) != sizeof(command)) {
+        error = std::strerror(errno); return false;
+    }
+    return true;
+}
 bool platform_player_set_speed(uint16_t percent, std::string& error) {
     if (percent == 100) return true;
     error = "Only normal speed is supported"; return false;
