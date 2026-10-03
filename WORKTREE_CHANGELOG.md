@@ -17,6 +17,10 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / pending / Hidden black-strip candidate deployed
+
+源码5358305，专用播放器SHA256 4af2c4480a0e7c84d5938afd597d7df00683bc92871bab6e833bd68ed3831a8a；原SDK增量make net-player成功，SSH部署哈希一致。仅重启本轮wiliwili应用，未重启板子、未修改投屏/驱动。隐藏时使用屏幕外x480、alpha255，显示时x0、alpha255。显示坐标修改仅作用UI层1，视频层0保持不变。实际黑条消失与触摸十秒切换待用户确认，状态pending。
+
 ## 2026-10-03 / Planned / Remove hidden controls from visible scanout
 
 用户确认隐藏UI后控制条区域变黑。原方案只改层1全局alpha=0，而RGB层与视频层在同一硬件pipe，不能视为可靠的像素透明叠加。修正仅应用专用cedar_osd.c：控制条始终alpha255，隐藏时坐标移到x=480屏幕外，显示时恢复x=0；保持同一137600字节缓冲，不做整屏合成、不改kernel。验证隐藏时控制区域真实视频恢复，显示/十秒隐藏仍可用。未验证前不宣称修复。
