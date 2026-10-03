@@ -1,0 +1,61 @@
+#!/bin/sh
+set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+SELF=/etc/init.d/S90f1-menu
+SUPERVISOR=/root/aic_miracast/candidates/cma_start_preflight_20261002/menu-supervisor.sh
+UI=/root/aic_miracast/candidates/lvgl_connections_20261002/f1-menu
+PID=/run/f1-menu-service.pid
+LOG=/run/f1-menu-service.log
+
+alive() {
+    [ -r "$PID" ] || return 1
+    pid=$(cat "$PID")
+    case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+    [ -r "/proc/$pid/cmdline" ] || return 1
+    tr '\0' ' ' < "/proc/$pid/cmdline" | grep -Fq "$SUPERVISOR"
+}
+
+case "${1:-start}" in
+    start)
+        alive && exit 0
+        if [ -d /run/f1-menu.lock ]; then
+            echo 'Menu already managed; refusing a second display owner' >&2
+            exit 1
+        fi
+        test -x "$UI" && test -x "$SUPERVISOR"
+        start-stop-daemon -S -b -m -p "$PID" -x "$SELF" -- run
+        ;;
+    run)
+        exec >> "$LOG" 2>&1
+        unset F1_UI_TEST_MS F1_MENU_ERROR
+        n=0
+        while [ ! -c /dev/fb0 ] || [ ! -c /dev/i2c-0 ]; do
+            n=$((n + 1))
+            [ "$n" -lt 15 ] || { echo 'Menu display/input readiness timeout'; exit 1; }
+            sleep 1
+        done
+        echo 'Starting F1C200S application menu'
+        exec /bin/sh "$SUPERVISOR"
+        ;;
+    stop)
+        if alive; then
+            kill -TERM "$pid"
+            n=0
+            while alive; do
+                n=$((n + 1))
+                [ "$n" -lt 20 ] || { echo 'Menu shutdown still pending' >&2; exit 1; }
+                sleep 1
+            done
+        fi
+        rm -f "$PID"
+        ;;
+    restart)
+        "$SELF" stop
+        "$SELF" start
+        ;;
+    status)
+        alive || exit 1
+        echo "Menu supervisor PID=$pid"
+        ;;
+    *) echo 'Usage: S90f1-menu {start|stop|restart|status}' >&2; exit 1 ;;
+esac
