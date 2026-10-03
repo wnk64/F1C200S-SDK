@@ -17,6 +17,10 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / Planned / Seek preroll and first-frame audio gate
+
+用户确认拖动后画面比声音滞后。旧逻辑SeekClosest后视频从关键帧直接显示，音频独立输出，未对齐首帧时间。仅专用适配器增加首个视频PTS/音频包PTS日志；目标之前的视频仍解码但不送显示，首帧成功提交前音频PCM等待；音频早于首视频PTS的整块PCM不输出，确保不提前播旧时间声音。保持绿条有效窗口、控制UI、默认声卡和投屏不变。真实同步必须用户重拖确认，未将推测称已证实根因。
+
 ## 2026-10-03 / Planned / Visible-pixel window for rotated MB32 frames
 
 首帧实测buffer384x640/stride384，有效边界L8/T0/R368/B640。旧view把填充列包含进去。应用专用适配改用已有内核center-crop命令保留完整pitch384、输入有效360x640；该接口只支持32字节对齐起点，因此应用通过受限FE映射补齐tile内X0=8及X1=15，两路Y/UV一致，随后置寄存器ready。仅确认MB32 YUV420格式且有效起点<32、top0时启用，否则报错拒绝，不泛化到未知布局。只触及FE的0x30/0x34/0x04，不修改kernel/DTB/原投屏程序，不新增全帧复制或CMA缓冲。退出关闭映射，恢复fbdev会重设FE；实机绿条结果待验证。输出窗口仍沿用当前显示设置，此项仅移除填充，不宣称改变整体缩放策略。
