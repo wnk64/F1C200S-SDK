@@ -105,7 +105,14 @@ static int apply(struct config *c)
     if (network(ssid, sizeof(ssid))) return 2;
     if (strcmp(c->mode, "static") || strcmp(ssid, c->ssid)) return 2;
     stop_dhcp();
-    char *address[] = {"/sbin/ip", "addr", "replace", c->cidr, "brd", "+", "dev", "rtlwlan0", NULL};
+    char host_text[32], broadcast[INET_ADDRSTRLEN];
+    snprintf(host_text, sizeof(host_text), "%s", c->cidr);
+    char *slash = strchr(host_text, '/');
+    *slash++ = 0;
+    uint32_t host; if (ip(host_text, &host)) return 1;
+    struct in_addr b = {.s_addr = htonl(host | ~(0xffffffffU << (32 - atoi(slash))))};
+    if (!inet_ntop(AF_INET, &b, broadcast, sizeof(broadcast))) return 1;
+    char *address[] = {"/sbin/ip", "addr", "replace", c->cidr, "broadcast", broadcast, "dev", "rtlwlan0", NULL};
     char *route[] = {"/sbin/ip", "route", "replace", "default", "via", c->gateway, "dev", "rtlwlan0", NULL};
     if (run(address) || run(route)) return 1;
     struct ifaddrs *list;

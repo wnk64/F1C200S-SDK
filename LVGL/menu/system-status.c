@@ -52,9 +52,9 @@ void system_battery(char *text, size_t length, int *charging)
     if (!property("capacity", &capacity) && capacity >= 0 && capacity <= 100) {
         snprintf(text, length, "%d%%", capacity); return;
     }
-    int ocv, target;
-    if (property("voltage_ocv", &ocv) || property("constant_charge_voltage_max", &target) ||
-        target != 4200000 || ocv < 2500000 || ocv > 4350000) return;
+    /* User-confirmed 4.2 V cell; external VSET is not readable as a nominal target. */
+    int ocv;
+    if (property("voltage_ocv", &ocv) || ocv < 2500000 || ocv > 4350000) return;
     static const int mv[] = {3300, 3500, 3600, 3700, 3800, 3900, 4000, 4100, 4200};
     static const int percent[] = {0, 5, 10, 25, 50, 70, 85, 95, 100};
     int voltage = ocv / 1000;
