@@ -16,7 +16,9 @@ network_worker() {
         /opt/f1-network/f1-ip-config apply && rc=0 || rc=$?
     fi
     if [ "$rc" -eq 0 ]; then rm -f "$RUN/worker.pid"; return 0; fi
-    [ "$rc" -eq 2 ] || return "$rc"
+    if [ "$rc" -ne 2 ]; then
+        echo "[bs-sta] static configuration failed (rc=$rc); recovering with DHCP" >&2
+    fi
     exec udhcpc -f -i rtlwlan0 -t 3 -T 3 -p "$RUN/dhcp.pid"
 }
 
