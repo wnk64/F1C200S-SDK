@@ -390,3 +390,13 @@ Rollback at board candidates/newboard_panel_20260930/rollback (old DTB/startup/m
 ## 2026-10-03 / planned / PCF8563开机时间校验
 
 用户要求RTC读取时间与当前运行kernel编译时间比较，早于编译时间判异常，联网取最新时间并回写PCF8563。基线7be9484，新增SCRCPT/network-and-audio-source/rtc_time_20261003/f1-rtc-time.c及S18rtc-time；不改内核、驱动、播放器或网络配置。RTC低电压标记导致RTC_RD_TIME失败、系统1970年、wiliwili证书校验失败已实测。后台SNTP不阻塞菜单和SSH，成功后回写/回读验证并退出；无效回复不调时，网络不可用每30秒后台重试。详细中文记录同目录changes_20261003.md。原Buildroot GCC6.4编译rc0、主机自测通过；二进制72adcc708ff11d62c6d4d143dd0c8c8a5f8241b433e877ebc0a9574132d29991。待部署、真实授时、冷启动与HTTPS回归；rollback仅移除新增服务/工具，不影响原服务。
+
+## 2026-10-04 / pending / PE4电源与菜单系统状态
+
+83ece05独立DRIVER/board-power-20261004模块，仅关机最终阶段PE4高2.5秒，reboot不触发，init低电平；原kernel#250匹配源码/config/zImage前检通过、release5.7.1、模块vermagic正确。源码/构建/部署/回退详见同目录changes_20261004.md。634e3c8菜单加入电源确认、SSH地址及电池/充电接口。模块f2788eb3542757e37bc9db8daf801bceb8cfc1ecbd8c8dcc6c2bc847beaba7ac加载GPIO132 out lo，system-smoke通过，正常reboot成功boot_id0110a188-4e64-4c5e-86ff-82405ed002a6、菜单SSH恢复、PE4仍低。最终切总电源未测试；IP5209无ACK/总线超时，battery unknown不能称已读取真实电量。
+
+## 2026-10-04 / pending恢复 / 静态IP与菜单
+
+7db63c0/5a22ab6/78d6698新增f1-ip-config、SSID绑定静态策略、S17启动调用、连接helper换网激活、菜单IPv4/CIDR/网关/DNS编辑；不改kernel/无线驱动/密码/路由器/播放器。当前静态10.0.0.234/24、gateway/DNS10.0.0.1，SSID wnk641_2.4G。主机输入校验/ARM构建通过，运行configure成功、停止udhcpc、SSH保持、GUI实际按钮自测rc0、截图布局通过。详情SCRCPT/network-and-audio-source/static_ip_20261004/changes_20261004.md。
+
+但正常reboot后SSH无响应，ping/ARP不可达，电脑无串口，无法验证启动原因；已告知用户接回串口恢复。不称静态开机成功、不归档稳定；须先恢复SSH再修正失败fallback或回退。运行修改已经持久保存，旧S17/menu/helper源码及二进制保留，回退DHCP使用f1-ip-config configure dhcp。未再次断电、未通过串口传文件。
