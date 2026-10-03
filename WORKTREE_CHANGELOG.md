@@ -17,6 +17,11 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / pending / Controls deployment running
+
+源码b86ab54/独立入口036379a，UI36956249c13c2e3833030b64ae066ca7ddf0b8054b3c218544224415f758c0ba、播放器6db4275ffcde0a9511a38e96efe08e8df85f7d0b6a822441012fde5053bddc8b，主机与板端SHA256一致。原进程9658及其子任务退出，当前UI11892/player11938，原480版本文件保留，不覆盖投屏。
+启动日志PLAYER volume=41，default 48kHz stereo输出，连续5秒窗口125帧、errors0；MemAvailable24516KiB/CmaFree9780KiB。这确认命令送达和启动播放，不代替人耳音量验证/真实拖动验收。按下暂停、松开一次重建会话并按时间seek功能等待用户实测，可能有网络重缓冲等待。修改已Git跟踪，候选pending，三冷0/3。未创建临时脚本。
+
 ## 2026-10-03 / Planned / Deploy volume and drag-seek candidate
 
 用户明确允许部署，反馈当前播放恢复正常。源码b86ab54，原工具链构建rc0；新UI36956249、新播放器6db4275f，使用独立controls文件名及启动入口，当前480文件40686916/c8f496bf保留可回退。只停止本轮记录PID9658及其自有子进程，不停止蓝牙/Wi-Fi或修改原投屏链路。新运行日志检查初始音量真实应用、解码连续性和资源占用；真实拖动/声音需用户验证。
