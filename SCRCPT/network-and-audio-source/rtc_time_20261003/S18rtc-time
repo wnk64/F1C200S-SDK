@@ -40,17 +40,27 @@ worker)
     }
     trap cleanup EXIT
     trap 'exit 0' INT TERM
+    retry_delay=3
     while :; do
+        # DHCP installs the default route; do not consume the first attempt before it.
+        while ! /sbin/ip route get 1.1.1.1 >/dev/null 2>&1; do
+            sleep 1 &
+            child=$!
+            wait "$child" || true
+            child=
+        done
         "$TOOL" sync > "$STATUS" 2>&1 &
         child=$!
         rc=0
         wait "$child" || rc=$?
         child=
         [ "$rc" -ne 0 ] || exit 0
-        sleep 30 &
+        sleep "$retry_delay" &
         child=$!
         wait "$child" || true
         child=
+        retry_delay=$((retry_delay * 2))
+        [ "$retry_delay" -le 30 ] || retry_delay=30
     done
     ;;
 stop)

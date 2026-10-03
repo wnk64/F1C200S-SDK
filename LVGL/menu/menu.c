@@ -236,9 +236,8 @@ int main(int argc, char **argv)
         if (now - update >= 250) {
             update = now;
             if (view < 3) {
-                time_t t = time(NULL) + 8 * 3600;
-                struct tm date; char clock[40], text[80];
-                gmtime_r(&t, &date); strftime(clock, sizeof(clock), "%Y-%m-%d  %H:%M:%S", &date);
+                char clock[40], text[80];
+                time_settings_format_clock(clock, sizeof(clock));
                 snprintf(text, sizeof(text), "%s  |  %s", access("/sys/class/net/rtlwlan0", F_OK) ? "Wi-Fi --" : "Wi-Fi", clock);
                 if (strcmp(lv_label_get_text(status_label), text)) lv_label_set_text(status_label, text);
             }

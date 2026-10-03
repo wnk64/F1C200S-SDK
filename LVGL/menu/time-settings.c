@@ -17,6 +17,28 @@ static int active, last_result;
 static const char *tool = "/opt/f1-time/f1-rtc-time-ui";
 LV_FONT_DECLARE(menu_font_28);
 
+void time_settings_format_clock(char *text, size_t length)
+{
+    static time_t floor;
+    if (!floor) {
+        FILE *status = fopen("/run/f1-rtc-time.status", "r");
+        if (status) {
+            char line[160]; long value;
+            while (fgets(line, sizeof(line), status)) {
+                if (sscanf(line, "kernel_build_utc=%ld", &value) == 1 && value > 0) {
+                    floor = (time_t)value; break;
+                }
+            }
+            fclose(status);
+        }
+    }
+    time_t t = time(NULL);
+    if (!floor || t < floor) { snprintf(text, length, "Syncing time..."); return; }
+    t += 8 * 3600;
+    struct tm date; gmtime_r(&t, &date);
+    strftime(text, length, "%Y-%m-%d  %H:%M:%S", &date);
+}
+
 void time_settings_close(void)
 {
     active = 0;
@@ -133,9 +155,7 @@ void time_settings_poll(void)
     if (!active) return;
     uint64_t now = platform_ms();
     if (now - last_update >= 1000 || !last_update) {
-        time_t t = time(NULL) + 8 * 3600;
-        struct tm date; char text[40]; gmtime_r(&t, &date);
-        strftime(text, sizeof(text), "%Y-%m-%d  %H:%M:%S", &date);
+        char text[40]; time_settings_format_clock(text, sizeof(text));
         lv_label_set_text(clock_label, text); last_update = now;
     }
     if (child > 0) {
