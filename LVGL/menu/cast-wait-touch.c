@@ -5,10 +5,14 @@
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
 #include <signal.h>
+#include <poll.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -41,18 +45,44 @@ static int sample(struct gesture *g, unsigned long long now, int down, int x, in
     g->down = down;
     return hit;
 }
-static int connected(void)
+static int station_connected(int force)
+{
+    static unsigned long long checked;
+    static int cached;
+    unsigned long long now = milliseconds();
+    if (!force && checked && now - checked < 250) return cached;
+    checked = now;
+    int fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+    if (fd < 0) return 1;
+    struct sockaddr_un local = {.sun_family = AF_UNIX}, remote = {.sun_family = AF_UNIX};
+    snprintf(local.sun_path + 1, sizeof(local.sun_path) - 1, "cast-touch-%ld", (long)getpid());
+    snprintf(remote.sun_path, sizeof(remote.sun_path), "/tmp/manual_miracast_20260920/wpa_ctrl/wlan1");
+    int rc = bind(fd, (struct sockaddr *)&local, offsetof(struct sockaddr_un, sun_path) + 1 + strlen(local.sun_path + 1));
+    cached = 1; /* Unknown connection state must not cancel an active handshake. */
+    if (!rc && !connect(fd, (struct sockaddr *)&remote, sizeof(remote)) && send(fd, "STA-FIRST", 9, 0) == 9) {
+        struct pollfd event = {.fd = fd, .events = POLLIN};
+        if (poll(&event, 1, 100) > 0 && (event.revents & POLLIN)) {
+            char reply[1024]; ssize_t count = recv(fd, reply, sizeof(reply) - 1, 0);
+            if (count > 0) {
+                reply[count] = 0;
+                if (!strncmp(reply, "FAIL", 4)) cached = 0;
+            }
+        }
+    }
+    close(fd); return cached;
+}
+static int connected(int force)
 {
     FILE *file = fopen("/tmp/manual_miracast_20260920/sink.pid", "r");
-    if (!file) return 0;
+    if (!file) return station_connected(force);
     long pid; int valid = fscanf(file, "%ld", &pid) == 1 && pid > 1; fclose(file);
-    if (!valid || kill(pid, 0)) return 0;
+    if (!valid || kill(pid, 0)) return station_connected(force);
     char path[80], executable[320];
     snprintf(path, sizeof(path), "/proc/%ld/exe", pid);
     ssize_t count = readlink(path, executable, sizeof(executable) - 1);
-    if (count < 0) return 0;
+    if (count < 0) return station_connected(force);
     executable[count] = 0;
-    return !strcmp(executable, "/root/aic_miracast/candidates/audio_reopen_20261002/sink-audio-reopen");
+    return !strcmp(executable, "/root/aic_miracast/candidates/audio_reopen_20261002/sink-audio-reopen") || station_connected(force);
 }
 static int selftest(void)
 {
@@ -76,6 +106,7 @@ static int selftest(void)
 int main(int argc, char **argv)
 {
     if (argc == 2 && !strcmp(argv[1], "--selftest")) return selftest();
+    if (argc == 2 && !strcmp(argv[1], "--connected")) return connected(1) ? 0 : 1;
     int simulated = argc == 2 && !strcmp(argv[1], "--simulate-triple");
     if (argc > 2 || (argc == 2 && !simulated)) return 1;
     signal(SIGTERM, stop); signal(SIGINT, stop);
@@ -83,7 +114,7 @@ int main(int argc, char **argv)
     if (!simulated && fd < 0) { perror("cast touch input"); return 1; }
     struct gesture g = {0}; unsigned long long start = milliseconds();
     while (!stopped) {
-        if (connected()) { if (fd >= 0) close(fd); puts("cast touch guard: connected, released"); return 0; }
+        if (connected(0)) { if (fd >= 0) close(fd); puts("cast touch guard: connected/handshake or unknown, released"); return 0; }
         unsigned long long now = milliseconds();
         int down, x, y;
         if (simulated) {
@@ -103,7 +134,7 @@ int main(int argc, char **argv)
             int ry = ((report[3] & 15) << 8) | report[4];
             ft_touch_portrait(rx, ry, &x, &y);
         }
-        if (sample(&g, now, down, x, y) && !connected()) {
+        if (sample(&g, now, down, x, y) && !connected(1)) {
             if (fd >= 0) close(fd);
             puts("cast touch guard: triple-center exit requested"); return 10;
         }

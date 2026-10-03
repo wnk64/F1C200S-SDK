@@ -83,6 +83,10 @@ while same_process "$watch" "$watch_stamp"; do
         touch_pid=
         if [ "$touch_rc" -eq 10 ] && [ "$sink_seen" -eq 0 ]; then
             # Recheck the connection after the helper exits to close the race.
+            if "$TOUCH" --connected; then
+                echo 'touch exit suppressed: phone connection began'
+                continue
+            fi
             candidate=$(cat "$R/sink.pid" 2>/dev/null || true)
             if [ -n "$candidate" ] && [ "$(readlink "/proc/$candidate/exe" 2>/dev/null || true)" = "$SINK" ]; then
                 remember sink.pid; sink_seen=1
