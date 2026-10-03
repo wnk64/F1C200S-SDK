@@ -54,12 +54,22 @@ static AAC_DECODER_ERROR wiliwili_aac_fill(HANDLE_AACDECODER decoder, UCHAR *buf
 
 atomic_int wiliwili_crop_ready = ATOMIC_VAR_INIT(0);
 int wiliwili_crop_left, wiliwili_crop_width, wiliwili_crop_height;
+static unsigned picture_requests, picture_returns;
+static int diagnostic_return(VideoDecoder *decoder, VideoPicture *picture)
+{
+    int rc = ReturnPicture(decoder, picture);
+    ++picture_returns;
+    if (rc && wiliwili_debug_enabled()) fprintf(stderr, "DEBUG ReturnPicture failed=%d\n", rc);
+    return rc;
+}
+#define ReturnPicture diagnostic_return
 
 static VideoPicture *wiliwili_request_picture(VideoDecoder *decoder, int stream)
 {
     if (player_pause_wait()) return NULL;
     video_thread = 1;
     VideoPicture *picture = RequestPicture(decoder, stream);
+    if (picture) ++picture_requests;
     static int logged;
     static int preroll_done;
     static unsigned preroll_frames;
@@ -240,9 +250,9 @@ static int wiliwili_decode(VideoDecoder *decoder, int eos, int keyframe, int dro
         pthread_mutex_lock(&layer->free_queue.mtx);
         size_t returned = layer->free_queue.count;
         pthread_mutex_unlock(&layer->free_queue.mtx);
-        fprintf(stderr, "DEBUG frame pipeline decode=%d valid=%d display_queue=%zu free_queue=%zu audio_pts=%lld video_pts=%lld\n",
+        fprintf(stderr, "DEBUG frame pipeline decode=%d valid=%d display_queue=%zu free_queue=%zu audio_pts=%lld video_pts=%lld requests=%u returns=%u\n",
             rc, ValidPictureNum(decoder, 0), queued, returned,
-            (long long)audio_now(), (long long)atomic_load(&wiliwili_latest_video_pts));
+            (long long)audio_now(), (long long)atomic_load(&wiliwili_latest_video_pts), picture_requests, picture_returns);
         report = monotonic_us();
     }
     return rc;
