@@ -7,6 +7,20 @@
 #include <alsa/asoundlib.h>
 #include <string.h>
 #include <errno.h>
+#include <vdecoder.h>
+
+static VideoPicture *wiliwili_request_picture(VideoDecoder *decoder, int stream)
+{
+    VideoPicture *picture = RequestPicture(decoder, stream);
+    static int logged;
+    if (picture && !logged) {
+        logged = 1;
+        fprintf(stderr, "PLAYER frame bounds: buffer=%dx%d stride=%d visible=L%d T%d R%d B%d\n",
+                picture->nWidth, picture->nHeight, picture->nLineStride,
+                picture->nLeftOffset, picture->nTopOffset, picture->nRightOffset, picture->nBottomOffset);
+    }
+    return picture;
+}
 
 atomic_int wiliwili_volume = ATOMIC_VAR_INIT(100);
 static int initial_seek_applied;
@@ -59,4 +73,5 @@ static cdx_int32 wiliwili_seek_to(CdxParserT *parser, cdx_int64 time_us, SeekMod
 #define CdxParserSeekTo wiliwili_seek_to
 #define CdxParserPrefetch wiliwili_prefetch
 #define snd_pcm_writei wiliwili_pcm_write
+#define RequestPicture wiliwili_request_picture
 #include "render/mediaplayer.c"

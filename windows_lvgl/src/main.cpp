@@ -3963,7 +3963,18 @@ void request_video_detail(size_t video_index, size_t part_index) {
                                               "&cid=" + detail.cid + "&qn=" + std::to_string(requested_qn) +
                                               "&fnval=" + std::to_string(requested_format) +
                                               "&fourk=1&fnver=0";
-                if (fetch_feed(play_path, play_body, play_error)) {
+                bool play_ok = fetch_feed(play_path, play_body, play_error);
+#ifdef WILIWILI_BOARD
+                std::string actual_quality;
+                if (!play_ok || !json_number_at(play_body, "quality", actual_quality) || actual_quality != "32") {
+                    std::fprintf(stderr, "SOURCE preferred=800x480/480p unavailable; request fallback=640x360/360p\n");
+                    const std::string fallback_path = "/x/player/wbi/playurl?bvid=" + url_encode(detail.bvid) +
+                        "&cid=" + detail.cid + "&qn=16&fnval=1&fourk=0&fnver=0";
+                    play_body.clear();
+                    play_ok = fetch_feed(fallback_path, play_body, play_error);
+                }
+#endif
+                if (play_ok) {
                     parse_play_source(play_body, detail.play_url, detail.play_format, setting_video_codec, &detail.play_audio_url);
                 }
             }
@@ -6882,10 +6893,13 @@ int main(int argc, char** argv) {
                 const bool clicked = event.pressed && !board_pointer_down;
                 board_pointer_down = event.pressed;
                 if (player_page_visible && clicked) {
-                    if (!board_controls_visible && event.x >= 250 && event.x <= 550 && event.y >= 140 && event.y <= 340) {
-                        board_controls_visible = true;
-                        if (board_player_controls) lv_obj_clear_flag(board_player_controls, LV_OBJ_FLAG_HIDDEN);
-                        platform_player_controls_visible(true);
+                    if (event.x >= 250 && event.x <= 550 && event.y >= 140 && event.y <= 340) {
+                        board_controls_visible = !board_controls_visible;
+                        if (board_player_controls) {
+                            if (board_controls_visible) lv_obj_clear_flag(board_player_controls, LV_OBJ_FLAG_HIDDEN);
+                            else lv_obj_add_flag(board_player_controls, LV_OBJ_FLAG_HIDDEN);
+                        }
+                        platform_player_controls_visible(board_controls_visible);
                     }
                     if (board_controls_visible) board_controls_last_click = platform_ticks();
                 }

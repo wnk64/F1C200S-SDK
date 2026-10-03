@@ -17,6 +17,11 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / Planned / Center toggle, explicit fallback and green-edge diagnosis
+
+用户要求中心再次点击隐藏UI；优先800x480目标，不可用回退640x360；照片显示视频边缘绿条。现有日志旋转有效画面360x640，但DRM输入384x640，疑似对齐填充被缩放，暂不认定屏参问题。
+修改仅wiliwili：中心点按切换可见；请求qn32渐进MP4并检查quality，不满足时明确请求qn16；暂不冒充已经支持DASH双轨或精确800x480。专用播放器记录首帧VideoPicture的裁剪边界，确认真实有效区域后再用既有裁剪接口处理，不改kernel/原投屏播放器。
+
 ## 2026-10-03 / pending / First-frame-gated clock deployed
 
 源码a9a5dd3/独立入口ca71aa7，UI37f3297b8eb2ce1cb85b70790bfd5edbeee275988f417436cf5c380d5eabb810、播放器13e327372402f0f2f6a5d7f2bd9fef13958f21de78b4cb8da39773dbf37ad903，原SDK增量构建rc0/无新警告，SSH校验一致。原controls文件保留，原投屏未改。
