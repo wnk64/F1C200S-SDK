@@ -36,7 +36,7 @@ if not dc or not font:
     raise OSError("GDI font creation failed")
 old = gdi.SelectObject(dc, font)
 matrix = Matrix(Fixed(0, 1), Fixed(0, 0), Fixed(0, 0), Fixed(0, 1))
-codes = sorted(set(map(ord, TEXT + "关机重启确认关闭设备电源驱动未就绪")))
+codes = sorted(set(map(ord, TEXT + "关机重启确认关闭设备电源驱动未就绪地址静态当前网络网关正在应用网络设置已应用参数错误")))
 bitmap, descriptors = [], ["{0}"]
 try:
     for code in codes:

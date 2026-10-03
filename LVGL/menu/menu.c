@@ -4,6 +4,7 @@
 #include "connections.h"
 #include "time-settings.h"
 #include "system-status.h"
+#include "ip-settings.h"
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,6 +59,7 @@ void menu_settings(void) { settings(); }
 void header(const char *title, int can_back)
 {
     time_settings_close();
+    ip_settings_close();
     back_action = home;
     view = 0; touch_label = marker = brightness_label = NULL;
     battery_label = ssh_label = NULL;
@@ -127,9 +129,19 @@ static void brightness(lv_event_t *e)
     if (current < 0 || next < 1 || next > 8) return;
     if (platform_brightness(next) >= 0) lv_label_set_text_fmt(brightness_label, "%d / 8", next);
 }
+static void wifi_connect_open(lv_event_t *e) { (void)e; connections_show(0); }
+static void ip_open(lv_event_t *e) { (void)e; ip_settings_show(); }
 static void network_open(lv_event_t *e)
 {
-    connections_show((int)(intptr_t)lv_event_get_user_data(e));
+    if ((int)(intptr_t)lv_event_get_user_data(e)) { connections_show(1); return; }
+    header("Wi-Fi", 1); menu_back_to(menu_settings);
+    const char *titles[] = {"Wi-Fi 连接", "IP 地址设置"};
+    for (int i = 0; i < 2; ++i) {
+        lv_obj_t *b = button(content, 24, 204 + i * 180, 432, 148, 0xFFFFFF);
+        label(b, i ? LV_SYMBOL_SETTINGS : LV_SYMBOL_WIFI, 28, 54, 64, 0x167A6F);
+        label(b, titles[i], 112, 54, 292, 0x172329);
+        lv_obj_add_event_cb(b, i ? ip_open : wifi_connect_open, LV_EVENT_CLICKED, NULL);
+    }
 }
 static void time_open(lv_event_t *e) { (void)e; time_settings_show(); }
 static void power_open(lv_event_t *e) { (void)e; power_settings(); }
@@ -258,6 +270,7 @@ int main(int argc, char **argv)
     int system_smoke = argc > 2 && !strcmp(argv[2], "--system-smoke");
     int power_preview = argc > 2 && !strcmp(argv[2], "--power-preview");
     int settings_preview = argc > 2 && !strcmp(argv[2], "--settings-preview");
+    int ip_preview = argc > 2 && !strcmp(argv[2], "--ip-preview");
     if (platform_open()) { platform_close(); return 2; }
     signal(SIGTERM, signal_stop); signal(SIGINT, signal_stop);
     signal(SIGPIPE, SIG_IGN);
@@ -268,6 +281,7 @@ int main(int argc, char **argv)
     if (time_preview || time_test) time_settings_show();
     if (power_preview) power_settings();
     if (settings_preview) settings();
+    if (ip_preview) ip_settings_show();
     uint64_t previous = platform_ms(), start = previous, update = 0;
     int smoke_stage = 0;
     uint64_t system_update = 0;
@@ -276,6 +290,7 @@ int main(int argc, char **argv)
         uint32_t idle_ms = lv_timer_handler();
         connections_poll();
         time_settings_poll();
+        ip_settings_poll();
         if (now - system_update >= 5000 || !system_update) {
             system_update = now;
             if (battery_label) {
@@ -347,6 +362,7 @@ int main(int argc, char **argv)
     fprintf(stderr, "menu: exit=%d heap=%u\n", exit_code, (unsigned)LV_MEM_SIZE);
     connections_close();
     time_settings_close();
+    ip_settings_close();
     if (exit_code >= 20 && exit_code < 20 + (int)count) {
         lv_obj_clean(content);
         label(content, apps[exit_code - 20].title, 64, 330, 352, 0x167A6F);

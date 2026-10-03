@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 SELF=$(CDPATH= cd "$(dirname "$0")" && pwd)
-UI=/root/aic_miracast/candidates/menu_graphics_boot_20261003/f1-menu-power
+UI=/root/aic_miracast/candidates/menu_graphics_boot_20261003/f1-menu-ip
 test_once=0
 case "${1:-}" in
     '') ;;

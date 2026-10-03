@@ -11,6 +11,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -165,6 +166,18 @@ static int wifi_action(const char *action, const char *key)
         return error("connect-timeout");
     }
     if (ok("SAVE_CONFIG")) return error("save-failed");
+    if (!access("/opt/f1-network/f1-ip-config", X_OK)) {
+        pid_t child = fork();
+        if (!child) {
+            dup2(STDERR_FILENO, STDOUT_FILENO);
+            execl("/opt/f1-network/f1-ip-config", "f1-ip-config", "activate", (char *)NULL);
+            _exit(127);
+        }
+        int result;
+        if (child < 0 || waitpid(child, &result, 0) != child ||
+            !WIFEXITED(result) || WEXITSTATUS(result)) return error("configure-failed");
+        return 0;
+    }
     FILE *pidfile = fopen("/run/rtl-bs-sta/dhcp.pid", "r");
     if (pidfile) {
         int pid;

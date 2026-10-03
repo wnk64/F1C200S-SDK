@@ -11,6 +11,12 @@ network_worker() {
         [ -r "$RUN/wpa.pid" ] && kill -0 "$(cat "$RUN/wpa.pid")" 2>/dev/null || return 1
         sleep 1
     done
+    rc=2
+    if [ -x /opt/f1-network/f1-ip-config ]; then
+        /opt/f1-network/f1-ip-config apply && rc=0 || rc=$?
+    fi
+    if [ "$rc" -eq 0 ]; then rm -f "$RUN/worker.pid"; return 0; fi
+    [ "$rc" -eq 2 ] || return "$rc"
     exec udhcpc -f -i rtlwlan0 -t 3 -T 3 -p "$RUN/dhcp.pid"
 }
 

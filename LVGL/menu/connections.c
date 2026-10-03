@@ -217,7 +217,7 @@ static int start_job(const char *operation, const char *key, const char *secret)
         ssize_t n = readlink("/proc/self/exe", helper_path, sizeof(helper_path)-1);
         if (n < 0) return -1;
         helper_path[n] = 0; char *slash = strrchr(helper_path, '/'); if (!slash) return -1;
-        snprintf(slash + 1, sizeof(helper_path) - (size_t)(slash + 1 - helper_path), "connections-helper");
+        snprintf(slash + 1, sizeof(helper_path) - (size_t)(slash + 1 - helper_path), "connections-helper-ip");
     }
     int output[2], input[2]; if (pipe(output)) return -1;
     if (pipe(input)) { close(output[0]); close(output[1]); return -1; }

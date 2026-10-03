@@ -3,7 +3,7 @@ STRIP := /home/wnk/Desktop/F1c200S_SOFT/ROOTFS/buildroot-2018.02.11/output/host/
 LV := ../touch
 CFLAGS := -Os -std=gnu99 -Wall -Wextra -DLV_CONF_INCLUDE_SIMPLE -I. -I$(LV) -I$(LV)/lvgl -ffunction-sections -fdata-sections -MMD -MP
 LVOBJ := $(patsubst $(LV)/lvgl/%.c,build/lvgl/%.o,$(shell find $(LV)/lvgl/src -name '*.c'))
-OBJ := menu.o platform.o menu_font_28.o menu_font_stream.o connections.o net_protocol.o time-settings.o system-status.o
+OBJ := menu.o platform.o menu_font_28.o menu_font_stream.o connections.o net_protocol.o time-settings.o system-status.o ip-settings.o
 SYSROOT := $(shell $(CC) --print-sysroot)
 .DEFAULT_GOAL := all
 all: f1-menu connections-helper
