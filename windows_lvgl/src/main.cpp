@@ -7296,6 +7296,7 @@ int main(int argc, char** argv) {
         }
         if (player_page_visible && player_playing && player_seek_label) {
 #ifdef WILIWILI_BOARD
+            if (!platform_player_ready()) player_started_tick = platform_ticks();
             if (platform_player_rewound()) {
                 player_elapsed_offset_ms = 0;
                 player_started_tick = platform_ticks();

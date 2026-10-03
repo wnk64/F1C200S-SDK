@@ -92,4 +92,5 @@ void platform_player_stop();
 #ifdef WILIWILI_BOARD
 void platform_player_controls_visible(bool visible);
 bool platform_player_rewound();
+bool platform_player_ready();
 #endif

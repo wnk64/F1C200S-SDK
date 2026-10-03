@@ -10,6 +10,7 @@
 #include <sys/eventfd.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 enum { OSD_WIDTH = 86, OSD_HEIGHT = 800 };
@@ -26,6 +27,27 @@ static unsigned long updates;
 static int osd_drm_fd;
 static int desired_visibility;
 extern atomic_int wiliwili_volume;
+static int first_frame_notified;
+int __real_drmIoctl(int fd, unsigned long request, void *argument);
+int __wrap_drmIoctl(int fd, unsigned long request, void *argument)
+{
+    int result = __real_drmIoctl(fd, request, argument);
+    if (!result && !first_frame_notified && event_fd >= 0 && request == DRM_IOCTL_SRGN_ATOMIC_COMMIT && argument) {
+        struct drm_srgn_atomic_commit *commit = argument;
+        struct drm_srgn_atomic_commit_data *items = (void *)(uintptr_t)commit->data;
+        for (unsigned i = 0; i < commit->size; ++i) {
+            if (items[i].layer_id == 0 && items[i].type == DRM_SRGN_ATOMIC_COMMIT_MOUNT_FB_YUV) {
+                const uint64_t ready = 6;
+                if (send(event_fd, &ready, sizeof(ready), MSG_DONTWAIT | MSG_NOSIGNAL) == sizeof(ready)) {
+                    first_frame_notified = 1;
+                    fprintf(stderr, "PLAYER ready event: first YUV commit succeeded\n");
+                }
+                break;
+            }
+        }
+    }
+    return result;
+}
 
 static void visible(int show)
 {

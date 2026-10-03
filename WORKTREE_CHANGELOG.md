@@ -17,6 +17,10 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / Planned / Hold seek clock until first video frame
+
+用户确认音量和拖动可用，但松开后黑屏加载时UI先走时。改为专用播放器第一次成功提交实际YUV帧时发送ready事件6，UI在该事件前保持选定时间/滑块不走时，收到后启动软件计时。仅适配器/UI修改，不改变原投屏播放器。事件表示成功提交显示硬件，不冒充精确扫描输出PTS；seek仍有网络加载等待。
+
 ## 2026-10-03 / pending / Controls deployment running
 
 源码b86ab54/独立入口036379a，UI36956249c13c2e3833030b64ae066ca7ddf0b8054b3c218544224415f758c0ba、播放器6db4275ffcde0a9511a38e96efe08e8df85f7d0b6a822441012fde5053bddc8b，主机与板端SHA256一致。原进程9658及其子任务退出，当前UI11892/player11938，原480版本文件保留，不覆盖投屏。

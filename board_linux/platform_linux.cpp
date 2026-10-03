@@ -62,6 +62,7 @@ bool player_paused = false;
 PlatformPlayerSpec player_spec;
 uint32_t player_start_ms = 0;
 int player_volume = 100;
+bool player_ready = false, player_rewind_pending = false;
 void ssl_lock(int mode, int n, const char *, int) {
     if (n < 0 || n >= 128) return;
     if (mode & CRYPTO_LOCK) pthread_mutex_lock(&ssl_locks[n]);
@@ -333,6 +334,8 @@ bool platform_player_start(std::string& error) {
     int channels[2];
     if (socketpair(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0, channels)) { error = std::strerror(errno); return false; }
     osd_event_fd = channels[0];
+    player_ready = false;
+    player_rewind_pending = false;
     posix_spawn_file_actions_t actions;
     posix_spawn_file_actions_init(&actions);
     posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
@@ -358,12 +361,25 @@ void platform_player_controls_visible(bool visible) {
     const uint64_t command = visible ? 2 : 3;
     (void)send(osd_event_fd, &command, sizeof(command), MSG_DONTWAIT | MSG_NOSIGNAL);
 }
-bool platform_player_rewound() {
-    if (osd_event_fd < 0) return false;
-    bool rewound = false;
+static void poll_player_notifications() {
+    if (osd_event_fd < 0) return;
     uint64_t notification;
-    while (recv(osd_event_fd, &notification, sizeof(notification), MSG_DONTWAIT) == sizeof(notification))
-        if (notification == 4) rewound = true;
+    while (recv(osd_event_fd, &notification, sizeof(notification), MSG_DONTWAIT) == sizeof(notification)) {
+        if (notification == 4) player_rewind_pending = true;
+        if (notification == 6) {
+            player_ready = true;
+            std::fprintf(stderr, "PLAYER ready: first video frame committed\n");
+        }
+    }
+}
+bool platform_player_ready() {
+    poll_player_notifications();
+    return player_ready;
+}
+bool platform_player_rewound() {
+    poll_player_notifications();
+    bool rewound = player_rewind_pending;
+    player_rewind_pending = false;
     return rewound;
 }
 bool platform_player_seek(uint32_t milliseconds, std::string& error) {
