@@ -186,3 +186,9 @@ Acceptance: pending; cold boot cycles 0/3. No video-playback acceptance implied.
 同一已连接蓝牙、同一视频测试：OSD隔离与完整OSD两轮暂停冻结/恢复/20秒播放/退出均rc0，帧分别166→1066→19100及166→1133→19133；尚不证明长时/循环/seek195/多次冷启动已验收。完整OSD音视频相差几十毫秒，MemAvailable24988KiB/CmaFree7212KiB。新程序8815dc7ad7d002bcb5abf62817827ad359cf85a62476a42f19e61abdbfaf1cb7，播放器ba2a8b87c119a361072d1ec3f6636a45cecf44a6abdc6be34a0a8b00d2a92b0f，SCP核验一致。
 
 cb2fc19新增launch-audio-recovery-with-menu.sh，eb55d01根仓库菜单入口切换，仅wiliwili一行，投屏/触摸/设置保留。板端apps.conf1e28b728936a047627d7867e5008093325b05a76ab213bd47bd3ed4143c438cb，重启菜单成功。正式入口默认debug0且unset OSD隔离/测试变量，不自动播放。旧loop应用、播放器、启动器保留；回退apps.conf最后一行至launch-loop-with-menu.sh。一次性执行包装删除；候选未标稳定、未推GitHub稳定标签。
+
+## 2026-10-03 / pending长时回归 / PCM短暂背压不再误重开
+
+基线5571b6e，计划/详细证据audio-backpressure-20261003.md。用户报告视频正常、声音偶卡，实测500ms EAGAIN触发耳机回退与3秒蓝牙重开，BlueALSA无断链。dadad4b仅改audio_output.h把EAGAIN/零写入作为背压20ms等待，最长5秒无进展才恢复，真实ENODEV即时恢复，停止/暂停/路由可中断；同句柄prepare处理欠载。显式debug和注入测试650ms，正式入口unset注入变量。
+
+3a8cee6修正注入避开暂停重开。实机同音响同视频帧200→恢复1066→19100，rc0，实际650918us原输出恢复，无audio transport failed、无耳机回退；另有120～182ms真实背压正常恢复。新播放器aa4c72500e5ded6e5e0cde310f0a25eac88fb027c65e8404a2096c85e5ee106b，SCP核验并切正式启动器F1_CEDAR_PLAYER至cedar-audio-backpressure；旧cedar-audio-recovery保留可回退。原GCC6.4增量make net-player/selftest rc0，不改内核/蓝牙/Miracast/UI。菜单已恢复、无遗留测试进程、临时包装删除；耳听/长时/三冷验证未完成，不能称所有音频卡顿已消除。
