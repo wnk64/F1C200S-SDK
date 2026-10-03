@@ -17,6 +17,12 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / pending / Automatic seek-loop test PASS
+
+源码1349b98；播放器37785e3252a4396d6e3bd1202d9d683a5e79455650bcc0dde9fcdd75c38bb911，自动探针3a3d67cf，原SDK all/net-player/selftest构建rc0、SSH哈希一致。
+板端自动测试返回0：首帧position160ms；第一次seek195s首帧195040ms，循环后120ms，再进到5520ms；第二次seek195s首帧195080ms，循环后120ms，再进5560ms；暂停1.2秒位置不变，恢复到6120ms。SELFTEST PASS明确两轮loop-and-postloop-progress。无需用户拖动，使用固定MV的新HTTPS源、不保存视频。
+视频跨循环旧PTS约212秒帧被清理；新轮A/V clock示例delta19318/18225us。曾有网络填充约1.5～2秒间隙，自动检查并不宣称无卡顿/耳听完美。系统MemAvailable约25MiB/CmaFree约9.6MiB，无新增全帧CMA。测试结束已回收自有子进程，计划恢复新UI正常播放，debug默认关闭；真实UI由视频提交PTS反馈更新，帧停进度停。三冷仍0/3，候选pending。
+
 ## 2026-10-03 / rejected then planned / Automatic loop/seek probe and media-driven progress
 
 用户报告音频主时钟候选回放卡死且进度仍走时；实测seek184s后EOS，video total702连续多个窗口0帧，视频线程sleep/音频线程futex。已停止候选18141，回退上一sync入口恢复服务，不能把该音频主时钟候选称稳定。
