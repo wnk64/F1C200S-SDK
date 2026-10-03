@@ -12,6 +12,7 @@ int board_jpeg_thumbnail(const uint8_t *, size_t, int, int, uint16_t *);
 #include <csignal>
 #include <cstdlib>
 #include <cstring>
+#include <cstdio>
 #include <fcntl.h>
 #include <linux/fb.h>
 #include <linux/i2c.h>
@@ -27,6 +28,10 @@ int board_jpeg_thumbnail(const uint8_t *, size_t, int, int, uint16_t *);
 #include <thread>
 #include <unistd.h>
 #include <pthread.h>
+#include <spawn.h>
+#include <sys/wait.h>
+#include <cerrno>
+extern char **environ;
 
 namespace {
 int fb_fd = -1, input_fd = -1, i2c_fd = -1;
@@ -46,6 +51,9 @@ void signal_stop(int) { stopped = 1; }
 pthread_once_t curl_once = PTHREAD_ONCE_INIT;
 pthread_mutex_t ssl_locks[128];
 bool curl_ready = false;
+pid_t player_pid = -1;
+bool player_paused = false;
+PlatformPlayerSpec player_spec;
 void ssl_lock(int mode, int n, const char *, int) {
     if (n < 0 || n >= 128) return;
     if (mode & CRYPTO_LOCK) pthread_mutex_lock(&ssl_locks[n]);
@@ -264,11 +272,86 @@ bool platform_md5_hex(const std::string& input, std::string& digest, std::string
     for (size_t i = 0; i < 16; ++i) { digest[i * 2] = hex[bytes[i] >> 4]; digest[i * 2 + 1] = hex[bytes[i] & 15]; }
     return true;
 }
-bool platform_player_prepare(const PlatformPlayerSpec&, std::string& error) { error = "Cedar container-stream adapter is not ported yet"; return false; }
-bool platform_player_start(std::string& error) { error = "Cedar container-stream adapter is not ported yet"; return false; }
-bool platform_player_pause(std::string& error) { error = "Player is not active"; return false; }
-bool platform_player_seek(uint32_t, std::string& error) { error = "Player is not active"; return false; }
-bool platform_player_set_volume(uint8_t, std::string& error) { error = "Player is not active"; return false; }
-bool platform_player_set_speed(uint16_t, std::string& error) { error = "Player is not active"; return false; }
-bool platform_player_finished() { return true; }
-void platform_player_stop() {}
+bool platform_player_prepare(const PlatformPlayerSpec& spec, std::string& error) {
+    platform_player_stop();
+    const char *executable = std::getenv("F1_CEDAR_PLAYER");
+    if (!executable || access(executable, X_OK)) { error = "Cedar network player is missing"; return false; }
+    if (spec.input != PlatformVideoInput::ContainerStream || spec.stream_uri.compare(0, 8, "https://") ||
+        spec.stream_uri.size() >= 2048 || spec.stream_uri.find_first_of("\r\n") != std::string::npos) {
+        error = "An HTTPS H.264 MP4 stream is required"; return false;
+    }
+    if (!spec.audio_stream_uri.empty()) { error = "Separate DASH audio is not supported yet"; return false; }
+    if (spec.rotation_degrees != 90) { error = "Board playback requires 90-degree rotation"; return false; }
+    if (spec.playback_speed_percent != 100) { error = "Board playback currently supports normal speed"; return false; }
+    player_spec = spec;
+    error.clear();
+    return true;
+}
+bool platform_player_start(std::string& error) {
+    if (player_pid > 0) {
+        if (player_paused && kill(player_pid, SIGCONT)) { error = "Cannot resume player"; return false; }
+        player_paused = false;
+        return true;
+    }
+    const char *executable = std::getenv("F1_CEDAR_PLAYER");
+    if (!executable || player_spec.stream_uri.empty()) { error = "No prepared stream"; return false; }
+    std::vector<std::string> environment;
+    for (char **entry = environ; *entry; ++entry) {
+        if (!std::strncmp(*entry, "CEDAR_ROTATE=", 13) || !std::strncmp(*entry, "CEDAR_AUDIODEV=", 15)) continue;
+        environment.emplace_back(*entry);
+    }
+    environment.emplace_back("CEDAR_ROTATE=90");
+    environment.emplace_back("CEDAR_AUDIODEV=default");
+    std::vector<char *> envp;
+    for (auto& item : environment) envp.push_back(&item[0]);
+    envp.push_back(nullptr);
+    char *args[] = {const_cast<char *>(executable), &player_spec.stream_uri[0], nullptr};
+    posix_spawn_file_actions_t actions;
+    posix_spawn_file_actions_init(&actions);
+    posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
+    posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO, "/run/wiliwili-player.log", O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    posix_spawn_file_actions_adddup2(&actions, STDOUT_FILENO, STDERR_FILENO);
+    const int rc = posix_spawn(&player_pid, executable, &actions, nullptr, args, envp.data());
+    posix_spawn_file_actions_destroy(&actions);
+    if (rc) { player_pid = -1; error = std::strerror(rc); return false; }
+    player_paused = false;
+    std::fprintf(stderr, "CEDAR child started pid=%ld\n", static_cast<long>(player_pid));
+    return true;
+}
+bool platform_player_pause(std::string& error) {
+    if (player_pid <= 0 || kill(player_pid, SIGSTOP)) { error = "Player is not active"; return false; }
+    player_paused = true;
+    return true;
+}
+bool platform_player_seek(uint32_t, std::string& error) { error = "Seek controls are not connected yet"; return false; }
+bool platform_player_set_volume(uint8_t, std::string& error) { error = "Use the system audio volume for this candidate"; return false; }
+bool platform_player_set_speed(uint16_t percent, std::string& error) {
+    if (percent == 100) return true;
+    error = "Only normal speed is supported"; return false;
+}
+bool platform_player_finished() {
+    if (player_pid <= 0) return true;
+    int status;
+    const pid_t result = waitpid(player_pid, &status, WNOHANG);
+    if (result == player_pid || (result < 0 && errno == ECHILD)) {
+        if (result > 0) std::fprintf(stderr, "CEDAR child ended status=%d\n", status);
+        player_pid = -1;
+        player_paused = false;
+        return true;
+    }
+    return false;
+}
+void platform_player_stop() {
+    if (player_pid <= 0) return;
+    if (player_paused) kill(player_pid, SIGCONT);
+    kill(player_pid, SIGTERM);
+    for (int n = 0; n < 100; ++n) {
+        if (platform_player_finished()) return;
+        platform_delay(20);
+    }
+    kill(player_pid, SIGKILL);
+    int status;
+    while (waitpid(player_pid, &status, 0) < 0 && errno == EINTR) {}
+    player_pid = -1;
+    player_paused = false;
+}

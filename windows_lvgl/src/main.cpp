@@ -3893,10 +3893,16 @@ void request_video_detail(size_t video_index, size_t part_index) {
             if (!detail.cid.empty()) {
                 std::string play_body;
                 std::string play_error;
+#ifdef WILIWILI_BOARD
+                const int requested_qn = 16;
+                const int requested_format = 1;
+#else
                 const int requested_qn = setting_low_quality ? 16 : setting_video_quality;
+                const int requested_format = setting_video_format;
+#endif
                 const std::string play_path = "/x/player/wbi/playurl?bvid=" + url_encode(detail.bvid) +
                                               "&cid=" + detail.cid + "&qn=" + std::to_string(requested_qn) +
-                                              "&fnval=" + std::to_string(setting_video_format) +
+                                              "&fnval=" + std::to_string(requested_format) +
                                               "&fourk=1&fnver=0";
                 if (fetch_feed(play_path, play_body, play_error)) {
                     parse_play_source(play_body, detail.play_url, detail.play_format, setting_video_codec, &detail.play_audio_url);
