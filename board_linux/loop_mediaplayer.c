@@ -228,6 +228,26 @@ static cdx_int32 wiliwili_seek_to(CdxParserT *parser, cdx_int64 time_us, SeekMod
     return result;
 }
 
+static int wiliwili_decode(VideoDecoder *decoder, int eos, int keyframe, int drop, int64_t now)
+{
+    int rc = DecodeVideoStream(decoder, eos, keyframe, drop, now);
+    static int64_t report;
+    if (wiliwili_debug_enabled() && monotonic_us() - report > 5000000) {
+        layer_t *layer = &g_mediaplayer.drm_warpper->layer[DRM_WARPPER_LAYER_VIDEO];
+        pthread_mutex_lock(&layer->display_queue.mtx);
+        size_t queued = layer->display_queue.count;
+        pthread_mutex_unlock(&layer->display_queue.mtx);
+        pthread_mutex_lock(&layer->free_queue.mtx);
+        size_t returned = layer->free_queue.count;
+        pthread_mutex_unlock(&layer->free_queue.mtx);
+        fprintf(stderr, "DEBUG frame pipeline decode=%d valid=%d display_queue=%zu free_queue=%zu audio_pts=%lld video_pts=%lld\n",
+            rc, ValidPictureNum(decoder, 0), queued, returned,
+            (long long)audio_now(), (long long)atomic_load(&wiliwili_latest_video_pts));
+        report = monotonic_us();
+    }
+    return rc;
+}
+
 /* Compile the original player without editing its protected source tree. */
 #define CdxParserSeekTo wiliwili_seek_to
 #define CdxParserPrefetch wiliwili_prefetch
@@ -238,6 +258,7 @@ static cdx_int32 wiliwili_seek_to(CdxParserT *parser, cdx_int64 time_us, SeekMod
 #define snd_pcm_close wiliwili_pcm_drop
 #define snd_pcm_recover wiliwili_pcm_recover
 #define RequestPicture wiliwili_request_picture
+#define DecodeVideoStream wiliwili_decode
 #define usleep wiliwili_usleep
 #define aacDecoder_Fill(dec, buffers, sizes, valid) wiliwili_aac_fill(dec, buffers, sizes, valid, pkt->pts)
 #include "render/mediaplayer.c"
