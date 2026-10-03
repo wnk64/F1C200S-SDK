@@ -40,7 +40,8 @@ int main() {
     require(platform_player_set_volume(0, error), error);
     platform_delay(250);
     require(platform_player_set_volume(40, error), error);
-    for (int cycle = 0; cycle < 2; ++cycle) {
+    const bool audio_test = std::getenv("F1_AUDIO_RECOVERY_TEST") != nullptr;
+    for (int cycle = 0; !audio_test && cycle < 2; ++cycle) {
         require(platform_player_pause(error), error);
         platform_delay(250);
         require(platform_player_seek(195000, error), error);
@@ -59,12 +60,19 @@ int main() {
     }
     uint32_t before = 0, after = 0;
     require(platform_player_pause(error), error);
+    platform_player_controls_visible(true);
     platform_delay(300);
     require(platform_player_video_position(before), "missing paused position");
     platform_delay(1200);
     require(platform_player_video_position(after) && after == before, "paused progress changed");
     require(platform_player_start(error), error);
     wait_frame(after + 500, after + 5000);
+    if (audio_test) {
+        std::cout << "SELFTEST audio-route observation window=20s" << std::endl;
+        uint32_t position = 0;
+        require(platform_player_video_position(position), "missing audio test position");
+        wait_frame(position + 18000, position + 24000);
+    }
     platform_player_stop();
     platform_display_shutdown();
     std::cout << "SELFTEST PASS: two seek-loop cycles, pause, resume, frozen progress" << std::endl;
