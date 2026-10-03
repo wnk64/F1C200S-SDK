@@ -17,6 +17,10 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / rejected then planned / Correct loop event location
+
+用户再次确认进度未归零；完整自然循环监测无rewind日志。字节seek=0不等于MP4时间seek=0，上一检测候选被否定。去掉HTTP字节回绕推断，新增应用专用loop_mediaplayer.c，包含原完整mediaplayer.c并仅拦截它调用CdxParserSeekTo(parser,0)的返回结果；成功后发送事件4并记录真实发送字节数。原cedar-player工作树源文件不修改，原投屏二进制不变。同时保留上一请求的黑底播放页，待实机自然循环验证。
+
 ## 2026-10-03 / Planned / Black playback startup instead of enlarged cover
 
 用户要求进入播放前不显示放大的缩略图，允许黑屏。仅在WILIWILI_BOARD播放页取消surface上的封面图片和遮罩控件，背景设为纯黑；推荐/动态/详情的小封面仍保留，Windows预览不变。保护已有硬解、异步预读、UI自动隐藏和循环归零逻辑。原工具链增量构建并Git跟踪，不改kernel或投屏。

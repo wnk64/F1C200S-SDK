@@ -17,6 +17,9 @@ PLAYER_C := main.c driver/drm_warpper.c render/mediaplayer.c utils/cedar_cma_poo
 PLAYER_OBJ := $(addprefix build-arm/net-player/,$(PLAYER_C:.c=.o))
 SYSROOT := $(shell $(CC) --print-sysroot)
 net-player: build-arm/cedar-net-player
+build-arm/net-player/render/mediaplayer.o: loop_mediaplayer.c $(PLAYER_SRC)/render/mediaplayer.c
+	@mkdir -p $(@D)
+	$(CC) -Os -std=gnu11 -Wall -Wextra -Wno-unused-parameter -D_GNU_SOURCE -DHAVE_CEDARX=1 -I$(PLAYER_SRC) -I$(PLAYER_SRC)/render -I$(SYSROOT)/usr/include/drm -I../../../ROOTFS/buildroot-2018.02.11/output/build/libcedarx-custom -MMD -MP -c -o $@ $<
 build-arm/net-player/%.o: $(PLAYER_SRC)/%.c
 	@mkdir -p $(@D)
 	$(CC) -Os -std=gnu11 -Wall -Wextra -Wno-unused-parameter -D_GNU_SOURCE -DHAVE_CEDARX=1 -I$(PLAYER_SRC) -I$(SYSROOT)/usr/include/drm -I../../../ROOTFS/buildroot-2018.02.11/output/build/libcedarx-custom -MMD -MP -c -o $@ $<
