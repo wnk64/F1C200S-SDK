@@ -17,6 +17,11 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / pending / Audio-master runtime measurement
+
+源码69c2f16/独立入口48be03e，专用播放器SHA256 f4af89aa27947dfde62d94464b75be2d2d39f06fbc203632637149b5e11b6d37，原SDK编译rc0/无新警告，SSH校验一致。保持UI fb11360c（中心toggle、明确fallback）和绿色边界修复；旧sync播放器4c38dfd8保留。
+当前player18190启动后A/V时钟测量delta19517/19147/18985/18370us，dropped0，最近5秒124帧/errors0；MemAvailable25136KiB/CmaFree9808KiB。显示提交间隔有约81ms抖动，不能称完全平滑。请求用户新一轮seek嘴型验证，未取得反馈前同步整体仍pending；日志delta为ALSA估算与解码帧PTS，不等价于蓝牙音响实际声学延迟。未改蓝牙服务/内核/原投屏播放器，未创建临时脚本，三冷0/3。
+
 ## 2026-10-03 / Planned / Audio-master pacing after seek
 
 用户确认仍画面滞后。实测target184000ms，audio first179967833us，video preroll180120000us，丢97帧后first display184000000us，证明上一候选确实丢了目标之前的视频，不能再把所有问题归为旧关键帧。
