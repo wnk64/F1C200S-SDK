@@ -2,8 +2,8 @@
 set -eu
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 SELF=/etc/init.d/S90f1-menu
-SUPERVISOR=/root/aic_miracast/candidates/cma_start_preflight_20261002/menu-supervisor.sh
-UI=/root/aic_miracast/candidates/lvgl_connections_20261002/f1-menu
+SUPERVISOR=/root/aic_miracast/candidates/menu_graphics_boot_20261003/menu-supervisor.sh
+UI=/root/aic_miracast/candidates/menu_graphics_boot_20261003/f1-menu
 PID=/run/f1-menu-service.pid
 LOG=/run/f1-menu-service.log
 
@@ -12,7 +12,7 @@ alive() {
     pid=$(cat "$PID")
     case "$pid" in ''|*[!0-9]*) return 1 ;; esac
     [ -r "/proc/$pid/cmdline" ] || return 1
-    tr '\0' ' ' < "/proc/$pid/cmdline" | grep -Fq "$SUPERVISOR"
+    tr '\0' ' ' < "/proc/$pid/cmdline" | grep -Fq -e "$SUPERVISOR" -e "$SELF"
 }
 
 case "${1:-start}" in

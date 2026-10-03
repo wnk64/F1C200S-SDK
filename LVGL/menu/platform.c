@@ -1,11 +1,12 @@
 #define _POSIX_C_SOURCE 200809L
 #include "platform.h"
-#include "../ft6236_20261002/touch_orientation.h"
+#include "../touch/touch_orientation.h"
 #include <fcntl.h>
 #include <linux/fb.h>
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
 #include <linux/input.h>
+#include <linux/kd.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -14,6 +15,7 @@
 
 static uint8_t *fb;
 static int fb_fd = -1, input_fd = -1, i2c_fd = -1;
+static int tty_fd = -1, tty_mode = KD_TEXT, tty_owned;
 static struct fb_var_screeninfo screen;
 static struct fb_fix_screeninfo fixed;
 static lv_color_t strips[2][480 * 16];
@@ -93,10 +95,16 @@ int platform_open(void)
         ioctl(fb_fd, FBIOGET_FSCREENINFO, &fixed)) return -1;
     if (screen.xres != 480 || screen.yres != 800 || screen.bits_per_pixel != 32 ||
         screen.red.length != 8 || screen.green.length != 8 || screen.blue.length != 8) return -1;
+    tty_fd = open("/dev/tty0", O_RDWR | O_NOCTTY | O_CLOEXEC);
+    if (tty_fd < 0 || ioctl(tty_fd, KDGETMODE, &tty_mode) ||
+        ioctl(tty_fd, KDSETMODE, KD_GRAPHICS)) {
+        perror("menu console graphics mode");
+        platform_close(); return -1;
+    }
+    /* Suppress fbcon drawing, not kernel logging or the serial console. */
+    tty_owned = 1;
     fb = mmap(NULL, fixed.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fb_fd, 0);
-    if (fb == MAP_FAILED) { fb = NULL; return -1; }
-    int tty = open("/dev/tty0", O_WRONLY | O_NOCTTY);
-    if (tty >= 0) { (void)write(tty, "\033[?25l", 6); close(tty); }
+    if (fb == MAP_FAILED) { fb = NULL; platform_close(); return -1; }
     input_fd = open("/dev/input/event0", O_RDONLY | O_NONBLOCK);
     i2c_fd = open("/dev/i2c-0", O_RDWR);
     lv_init();
@@ -114,6 +122,10 @@ int platform_open(void)
 void platform_close(void)
 {
     if (fb) { lv_deinit(); munmap(fb, fixed.smem_len); fb = NULL; }
+    if (tty_fd >= 0) {
+        if (tty_owned) (void)ioctl(tty_fd, KDSETMODE, tty_mode);
+        close(tty_fd); tty_fd = -1; tty_owned = 0;
+    }
     if (input_fd >= 0) close(input_fd);
     if (i2c_fd >= 0) close(i2c_fd);
     if (fb_fd >= 0) close(fb_fd);
