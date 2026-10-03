@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+MODULE=/root/aic_miracast/candidates/board_power_20261004/f1_board_power.ko
+case "${1:-start}" in
+start)
+    [ "$(uname -r)" = 5.7.1 ] || exit 1
+    [ ! -d /sys/module/f1_board_power ] || exit 0
+    insmod "$MODULE"
+    ;;
+stop)
+    # Keep the final kernel poweroff callback after rcK stops userspace services.
+    ;;
+*) echo 'Usage: S14board-power {start|stop}' >&2; exit 1 ;;
+esac
