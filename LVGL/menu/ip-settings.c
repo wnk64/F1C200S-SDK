@@ -11,7 +11,7 @@
 LV_FONT_DECLARE(menu_font_28);
 static lv_obj_t *mode, *inputs[3], *selected, *save;
 static pid_t child;
-static int active;
+static int active, last_result = -1;
 static const char *keys[] = {"1", "2", "3", "\n", "4", "5", "6", "\n", "7", "8", "9", "\n", ".", "0", "/", "\n", LV_SYMBOL_BACKSPACE, "", NULL};
 void ip_settings_close(void)
 {
@@ -47,6 +47,7 @@ static void submit(lv_event_t *event)
     }
     if (child < 0) { child = 0; lv_label_set_text(menu_status(), "启动失败"); return; }
     lv_obj_add_state(save, LV_STATE_DISABLED);
+    last_result = -1;
     lv_label_set_text(menu_status(), "正在应用网络设置");
 }
 void ip_settings_show(void)
@@ -109,6 +110,17 @@ void ip_settings_poll(void)
     if (waitpid(child, &status, WNOHANG) != child) return;
     child = 0; lv_obj_clear_state(save, LV_STATE_DISABLED);
     int rc = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    last_result = rc;
     lv_label_set_text(menu_status(), rc == 0 ? "网络设置已应用" : rc == 3 ?
         "IP 参数错误" : rc == 4 ? "Wi-Fi 未连接" : "应用失败，请检查日志");
+}
+int ip_settings_test_step(void)
+{
+    static int started;
+    if (!started) {
+        started = 1;
+        lv_event_send(save, LV_EVENT_CLICKED, NULL);
+    }
+    if (child > 0) return 0;
+    return last_result == 0 ? 1 : -1;
 }

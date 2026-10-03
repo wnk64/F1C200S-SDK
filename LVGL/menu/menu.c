@@ -271,6 +271,7 @@ int main(int argc, char **argv)
     int power_preview = argc > 2 && !strcmp(argv[2], "--power-preview");
     int settings_preview = argc > 2 && !strcmp(argv[2], "--settings-preview");
     int ip_preview = argc > 2 && !strcmp(argv[2], "--ip-preview");
+    int ip_test = argc > 2 && !strcmp(argv[2], "--ip-selftest");
     if (platform_open()) { platform_close(); return 2; }
     signal(SIGTERM, signal_stop); signal(SIGINT, signal_stop);
     signal(SIGPIPE, SIG_IGN);
@@ -281,7 +282,7 @@ int main(int argc, char **argv)
     if (time_preview || time_test) time_settings_show();
     if (power_preview) power_settings();
     if (settings_preview) settings();
-    if (ip_preview) ip_settings_show();
+    if (ip_preview || ip_test) ip_settings_show();
     uint64_t previous = platform_ms(), start = previous, update = 0;
     int smoke_stage = 0;
     uint64_t system_update = 0;
@@ -291,6 +292,12 @@ int main(int argc, char **argv)
         connections_poll();
         time_settings_poll();
         ip_settings_poll();
+        if (ip_test) {
+            int result = ip_settings_test_step();
+            if (result || now - start > 30000) {
+                exit_code = result == 1 ? 0 : 1; quit = 1;
+            }
+        }
         if (now - system_update >= 5000 || !system_update) {
             system_update = now;
             if (battery_label) {

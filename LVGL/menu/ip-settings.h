@@ -3,4 +3,5 @@
 void ip_settings_show(void);
 void ip_settings_poll(void);
 void ip_settings_close(void);
+int ip_settings_test_step(void);
 #endif
