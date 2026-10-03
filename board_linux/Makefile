@@ -10,6 +10,21 @@ LVOBJ := $(patsubst $(LV)/%.c,build-arm/lvgl/%.o,$(shell find $(LV)/src -name '*
 OBJ := build-arm/main.o build-arm/platform_linux.o build-arm/jpeg_thumbnail.o build-arm/board_font.o $(LVOBJ)
 .DEFAULT_GOAL := all
 all: build-arm/wiliwili-lvgl build-arm/platform-probe
+
+# Keep the protected Miracast player and its object files untouched.
+PLAYER_SRC := $(abspath ../../../SOFTWARE/cedar-player/player-src)
+PLAYER_C := main.c driver/drm_warpper.c render/mediaplayer.c utils/cedar_cma_pool.c utils/spsc_queue.c utils/log.c utils/misc.c
+PLAYER_OBJ := $(addprefix build-arm/net-player/,$(PLAYER_C:.c=.o))
+SYSROOT := $(shell $(CC) --print-sysroot)
+net-player: build-arm/cedar-net-player
+build-arm/net-player/%.o: $(PLAYER_SRC)/%.c
+	@mkdir -p $(@D)
+	$(CC) -Os -std=gnu11 -Wall -Wextra -Wno-unused-parameter -D_GNU_SOURCE -DHAVE_CEDARX=1 -I$(PLAYER_SRC) -I$(SYSROOT)/usr/include/drm -MMD -MP -c -o $@ $<
+build-arm/cdx_https.o: cdx_https.c
+	$(CC) -Os -std=gnu11 -Wall -Wextra -D_GNU_SOURCE -Ivendor/curl-8.16.0/include -c -o $@ $<
+build-arm/cedar-net-player: $(PLAYER_OBJ) build-arm/cdx_https.o build-curl/lib/.libs/libcurl.a
+	$(CC) -Wl,--gc-sections -o $@ $^ -ldrm -lMemAdapter -lvdecoder -lVE -lvideoengine -lcdc_base -lcdx_parser -lcdx_stream -lcdx_base -lcdx_common -lfdk-aac -lasound -lssl -lcrypto -lz -lpthread -lrt -ldl -lm
+-include $(PLAYER_OBJ:.o=.d)
 build-arm/wiliwili-lvgl: $(OBJ) build-curl/lib/.libs/libcurl.a
 	$(CXX) -Wl,--gc-sections -o $@ $^ -lssl -lcrypto -ljpeg -pthread -lm
 build-arm/main.o: ../windows_lvgl/src/main.cpp compat_cpp17.h

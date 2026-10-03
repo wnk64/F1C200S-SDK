@@ -17,6 +17,14 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / Planned / Bilibili HTTPS hardware playback
+
+基线：原工作树 39806ed，完整 LVGL/curl 源码与匹配产物保留，未新建工作树。
+证据：B站 API 返回360p、带音频MP4；现有播放器在解复用前报不支持https scheme。
+计划：仅增加wiliwili专用CdxStream HTTPS Range适配器，256KiB有界缓存，使用已有libcurl/OpenSSL校验证书；重用当前cedar-player完整源码，在应用build-arm内生成独立播放器，不覆盖投屏播放器、解码库、kernel或驱动。板端UI连接独立子进程，正确停止/回收；B站优先请求低清H264渐进MP4。
+回退：保留板端原wiliwili程序9e43a1a7，停止新候选后使用原菜单入口。
+测试：Range/seek与真实MP4解析、解码帧持续提交、菜单退出恢复、内存；三次冷启动与蓝牙/投屏回归仍待验收，禁止称稳定。
+
 Worktree: /home/wnk/Desktop/F1c200S_SOFT/LVGL/wiliwili_lvgl
 Component: LVGL wiliwili Linux application port
 Base: 39695b1; full current application source; no previous ARM artifact
