@@ -2,7 +2,7 @@
 set -eu
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 SELF=/etc/init.d/S18rtc-time
-TOOL=/opt/f1-time/f1-rtc-time
+TOOL=/opt/f1-time/f1-rtc-time-ui
 PID=/run/f1-rtc-time.pid
 STATUS=/run/f1-rtc-time.status
 alive() {

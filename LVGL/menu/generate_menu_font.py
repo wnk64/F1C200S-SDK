@@ -3,7 +3,7 @@ import ctypes as c
 from ctypes import wintypes as w
 from pathlib import Path
 
-TEXT = "应用无线投屏手机画面与声音触摸测试系统设置显示亮度返回上一页下一页启动失败请检查日志网络已连接未连接内存可用重试退出蓝牙选择设备暂无设备扫描已配对未配对已保存忘记此设备确认取消断开连接加密开放网络密码配对码正在扫描正在处理正在连接请稍候操作失败扫描失败不支持此认证密码需为8至63位"
+TEXT = "应用无线投屏手机画面与声音触摸测试系统设置显示亮度返回上一页下一页启动失败请检查日志网络已连接未连接内存可用重试退出蓝牙选择设备暂无设备扫描已配对未配对已保存忘记此设备确认取消断开连接加密开放网络密码配对码正在扫描正在处理正在连接请稍候操作失败扫描失败不支持此认证密码需为8至63位日期时间北京年月日时分保存联网校时无法启动正在更新写入失败忙稍后重试早于编译超时"
 
 class Point(c.Structure):
     _fields_ = [("x", w.LONG), ("y", w.LONG)]
@@ -83,5 +83,5 @@ const lv_font_t menu_font_28 = {
 };
 ''' % (codes[0], codes[-1]-codes[0]+1, len(codes))
 target = Path(__file__).with_name('menu_font_28.c')
-target.write_text(source, encoding='ascii')
+target.write_text(source, encoding='ascii', newline='\n')
 print('%s: %d glyphs, %d bitmap bytes' % (target, len(codes), len(bitmap)))

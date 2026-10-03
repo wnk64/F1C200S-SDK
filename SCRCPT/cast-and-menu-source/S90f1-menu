@@ -3,7 +3,7 @@ set -eu
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 SELF=/etc/init.d/S90f1-menu
 SUPERVISOR=/root/aic_miracast/candidates/menu_graphics_boot_20261003/menu-supervisor.sh
-UI=/root/aic_miracast/candidates/menu_graphics_boot_20261003/f1-menu
+UI=/root/aic_miracast/candidates/menu_graphics_boot_20261003/f1-menu-time
 PID=/run/f1-menu-service.pid
 LOG=/run/f1-menu-service.log
 

@@ -2,6 +2,7 @@
 #include "platform.h"
 #include "ui.h"
 #include "connections.h"
+#include "time-settings.h"
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,6 +53,7 @@ void menu_back_to(void (*callback)(void)) { back_action = callback; view = 3; }
 void menu_settings(void) { settings(); }
 void header(const char *title, int can_back)
 {
+    time_settings_close();
     back_action = home;
     view = 0; touch_label = marker = brightness_label = NULL;
     lv_obj_clean(content);
@@ -123,25 +125,30 @@ static void network_open(lv_event_t *e)
 {
     connections_show((int)(intptr_t)lv_event_get_user_data(e));
 }
+static void time_open(lv_event_t *e) { (void)e; time_settings_show(); }
 static void settings(void)
 {
     header("系统设置", 1); view = 1;
-    label(content, "显示亮度", 28, 178, 424, 0x172329);
-    brightness_label = label(content, "", 150, 276, 180, 0x172329);
+    label(content, "显示亮度", 28, 162, 424, 0x172329);
+    brightness_label = label(content, "", 150, 246, 180, 0x172329);
     lv_obj_set_style_text_align(brightness_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text_fmt(brightness_label, "%d / 8", platform_brightness(-1));
     for (int side = 0; side < 2; side++) {
-        lv_obj_t *b = button(content, side ? 350 : 24, 252, 106, 104, 0xFFFFFF);
+        lv_obj_t *b = button(content, side ? 350 : 24, 218, 106, 92, 0xFFFFFF);
         lv_obj_t *s = label(b, side ? LV_SYMBOL_PLUS : LV_SYMBOL_MINUS, 0, 0, 60, 0x167A6F);
         lv_obj_center(s); lv_obj_set_style_text_align(s, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_add_event_cb(b, brightness, LV_EVENT_CLICKED, (void *)(intptr_t)(side ? 1 : -1));
     }
     for (int kind = 0; kind < 2; kind++) {
-        lv_obj_t *b = button(content, 24, 410 + kind * 144, 432, 116, 0xFFFFFF);
-        label(b, kind ? LV_SYMBOL_BLUETOOTH : LV_SYMBOL_WIFI, 28, 40, 64, 0x167A6F);
-        label(b, kind ? "蓝牙" : "Wi-Fi", 112, 40, 272, 0x172329);
+        lv_obj_t *b = button(content, 24, 340 + kind * 120, 432, 100, 0xFFFFFF);
+        label(b, kind ? LV_SYMBOL_BLUETOOTH : LV_SYMBOL_WIFI, 28, 32, 64, 0x167A6F);
+        label(b, kind ? "蓝牙" : "Wi-Fi", 112, 32, 272, 0x172329);
         lv_obj_add_event_cb(b, network_open, LV_EVENT_CLICKED, (void *)(intptr_t)kind);
     }
+    lv_obj_t *time = button(content, 24, 580, 432, 100, 0xFFFFFF);
+    label(time, LV_SYMBOL_SETTINGS, 28, 32, 64, 0x167A6F);
+    label(time, "日期与时间", 112, 32, 272, 0x172329);
+    lv_obj_add_event_cb(time, time_open, LV_EVENT_CLICKED, NULL);
     lv_obj_t *version = label(content, "LVGL 8.2.0 / 480 x 800", 28, 736, 424, 0x66757E);
     lv_obj_set_style_text_font(version, &lv_font_montserrat_16, 0);
 }
@@ -200,6 +207,9 @@ int main(int argc, char **argv)
     if (argc > 2 && !strcmp(argv[2], "--validate")) return 0;
     int smoke = argc > 2 && !strcmp(argv[2], "--smoke");
     int net_smoke = argc > 2 && !strcmp(argv[2], "--network-smoke");
+    int time_smoke = argc > 2 && !strcmp(argv[2], "--time-smoke");
+    int time_preview = argc > 2 && !strcmp(argv[2], "--time-preview");
+    int time_test = argc > 2 && !strcmp(argv[2], "--time-selftest");
     if (platform_open()) { platform_close(); return 2; }
     signal(SIGTERM, signal_stop); signal(SIGINT, signal_stop);
     signal(SIGPIPE, SIG_IGN);
@@ -207,23 +217,44 @@ int main(int argc, char **argv)
     lv_obj_set_style_bg_opa(content, LV_OPA_COVER, 0);
     lv_obj_clear_flag(content, LV_OBJ_FLAG_SCROLLABLE);
     home();
+    if (time_preview || time_test) time_settings_show();
     uint64_t previous = platform_ms(), start = previous, update = 0;
     int smoke_stage = 0;
     while (!quit) {
         uint64_t now = platform_ms(); lv_tick_inc((uint32_t)(now - previous)); previous = now;
         uint32_t idle_ms = lv_timer_handler();
         connections_poll();
+        time_settings_poll();
+        if (time_test) {
+            int result = time_settings_test_step();
+            if (result || now - start > 60000) {
+                exit_code = result == 1 ? 0 : 1; quit = 1;
+            }
+        }
         if (idle_ms < 1) idle_ms = 1;
         if (idle_ms > 16) idle_ms = 16;
         if (now - update >= 250) {
             update = now;
-            if (view < 3) lv_label_set_text(status_label, access("/sys/class/net/rtlwlan0", F_OK) ? "Wi-Fi --" : "Wi-Fi  /  F1C200S");
+            if (view < 3) {
+                time_t t = time(NULL) + 8 * 3600;
+                struct tm date; char clock[40], text[80];
+                gmtime_r(&t, &date); strftime(clock, sizeof(clock), "%Y-%m-%d  %H:%M:%S", &date);
+                snprintf(text, sizeof(text), "%s  |  %s", access("/sys/class/net/rtlwlan0", F_OK) ? "Wi-Fi --" : "Wi-Fi", clock);
+                if (strcmp(lv_label_get_text(status_label), text)) lv_label_set_text(status_label, text);
+            }
             if (view == 2) {
                 int x, y, down; platform_touch(&x, &y, &down);
                 lv_label_set_text_fmt(touch_label, "X %03d   Y %03d", x, y);
                 if (down) { lv_obj_clear_flag(marker, LV_OBJ_FLAG_HIDDEN); lv_obj_set_pos(marker, x - 7, y - 7); }
                 else lv_obj_add_flag(marker, LV_OBJ_FLAG_HIDDEN);
             }
+        }
+        if (time_smoke && now - start > (uint64_t)(smoke_stage + 1) * 1000) {
+            if (smoke_stage == 0) settings();
+            else if (smoke_stage == 1) time_settings_show();
+            else if (smoke_stage == 2) home();
+            else quit = 1;
+            smoke_stage++;
         }
         if (smoke && now - start > (uint64_t)(smoke_stage + 1) * 1000) {
             if (smoke_stage == 0) settings();
@@ -243,6 +274,7 @@ int main(int argc, char **argv)
     }
     fprintf(stderr, "menu: exit=%d heap=%u\n", exit_code, (unsigned)LV_MEM_SIZE);
     connections_close();
+    time_settings_close();
     if (exit_code >= 20 && exit_code < 20 + (int)count) {
         lv_obj_clean(content);
         label(content, apps[exit_code - 20].title, 64, 330, 352, 0x167A6F);

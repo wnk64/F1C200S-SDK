@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/file.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/utsname.h>
@@ -64,6 +65,39 @@ static int read_rtc(int fd, time_t *result)
     if (t < 0 || date.tm_year != rtc.tm_year || date.tm_mon != rtc.tm_mon ||
         date.tm_mday != rtc.tm_mday) return -1;
     *result = t;
+    return 0;
+}
+
+static int local_time(const char *text, time_t floor, struct timeval *result)
+{
+    int year, month, day, hour, minute, second, end = 0;
+    if (sscanf(text, "%d-%d-%dT%d:%d:%d%n", &year, &month, &day,
+               &hour, &minute, &second, &end) != 6 || text[end] ||
+        year < 2020 || year > 2037 || month < 1 || month > 12 || day < 1 || day > 31 ||
+        hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) return -1;
+    struct tm date = {.tm_year = year - 1900, .tm_mon = month - 1,
+        .tm_mday = day, .tm_hour = hour, .tm_min = minute, .tm_sec = second};
+    time_t stamp = timegm(&date);
+    if (stamp < 8 * 3600 || date.tm_year != year - 1900 || date.tm_mon != month - 1 ||
+        date.tm_mday != day || stamp - 8 * 3600 < floor) return -1;
+    result->tv_sec = stamp - 8 * 3600; result->tv_usec = 0;
+    return 0;
+}
+
+static int write_clocks(int fd, const struct timeval *t)
+{
+    if (settimeofday(t, NULL)) { perror("set system time"); return 1; }
+    struct tm date;
+    if (!gmtime_r(&t->tv_sec, &date)) return 1;
+    struct rtc_time written = {.tm_year = date.tm_year, .tm_mon = date.tm_mon,
+        .tm_mday = date.tm_mday, .tm_hour = date.tm_hour,
+        .tm_min = date.tm_min, .tm_sec = date.tm_sec};
+    time_t rtc;
+    if (ioctl(fd, RTC_SET_TIME, &written) || read_rtc(fd, &rtc) ||
+        rtc < t->tv_sec || rtc > t->tv_sec + 2) {
+        fputs("System time updated, RTC write/readback failed\n", stderr); return 3;
+    }
+    printf("PCF8563 write/readback OK UTC=%ld\n", (long)rtc);
     return 0;
 }
 
@@ -143,22 +177,36 @@ static int selftest(void)
         !decode_ntp(packet, 48, nonce, a + 1, &time)) return 1;
     packet[24] ^= 1;
     if (!decode_ntp(packet, 48, nonce, a, &time)) return 1;
-    puts("SELFTEST PASS: kernel timezone, NTP lower bound, origin and truncation");
+    if (local_time("2026-10-01T12:08:27", a, &time) || time.tv_sec != a ||
+        !local_time("2026-02-30T12:08:27", 0, &time) ||
+        !local_time("2026-10-01T12:08:26", a, &time) ||
+        !local_time("2026-10-01T12:08:27junk", a, &time)) return 1;
+    puts("SELFTEST PASS: kernel timezone, NTP validation, manual date and UTC+8");
     return 0;
 }
 
 int main(int argc, char **argv)
 {
     if (argc == 2 && !strcmp(argv[1], "--selftest")) return selftest();
-    if (argc != 2 || (strcmp(argv[1], "restore") && strcmp(argv[1], "sync"))) return 1;
+    int manual = argc == 3 && !strcmp(argv[1], "set-local");
+    if (!manual && (argc != 2 || (strcmp(argv[1], "restore") && strcmp(argv[1], "sync")))) return 1;
     struct utsname kernel;
     time_t floor, rtc;
     if (uname(&kernel) || build_time(kernel.version, &floor)) {
         fputs("Cannot parse running kernel build time; no clock changed\n", stderr); return 1;
     }
     printf("kernel_build_utc=%ld\n", (long)floor);
+    struct timeval t;
+    if (manual && local_time(argv[2], floor, &t)) {
+        fputs("Invalid date or earlier than kernel build\n", stderr); return 5;
+    }
+    int lock = open("/run/f1-clock.lock", O_CREAT | O_RDWR | O_CLOEXEC, 0600);
+    if (lock < 0 || flock(lock, LOCK_EX | LOCK_NB)) {
+        fputs("Another time operation is in progress\n", stderr); return 4;
+    }
     int fd = open("/dev/rtc0", O_RDWR | O_CLOEXEC);
     if (fd < 0) { perror("open rtc0"); return 2; }
+    if (manual) { int rc = write_clocks(fd, &t); close(fd); return rc; }
     if (!strcmp(argv[1], "restore")) {
         if (read_rtc(fd, &rtc) || rtc < floor) {
             puts("RTC invalid or older than kernel build; network time required"); close(fd); return 2;
@@ -170,7 +218,6 @@ int main(int argc, char **argv)
         printf("RTC restored system UTC=%ld\n", (long)rtc); return 0;
     }
     const char *servers[] = {"ntp.aliyun.com", "time.cloudflare.com", "ntp.tencent.com", "pool.ntp.org"};
-    struct timeval t;
     int synced = 0;
     for (size_t i = 0; i < sizeof(servers) / sizeof(servers[0]); ++i) {
         if (!query_ntp(servers[i], floor, &t)) {
@@ -178,16 +225,6 @@ int main(int argc, char **argv)
         }
     }
     if (!synced) { close(fd); fputs("No valid network time; retry later\n", stderr); return 2; }
-    if (settimeofday(&t, NULL)) { close(fd); perror("set system time"); return 1; }
-    struct tm date;
-    if (!gmtime_r(&t.tv_sec, &date)) { close(fd); return 1; }
-    struct rtc_time written = {.tm_year = date.tm_year, .tm_mon = date.tm_mon,
-        .tm_mday = date.tm_mday, .tm_hour = date.tm_hour,
-        .tm_min = date.tm_min, .tm_sec = date.tm_sec};
-    if (ioctl(fd, RTC_SET_TIME, &written) || read_rtc(fd, &rtc) ||
-        rtc < t.tv_sec || rtc > t.tv_sec + 2) {
-        close(fd); fputs("System time updated, RTC write/readback failed\n", stderr); return 3;
-    }
-    close(fd); printf("PCF8563 write/readback OK UTC=%ld\n", (long)rtc);
-    return 0;
+    int rc = write_clocks(fd, &t);
+    close(fd); return rc;
 }
