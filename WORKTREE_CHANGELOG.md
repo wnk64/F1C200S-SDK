@@ -17,6 +17,14 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / pending / Hidden-control runtime and source-size result
+
+源码8ab36ba/f3defe2/a7fcf2b；UI388b83f2、最终专用播放器f28f1791。原工具链make -C board_linux -j2 all net-player成功，SSH部署哈希一致，旧候选及投屏播放器未覆盖。
+固定MV接口实测：fnval0/1即使qn32仍返回quality16/MP4，实际解码640x360；fnval16返回quality32，DASH H264/HEVC均852x480。不存在已发现的精确800x480源。当前未接DASH独立音频，不能宣称完成800x480播放。
+控制层通过有界Unix数据报显示/隐藏，默认透明，中心区域逻辑坐标x250..550/y140..340点按显示，十秒无新点击且手指松开后隐藏。播放器初始化会覆盖alpha，已在OSD线程重新维持指定透明度；实际触摸/十秒隐藏待用户验证。
+进度条按既有软件播放计时自动更新，非真实PTS反馈；原拖动/音量后端尚未接入，不宣称这些控件已实现。暂停目前SIGSTOP停止整个子进程，暂停时OSD线程也停止，故暂停期间隐藏命令暂不能应用，这是待修限制。
+未验收稳定，冷启动0/3。下一步480p DASH双轨接入与实际PTS控制；暂保留640x360实际播放，不用缩放充当800x480。
+
 ## 2026-10-03 / Planned / 480-line source and auto-hidden playback controls
 
 用户要求800x480视频及默认隐藏控制层，点击中心显示，10秒没有点击隐藏。B站API没有任意宽高参数；请求480p档qn=32、渐进MP4并以解码日志核对实际宽高，不将854x480宣称800x480，不下载转码补尺寸。
