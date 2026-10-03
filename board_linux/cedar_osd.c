@@ -26,6 +26,7 @@ static int worker_started;
 static unsigned long updates;
 static int osd_drm_fd;
 static int desired_visibility;
+static int diagnostic_no_osd;
 extern atomic_int wiliwili_volume;
 extern atomic_int wiliwili_paused;
 extern atomic_int wiliwili_first_frame_visible;
@@ -116,6 +117,7 @@ int __wrap_drmIoctl(int fd, unsigned long request, void *argument)
 static void visible(int show)
 {
     desired_visibility = show;
+    if (diagnostic_no_osd) return;
     struct drm_srgn_atomic_commit_data data[2] = {
         { .layer_id = 1, .type = DRM_SRGN_ATOMIC_COMMIT_MOUNT_SET_ALPHA, .arg0 = 255 },
         { .layer_id = 1, .type = DRM_SRGN_ATOMIC_COMMIT_MOUNT_SET_COORD, .arg0 = show ? 0 : 480 }
@@ -130,6 +132,7 @@ int __real_drm_warpper_destroy(drm_warpper_t *drm);
 
 static void copy_controls(void)
 {
+    if (diagnostic_no_osd) return;
     for (int y = 0; y < OSD_HEIGHT; ++y) {
         const uint32_t *source = (const uint32_t *)(fb_pixels +
             (y + fb_screen.yoffset) * fb_fixed.line_length) + fb_screen.xoffset;
@@ -198,6 +201,15 @@ static int prepare_osd(drm_warpper_t *drm)
     long fd = strtol(value, &end, 10);
     if (*end || fd != 3 || drm->plane_res->count_planes < 2) return -1;
     event_fd = (int)fd;
+    const char *no_osd = getenv("F1_DIAGNOSTIC_NO_OSD");
+    diagnostic_no_osd = no_osd && !strcmp(no_osd, "1");
+    if (diagnostic_no_osd) {
+        fprintf(stderr, "DIAGNOSTIC OSD plane disabled; control socket remains active\n");
+        atomic_store(&running, 1);
+        if (pthread_create(&worker, NULL, update_controls, NULL)) return -1;
+        worker_started = 1;
+        return 0;
+    }
     fb_fd = open("/dev/fb0", O_RDONLY | O_CLOEXEC);
     if (fb_fd < 0 || ioctl(fb_fd, FBIOGET_VSCREENINFO, &fb_screen) ||
         ioctl(fb_fd, FBIOGET_FSCREENINFO, &fb_fixed) || fb_screen.bits_per_pixel != 32 ||
