@@ -74,6 +74,16 @@ static lv_obj_t *roller(int x, int y, int width, int start, int count, int selec
     lv_roller_set_options(r, options, LV_ROLLER_MODE_NORMAL);
     lv_obj_set_style_text_font(r, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_font(r, &lv_font_montserrat_24, LV_PART_SELECTED);
+    lv_obj_set_style_text_line_space(r, 12, 0);
+    lv_obj_set_style_text_line_space(r, 12, LV_PART_SELECTED);
+    lv_obj_set_style_text_color(r, lv_color_hex(0x66757E), 0);
+    lv_obj_set_style_bg_color(r, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_bg_opa(r, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(r, 1, 0);
+    lv_obj_set_style_border_color(r, lv_color_hex(0xDDE3E7), 0);
+    lv_obj_set_style_bg_color(r, lv_color_hex(0x167A6F), LV_PART_SELECTED);
+    lv_obj_set_style_bg_opa(r, LV_OPA_COVER, LV_PART_SELECTED);
+    lv_obj_set_style_text_color(r, lv_color_hex(0xFFFFFF), LV_PART_SELECTED);
     lv_roller_set_visible_row_count(r, 3);
     lv_obj_set_pos(r, x, y); lv_obj_set_size(r, width, 124);
     lv_obj_set_style_radius(r, 8, 0);
