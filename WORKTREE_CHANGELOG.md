@@ -17,6 +17,12 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / pending / Normal playback restored, probes off, menu integrated
+
+正常UI d285c420190f1db550d5ff3ab091873d00883cdab2df6d3d729ad79635445f67已部署，专用player37785e32，恢复固定MV播放。UI以每帧成功提交的PTS消息更新，不再靠墙钟自动递增，加载/停帧时保持上次提交位置。
+当前player19857运行，/proc环境已确认F1_PLAYER_DEBUG=0、CEDAR_FRAME_GAP_STATS=0；player-selftest无残留进程。本轮Python一次性控制包装已删除，C++可复用探针/DEBUG_PROBES.md保持Git跟踪，显式开启才执行。
+统一根仓库57ad956仅更新apps.conf的wiliwili入口到launch-loop-with-menu.sh，其他投屏/设置/触摸行不变；板端apps.conf SHA256 1897037c1c1e7cc2b2e017ca9baeab48bf04c8b3399dc7d4f3584cb7480666d1，旧launch-with-menu.sh及旧播放器仍可回退。运行MemAvailable24984KiB/CmaFree9808KiB。软件自测通过不是三冷或声学验收，候选pending/冷0/3，不推稳定归档。
+
 ## 2026-10-03 / pending / Automatic seek-loop test PASS
 
 源码1349b98；播放器37785e3252a4396d6e3bd1202d9d683a5e79455650bcc0dde9fcdd75c38bb911，自动探针3a3d67cf，原SDK all/net-player/selftest构建rc0、SSH哈希一致。
