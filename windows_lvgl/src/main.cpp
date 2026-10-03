@@ -3483,9 +3483,10 @@ void show_player_page(size_t video_index) {
         // rectangle to the independent Cedar/DE video plane, without scaling.
         lv_obj_set_size(surface, kBoardWidth, kBoardHeight);
         lv_obj_set_pos(surface, 0, 0);
-        lv_obj_set_style_bg_color(surface, ui_color(0x05070b), 0);
+        lv_obj_set_style_bg_color(surface, ui_color(0x000000), 0);
         lv_obj_set_style_border_width(surface, 0, 0);
         lv_obj_clear_flag(surface, LV_OBJ_FLAG_SCROLLABLE);
+#ifndef WILIWILI_BOARD
         if (video_index < thumbnail_descriptors.size() && thumbnail_descriptors[video_index].data) {
             lv_obj_t* image = lv_img_create(surface);
             lv_img_set_src(image, &thumbnail_descriptors[video_index]);
@@ -3498,6 +3499,7 @@ void show_player_page(size_t video_index) {
         lv_obj_set_style_bg_opa(shade, LV_OPA_20, 0);
         lv_obj_set_style_border_width(shade, 0, 0);
         lv_obj_clear_flag(shade, LV_OBJ_FLAG_CLICKABLE);
+#endif
         danmaku_tracks.fill(nullptr);
         const size_t visible_tracks = setting_danmaku_area <= 25 ? 1 : setting_danmaku_area <= 50 ? 2 : 3;
         for (size_t index = 0; index < danmaku_tracks.size(); ++index) {

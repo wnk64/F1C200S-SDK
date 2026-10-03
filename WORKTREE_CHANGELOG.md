@@ -17,6 +17,10 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / Planned / Black playback startup instead of enlarged cover
+
+用户要求进入播放前不显示放大的缩略图，允许黑屏。仅在WILIWILI_BOARD播放页取消surface上的封面图片和遮罩控件，背景设为纯黑；推荐/动态/详情的小封面仍保留，Windows预览不变。保护已有硬解、异步预读、UI自动隐藏和循环归零逻辑。原工具链增量构建并Git跟踪，不改kernel或投屏。
+
 ## 2026-10-03 / Planned / Reset UI progress on actual stream rewind
 
 用户反馈循环结束后UI时间和进度继续递增。原Cedar循环在PSR_EOS执行CdxParserSeekTo(parser,0)，UI没有收到回绕通知。仅修改wiliwili专用HTTPS流seek适配与UI平台接口：从文件后半段实际seek到0时，经已有双向Unix数据报发送回绕事件，UI重置软件计时和进度。不依据duration自行猜循环，不改原投屏播放器。初始MP4索引读取若回到0也可产生重置，初始计时归零无害；不是解码输出PTS精确同步。
