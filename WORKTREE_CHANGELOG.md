@@ -400,3 +400,13 @@ Rollback at board candidates/newboard_panel_20260930/rollback (old DTB/startup/m
 7db63c0/5a22ab6/78d6698新增f1-ip-config、SSID绑定静态策略、S17启动调用、连接helper换网激活、菜单IPv4/CIDR/网关/DNS编辑；不改kernel/无线驱动/密码/路由器/播放器。当前静态10.0.0.234/24、gateway/DNS10.0.0.1，SSID wnk641_2.4G。主机输入校验/ARM构建通过，运行configure成功、停止udhcpc、SSH保持、GUI实际按钮自测rc0、截图布局通过。详情SCRCPT/network-and-audio-source/static_ip_20261004/changes_20261004.md。
 
 但正常reboot后SSH无响应，ping/ARP不可达，电脑无串口，无法验证启动原因；已告知用户接回串口恢复。不称静态开机成功、不归档稳定；须先恢复SSH再修正失败fallback或回退。运行修改已经持久保存，旧S17/menu/helper源码及二进制保留，回退DHCP使用f1-ip-config configure dhcp。未再次断电、未通过串口传文件。
+
+## 2026-10-04 / 实测补记 / COM11网络与IP5209
+
+用户接回COM11后当前boot已Static IPv4 applied/SSH可用，补523e1f7广播与开机失败DHCP回退，0c9d3d9明确广播地址及用户确认普通4.2V电池OCV估算。正常reboot boot_id766d322a-3f35-4b45-bc68-e638ae823834，静态10.0.0.234/24、广播10.0.0.255、无udhcpc、菜单SSH恢复，通过单次正常重启（不是三冷验收）。IP5209接口可读Charging，插电电流-777mA；拔电后Not charging/+305mA，电流方向与旧driver注释相反未修，不能称符号已校准。用户电池4.2V已确认，UI用OCV带~估算，充电图标来自真实status；不改充电寄存器。
+
+## 2026-10-04 / pending真实触摸与三冷回归 / 投屏等待三击退出
+
+计划/文件/回退详见SCRCPT/cast-and-menu-source/cast-touch-exit-20261004.md。a26d456新增独立cast-wait-touch（原始FT6236 I2C方向，中心x140..339/y260..539、2秒三次按下释放，长按/滑动不算），cast-app管理生命周期；0505381/3942b56直接WPA STA-FIRST检查P2P关联及sinkPID/exe，手机开始握手或连接时释放检测，不触发退出。第一次空STA响应误判修正后测试重做。不是PBC/协议/驱动修改，不保留LVGL。
+
+原GCC6.4增量构建、host及ARM手势自测通过；实际未连接投屏启动到ready、显式模拟三击→cleanup→rc0→菜单SSH恢复，final没有watch/player/sink/手势检测器遗留。helper PSS115KiB/private60KiB。59c225c菜单cast入口切独立cast-app-touch.sh，旧cast-app.sh保留。SCP哈希helper0ec48d5c6f7da49ded0a585f1e92c825be2f00713a77aefd355816a49d9fe816、脚本31fe30b11011f8a527beb3eb511ee1a0fa8b373dc76ebe4e54f63ba85f99f097、apps001ce6f4f9134d8c2b60f23f70da5500494923691ec9ab2276dd24c0e919c99e一致。kernel/驱动/视频/音频/其他菜单入口不改。真实三次触摸、真实连接下不退出、三冷完整回归尚未完成，不标stable。测试变量正式默认未设置，临时包装和运行日志清理。
