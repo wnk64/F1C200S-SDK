@@ -1,0 +1,70 @@
+#!/bin/sh
+set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+SELF=/etc/init.d/S18rtc-time
+TOOL=/opt/f1-time/f1-rtc-time
+PID=/run/f1-rtc-time.pid
+STATUS=/run/f1-rtc-time.status
+alive() {
+    [ -r "$PID" ] || return 1
+    pid=$(cat "$PID")
+    case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+    [ -r "/proc/$pid/cmdline" ] || return 1
+    tr '\0' ' ' < "/proc/$pid/cmdline" | grep -Fq "$SELF"
+}
+case "${1:-start}" in
+start)
+    alive && exit 0
+    test -x "$TOOL"
+    rc=0
+    "$TOOL" restore > "$STATUS" 2>&1 || rc=$?
+    if [ "$rc" -eq 0 ]; then
+        echo 'rtc-time: valid RTC restored'
+    elif [ "$rc" -eq 2 ]; then
+        echo 'rtc-time: invalid RTC; network correction in background'
+        start-stop-daemon -S -b -m -p "$PID" -x "$SELF" -- worker
+    else
+        cat "$STATUS" >&2
+        exit "$rc"
+    fi
+    ;;
+worker)
+    child=
+    cleanup() {
+        trap - EXIT INT TERM
+        if [ -n "$child" ]; then
+            kill -TERM "$child" 2>/dev/null || true
+            wait "$child" 2>/dev/null || true
+        fi
+        rm -f "$PID"
+    }
+    trap cleanup EXIT
+    trap 'exit 0' INT TERM
+    while :; do
+        "$TOOL" sync > "$STATUS" 2>&1 &
+        child=$!
+        rc=0
+        wait "$child" || rc=$?
+        child=
+        [ "$rc" -ne 0 ] || exit 0
+        sleep 30 &
+        child=$!
+        wait "$child" || true
+        child=
+    done
+    ;;
+stop)
+    if alive; then
+        kill -TERM "$pid"
+        n=0
+        while alive; do
+            n=$((n + 1))
+            [ "$n" -lt 10 ] || exit 1
+            sleep 1
+        done
+    fi
+    ;;
+restart) "$SELF" stop; "$SELF" start ;;
+status) cat "$STATUS"; if alive; then echo "worker PID=$pid"; fi ;;
+*) echo 'Usage: S18rtc-time {start|stop|restart|status}' >&2; exit 1 ;;
+esac

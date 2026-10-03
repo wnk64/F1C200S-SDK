@@ -386,3 +386,7 @@ Rollback at board candidates/newboard_panel_20260930/rollback (old DTB/startup/m
 源码提交96b4c2c；实际根因是fbcon日志覆盖运行中的菜单，不是服务未启动。platform.c保存/切换KD_GRAPHICS、退出恢复，Makefile与头文件路径适配实体迁移；在原LVGL/menu中make -j2 f1-menu增量rc0。部署及哈希、回退入口详见SCRCPT/cast-and-menu-source/menu-boot-change-20261003.md。新GUI bc7f3fd5c37771143038f11609c50897cf071c2b1eccf7b3ff488cc3291b5171，服务adf6a5eb29b6c04e5f3fd7f79f9029ba7b2a02c40dfb43e816d85937f532c57f，管理器e724a70d8f7804c9a4f4d7d58f179e6caf4b29861ef11bba2f695c1d55bfac36。
 
 板端候选menu_graphics_boot_20261003，原候选保留；apps.conf不变。网络过程状态已更新：最终保存wnl64优先级0和家庭2.4G优先级10，冷启动自动SSH10.0.0.234。三轮实际断电菜单/SSH/日志覆盖测试均通过，boot_id分别75faa115-7d7e-41aa-bbd4-d91470eea675、a8beb893-bc68-4601-8e14-642703aab959、798b510a-1f70-4bbb-8048-2901bcf2b66f。每轮fb0 MD5在日志注入前后均a0a288720b64b2765f44dc403dbab569。未重测投屏/蓝牙音频/wiliwili播放，完整基线验收仍pending。未重建rootfs镜像、未改kernel/驱动/播放器，未推稳定标签。
+
+## 2026-10-03 / planned / PCF8563开机时间校验
+
+用户要求RTC读取时间与当前运行kernel编译时间比较，早于编译时间判异常，联网取最新时间并回写PCF8563。基线7be9484，新增SCRCPT/network-and-audio-source/rtc_time_20261003/f1-rtc-time.c及S18rtc-time；不改内核、驱动、播放器或网络配置。RTC低电压标记导致RTC_RD_TIME失败、系统1970年、wiliwili证书校验失败已实测。后台SNTP不阻塞菜单和SSH，成功后回写/回读验证并退出；无效回复不调时，网络不可用每30秒后台重试。详细中文记录同目录changes_20261003.md。原Buildroot GCC6.4编译rc0、主机自测通过；二进制72adcc708ff11d62c6d4d143dd0c8c8a5f8241b433e877ebc0a9574132d29991。待部署、真实授时、冷启动与HTTPS回归；rollback仅移除新增服务/工具，不影响原服务。
