@@ -29,9 +29,11 @@ static int desired_visibility;
 static void visible(int show)
 {
     desired_visibility = show;
-    struct drm_srgn_atomic_commit_data data = { .layer_id = 1,
-        .type = DRM_SRGN_ATOMIC_COMMIT_MOUNT_SET_ALPHA, .arg0 = show ? 255 : 0 };
-    struct drm_srgn_atomic_commit request = { .size = 1, .data = (uint32_t)(uintptr_t)&data };
+    struct drm_srgn_atomic_commit_data data[2] = {
+        { .layer_id = 1, .type = DRM_SRGN_ATOMIC_COMMIT_MOUNT_SET_ALPHA, .arg0 = 255 },
+        { .layer_id = 1, .type = DRM_SRGN_ATOMIC_COMMIT_MOUNT_SET_COORD, .arg0 = show ? 0 : 480 }
+    };
+    struct drm_srgn_atomic_commit request = { .size = 2, .data = (uint32_t)(uintptr_t)data };
     if (drmIoctl(osd_drm_fd, DRM_IOCTL_SRGN_ATOMIC_COMMIT, &request))
         fprintf(stderr, "OSD visibility failed: %s\n", strerror(errno));
 }

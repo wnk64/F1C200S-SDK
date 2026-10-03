@@ -17,6 +17,10 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / Planned / Remove hidden controls from visible scanout
+
+用户确认隐藏UI后控制条区域变黑。原方案只改层1全局alpha=0，而RGB层与视频层在同一硬件pipe，不能视为可靠的像素透明叠加。修正仅应用专用cedar_osd.c：控制条始终alpha255，隐藏时坐标移到x=480屏幕外，显示时恢复x=0；保持同一137600字节缓冲，不做整屏合成、不改kernel。验证隐藏时控制区域真实视频恢复，显示/十秒隐藏仍可用。未验证前不宣称修复。
+
 ## 2026-10-03 / pending / Hidden-control runtime and source-size result
 
 源码8ab36ba/f3defe2/a7fcf2b；UI388b83f2、最终专用播放器f28f1791。原工具链make -C board_linux -j2 all net-player成功，SSH部署哈希一致，旧候选及投屏播放器未覆盖。
