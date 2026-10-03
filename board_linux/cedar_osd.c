@@ -27,11 +27,64 @@ static unsigned long updates;
 static int osd_drm_fd;
 static int desired_visibility;
 extern atomic_int wiliwili_volume;
+extern atomic_int wiliwili_crop_ready;
+extern int wiliwili_crop_left, wiliwili_crop_width, wiliwili_crop_height;
+static volatile uint32_t *frontend_regs;
+static int frontend_fd = -1;
+static int apply_visible_tile_offset(void)
+{
+    if (!frontend_regs) {
+        frontend_fd = open("/dev/mem", O_RDWR | O_SYNC | O_CLOEXEC);
+        if (frontend_fd < 0) return -1;
+        void *mapping = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, frontend_fd, 0x01e00000);
+        if (mapping == MAP_FAILED) { close(frontend_fd); frontend_fd = -1; return -1; }
+        frontend_regs = mapping;
+    }
+    uint32_t format = frontend_regs[0x4c / 4];
+    if ((format & 0xf00) != 0x600 || (format & 0x70) != 0x20) return -1;
+    unsigned left = wiliwili_crop_left, width = wiliwili_crop_width;
+    uint32_t offset = (((left + width - 1) & 31) << 16) | left;
+    frontend_regs[0x30 / 4] = offset;
+    frontend_regs[0x34 / 4] = offset;
+    __sync_synchronize();
+    frontend_regs[0x04 / 4] |= 1;
+    __sync_synchronize();
+    fprintf(stderr, "PLAYER visible window: left=%u width=%u height=%d tile_offset=0x%08x\n",
+            left, width, wiliwili_crop_height, offset);
+    return 0;
+}
 static int first_frame_notified;
 int __real_drmIoctl(int fd, unsigned long request, void *argument);
 int __wrap_drmIoctl(int fd, unsigned long request, void *argument)
 {
+    struct drm_srgn_atomic_commit local_request;
+    struct drm_srgn_atomic_commit_data local_items[12];
+    int cropped = 0;
+    if (request == DRM_IOCTL_SRGN_ATOMIC_COMMIT && argument && atomic_load(&wiliwili_crop_ready)) {
+        struct drm_srgn_atomic_commit *commit = argument;
+        if (commit->size <= 12) {
+            memcpy(local_items, (void *)(uintptr_t)commit->data, commit->size * sizeof(local_items[0]));
+            for (unsigned i = 0; i < commit->size; ++i) {
+                if (local_items[i].layer_id == 0 && local_items[i].type == DRM_SRGN_ATOMIC_COMMIT_MOUNT_SET_YUV_VIEW) {
+                    uint32_t output = local_items[i].arg1;
+                    local_items[i].type = 5;
+                    local_items[i].arg1 = ((uint32_t)wiliwili_crop_height << 16) | (uint32_t)wiliwili_crop_width;
+                    local_items[i].arg2 = output;
+                    cropped = 1;
+                }
+            }
+            if (cropped) {
+                local_request.size = commit->size;
+                local_request.data = (uint32_t)(uintptr_t)local_items;
+                argument = &local_request;
+            }
+        }
+    }
     int result = __real_drmIoctl(fd, request, argument);
+    if (!result && cropped && apply_visible_tile_offset()) {
+        fprintf(stderr, "PLAYER visible crop rejected: unsupported FE layout\n");
+        return -1;
+    }
     if (!result && !first_frame_notified && event_fd >= 0 && request == DRM_IOCTL_SRGN_ATOMIC_COMMIT && argument) {
         struct drm_srgn_atomic_commit *commit = argument;
         struct drm_srgn_atomic_commit_data *items = (void *)(uintptr_t)commit->data;
@@ -190,5 +243,7 @@ int __wrap_drm_warpper_destroy(drm_warpper_t *drm)
         fprintf(stderr, "OSD released updates=%lu; fbdev restore=%d\n", updates, restored);
         close(restore_fd); restore_fd = -1;
     }
+    if (frontend_regs) { munmap((void *)frontend_regs, 4096); frontend_regs = NULL; }
+    if (frontend_fd >= 0) { close(frontend_fd); frontend_fd = -1; }
     return result;
 }

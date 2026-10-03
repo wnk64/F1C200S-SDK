@@ -17,6 +17,10 @@ Protected: existing kernel/drivers/network/BT/Miracast/menu binaries; acceptance
 
 # Worktree Change Log
 
+## 2026-10-03 / Planned / Visible-pixel window for rotated MB32 frames
+
+首帧实测buffer384x640/stride384，有效边界L8/T0/R368/B640。旧view把填充列包含进去。应用专用适配改用已有内核center-crop命令保留完整pitch384、输入有效360x640；该接口只支持32字节对齐起点，因此应用通过受限FE映射补齐tile内X0=8及X1=15，两路Y/UV一致，随后置寄存器ready。仅确认MB32 YUV420格式且有效起点<32、top0时启用，否则报错拒绝，不泛化到未知布局。只触及FE的0x30/0x34/0x04，不修改kernel/DTB/原投屏程序，不新增全帧复制或CMA缓冲。退出关闭映射，恢复fbdev会重设FE；实机绿条结果待验证。输出窗口仍沿用当前显示设置，此项仅移除填充，不宣称改变整体缩放策略。
+
 ## 2026-10-03 / Planned / Center toggle, explicit fallback and green-edge diagnosis
 
 用户要求中心再次点击隐藏UI；优先800x480目标，不可用回退640x360；照片显示视频边缘绿条。现有日志旋转有效画面360x640，但DRM输入384x640，疑似对齐填充被缩放，暂不认定屏参问题。

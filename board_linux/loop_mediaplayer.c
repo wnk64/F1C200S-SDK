@@ -9,6 +9,9 @@
 #include <errno.h>
 #include <vdecoder.h>
 
+atomic_int wiliwili_crop_ready = ATOMIC_VAR_INIT(0);
+int wiliwili_crop_left, wiliwili_crop_width, wiliwili_crop_height;
+
 static VideoPicture *wiliwili_request_picture(VideoDecoder *decoder, int stream)
 {
     VideoPicture *picture = RequestPicture(decoder, stream);
@@ -18,6 +21,14 @@ static VideoPicture *wiliwili_request_picture(VideoDecoder *decoder, int stream)
         fprintf(stderr, "PLAYER frame bounds: buffer=%dx%d stride=%d visible=L%d T%d R%d B%d\n",
                 picture->nWidth, picture->nHeight, picture->nLineStride,
                 picture->nLeftOffset, picture->nTopOffset, picture->nRightOffset, picture->nBottomOffset);
+        if (picture->nTopOffset == 0 && picture->nLeftOffset >= 0 && picture->nLeftOffset < 32 &&
+            picture->nRightOffset > picture->nLeftOffset && picture->nRightOffset <= picture->nWidth &&
+            picture->nBottomOffset > 0 && picture->nBottomOffset <= picture->nHeight) {
+            wiliwili_crop_left = picture->nLeftOffset;
+            wiliwili_crop_width = picture->nRightOffset - picture->nLeftOffset;
+            wiliwili_crop_height = picture->nBottomOffset;
+            atomic_store(&wiliwili_crop_ready, 1);
+        }
     }
     return picture;
 }
