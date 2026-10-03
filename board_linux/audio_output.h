@@ -85,7 +85,15 @@ static snd_pcm_sframes_t audio_write(const void *samples, snd_pcm_uframes_t fram
             return frames;
         }
     }
-    int64_t deadline = monotonic_us() + 500000;
+    int64_t started = monotonic_us();
+    int64_t deadline = started + 5000000;
+    unsigned waits = 0;
+    static int injected;
+    int64_t inject_until = 0;
+    if (!injected && wiliwili_debug_enabled() && getenv("F1_AUDIO_EAGAIN_TEST")) {
+        injected = 1; inject_until = started + 650000;
+        fprintf(stderr, "DEBUG inject 650ms PCM backpressure\n");
+    }
     for (;;) {
         if (player_stopping()) return -EINTR;
         if (atomic_load(&wiliwili_paused)) {
@@ -93,10 +101,25 @@ static snd_pcm_sframes_t audio_write(const void *samples, snd_pcm_uframes_t fram
             if (player_pause_wait()) return -EINTR;
             return 0;
         }
-        snd_pcm_sframes_t rc = snd_pcm_writei(audio_pcm, samples, frames);
-        if (rc >= 0) return rc;
-        if (rc == -EPIPE && snd_pcm_prepare(audio_pcm) >= 0) continue;
-        if (rc == -EAGAIN && monotonic_us() < deadline) { usleep(2000); continue; }
+        audio_route_check();
+        if (!audio_pcm) return 0;
+        snd_pcm_sframes_t rc = monotonic_us() < inject_until ? -EAGAIN :
+            snd_pcm_writei(audio_pcm, samples, frames);
+        if (rc > 0) {
+            if (waits && wiliwili_debug_enabled() && monotonic_us() - started > 100000)
+                fprintf(stderr, "DEBUG PCM backpressure recovered wait_us=%lld; same output retained\n",
+                    (long long)(monotonic_us() - started));
+            return rc;
+        }
+        if (rc == -EINTR) continue;
+        if (rc == -EPIPE && monotonic_us() < deadline && snd_pcm_prepare(audio_pcm) >= 0) {
+            if (wiliwili_debug_enabled()) fprintf(stderr, "DEBUG PCM underrun prepared on same output\n");
+            continue;
+        }
+        /* EAGAIN is backpressure, not a disappeared Bluetooth transport. */
+        if ((rc == -EAGAIN || rc == 0) && monotonic_us() < deadline) {
+            ++waits; usleep(20000); continue;
+        }
         fprintf(stderr, "PLAYER audio transport failed: %s; fallback/reopen\n", snd_strerror(rc));
         audio_release(); audio_failed = 1; audio_retry = monotonic_us() + 3000000;
         if (audio_connect() >= 0) return 0;
