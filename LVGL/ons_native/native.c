@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <setjmp.h>
-#include <iconv.h>
 #include <png.h>
 #include <jpeglib.h>
 #include <ft2build.h>
@@ -144,18 +143,14 @@ int ons_text_gbk(ons_surface *d, const char *path, int size, int x, int baseline
 {
     if (!d || !text || size < 1 || size > 128 || strlen(text) > 2048) return -1;
     uint32_t codes[2048];
-    iconv_t cd = iconv_open("UTF-32LE", "GBK");
-    if (cd == (iconv_t)-1) return -1;
-    char *input = (char *)text, *output = (char *)codes;
-    size_t left = strlen(text), room = sizeof(codes);
-    size_t converted = iconv(cd, &input, &left, &output, &room); iconv_close(cd);
-    if (converted == (size_t)-1) return -1;
+    int decoded = ons_gbk_decode(text, codes, sizeof(codes) / sizeof(*codes));
+    if (decoded < 0) return -1;
     FT_Library library; FT_Face face;
     if (FT_Init_FreeType(&library)) return -1;
     if (FT_New_Face(library, path, 0, &face)) { FT_Done_FreeType(library); return -1; }
     if (FT_Set_Pixel_Sizes(face, 0, size)) { FT_Done_Face(face); FT_Done_FreeType(library); return -1; }
     int count = 0;
-    for (size_t i = 0; i < (sizeof(codes) - room) / 4; ++i) {
+    for (int i = 0; i < decoded; ++i) {
         if (FT_Load_Char(face, codes[i], FT_LOAD_RENDER)) continue;
         FT_GlyphSlot glyph = face->glyph; FT_Bitmap *bitmap = &glyph->bitmap;
         if (bitmap->pixel_mode != FT_PIXEL_MODE_GRAY) continue;

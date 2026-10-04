@@ -8,6 +8,12 @@
 
 int main(int argc, char **argv)
 {
+    uint32_t codes[4];
+    assert(ons_gbk_decode("A\xd6\xd0\xce\xc4", codes, 4) == 3);
+    assert(codes[0] == 'A' && codes[1] == 0x4e2d && codes[2] == 0x6587);
+    assert(ons_gbk_decode("A\xd6\xd0\xce\xc4", codes, 2) == -1);
+    assert(ons_gbk_decode("\xd6", codes, 4) == -1);
+    assert(ons_gbk_decode("\xd6\x7f", codes, 4) == -1);
     assert(ons_over(0, 0xff123456) == 0xff123456);
     assert(ons_over(0xffff0000, 0xff0000ff) == 0xffff0000);
     assert(ons_over(0x80ff0000, 0xff0000ff) == 0xff80007f);

@@ -12,4 +12,5 @@ int ons_text_gbk(ons_surface *destination, const char *font_path, int size,
                  int x, int baseline, const char *text, uint32_t color);
 int ons_nsa_read(const char *archive, const char *name, uint8_t **bytes, size_t *length);
 int ons_lzss(const uint8_t *input, size_t input_size, uint8_t *output, size_t output_size);
+int ons_gbk_decode(const char *text, uint32_t *codes, size_t capacity);
 #endif
