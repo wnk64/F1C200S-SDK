@@ -3,3 +3,4 @@ ons-native-probe
 native-tests
 *.raw
 *.png
+*.a

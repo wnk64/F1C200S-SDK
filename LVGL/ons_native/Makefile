@@ -1,6 +1,7 @@
 ROOT := /home/wnk/Desktop/F1c200S_SOFT
 HOST := $(ROOT)/ROOTFS/buildroot-2018.02.11/output/host
 CC := $(HOST)/bin/arm-buildroot-linux-gnueabi-gcc
+AR := $(HOST)/bin/arm-buildroot-linux-gnueabi-ar
 MENU := $(ROOT)/LVGL/menu
 LV := $(ROOT)/LVGL/touch/lvgl
 SOURCES := $(wildcard $(LV)/src/*/*.c) $(wildcard $(LV)/src/*/*/*.c) $(wildcard $(LV)/src/*/*/*/*.c)
@@ -9,7 +10,7 @@ CFLAGS := -Os -Wall -Wextra -ffunction-sections -fdata-sections -MMD -MP -D_FILE
 CFLAGS += -DLV_CONF_INCLUDE_SIMPLE -I$(MENU) -I$(ROOT)/LVGL/touch -I$(LV)
 CFLAGS += -I$(HOST)/arm-buildroot-linux-gnueabi/sysroot/usr/include/freetype2
 LIBS := -lpng -ljpeg -lfreetype -lm
-all: native-tests ons-native-probe
+all: libons-native.a native-tests ons-native-probe
 build/gbk_map.h: generate_gbk.py
 	@mkdir -p $(@D)
 	python3 generate_gbk.py $@
@@ -23,6 +24,8 @@ build/%.o: %.c native.h
 build/platform.o: $(MENU)/platform.c $(MENU)/platform.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $<
+libons-native.a: build/native.o build/archive.o build/gbk.o
+	$(AR) rcs $@ $^
 native-tests: build/tests.o build/native.o build/archive.o build/gbk.o
 	$(CC) -Wl,--gc-sections -o $@ $^ $(LIBS)
 ons-native-probe: build/probe.o build/native.o build/archive.o build/gbk.o build/platform.o $(OBJECTS)
