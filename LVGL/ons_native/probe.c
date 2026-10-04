@@ -60,8 +60,13 @@ static void image_clicked(lv_event_t *event)
 static void button(int x, const char *symbol, lv_event_cb_t callback)
 {
     lv_obj_t *b = lv_btn_create(lv_scr_act()); lv_obj_set_pos(b, x, 720); lv_obj_set_size(b, 80, 80);
+    lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(b, lv_color_hex(0x24343d), 0);
+    lv_obj_set_style_bg_color(b, lv_color_hex(0x45616f), LV_STATE_PRESSED);
+    lv_obj_set_style_radius(b, 8, 0);
     lv_obj_t *label = lv_label_create(b); lv_label_set_text(label, symbol);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_32, 0); lv_obj_center(label);
+    lv_obj_set_style_text_color(label, lv_color_white(), 0);
     lv_obj_add_event_cb(b, callback, LV_EVENT_CLICKED, NULL);
 }
 int main(int argc, char **argv)
