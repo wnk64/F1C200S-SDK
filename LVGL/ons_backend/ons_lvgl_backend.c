@@ -7,9 +7,11 @@
 #include <string.h>
 #include <time.h>
 #include "platform.h"
+#include "touch_events.h"
 
 static SDL_Surface *surface;
-static int opened, quit_requested, old_down, old_x, old_y, mouse_captured;
+static int opened, quit_requested;
+static struct ons_touch_state touch;
 static lv_obj_t *canvas;
 static uint64_t tick, start, test_next;
 static unsigned test_clicks;
@@ -88,6 +90,22 @@ void SDL_UpdateRect(SDL_Surface *screen, Sint32 x, Sint32 y, Uint32 w, Uint32 h)
     (void)x; (void)y; (void)w; (void)h; SDL_UpdateRects(screen, 0, NULL);
 }
 int SDL_Flip(SDL_Surface *screen) { SDL_UpdateRects(screen, 0, NULL); return 0; }
+Uint8 SDL_GetMouseState(int *x, int *y)
+{
+    if (opened) {
+        if (x) *x = touch.x;
+        if (y) *y = touch.y;
+        return touch.down ? SDL_BUTTON_LMASK : 0;
+    }
+    Uint8 (*real_state)(int *, int *) = dlsym(RTLD_NEXT, "SDL_GetMouseState");
+    return real_state(x, y);
+}
+Uint8 SDL_GetAppState(void)
+{
+    if (opened) return SDL_APPACTIVE | SDL_APPMOUSEFOCUS | SDL_APPINPUTFOCUS;
+    Uint8 (*real_state)(void) = dlsym(RTLD_NEXT, "SDL_GetAppState");
+    return real_state();
+}
 int SDL_PollEvent(SDL_Event *event)
 {
     SDL_Event ignored;
@@ -112,22 +130,11 @@ int SDL_PollEvent(SDL_Event *event)
             return 1;
         }
         int x, y, down; platform_touch(&x, &y, &down);
-        int sx = y - (800 - surface->w) / 2, sy = 479 - x - (480 - surface->h) / 2;
-        int exit_area = x >= 388 && y >= 708;
-        if (down != old_down) {
-            old_down = down;
-            if ((!down && mouse_captured) || (!exit_area && sx >= 0 && sx < surface->w && sy >= 0 && sy < surface->h)) {
-                if (!down) { sx = old_x; sy = old_y; }
-                mouse_captured = down;
-                memset(event, 0, sizeof(*event)); event->type = down ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
-                event->button.button = SDL_BUTTON_LEFT; event->button.state = down ? SDL_PRESSED : SDL_RELEASED;
-                event->button.x = sx; event->button.y = sy; old_x = sx; old_y = sy; return 1;
-            }
-        } else if (down && mouse_captured && !exit_area && sx >= 0 && sx < surface->w && sy >= 0 && sy < surface->h && (sx != old_x || sy != old_y)) {
-            memset(event, 0, sizeof(*event)); event->type = SDL_MOUSEMOTION;
-            event->motion.state = SDL_BUTTON_LMASK; event->motion.x = sx; event->motion.y = sy;
-            event->motion.xrel = sx - old_x; event->motion.yrel = sy - old_y; old_x = sx; old_y = sy; return 1;
-        }
+        SDL_Event generated[2];
+        int count = ons_touch_events(&touch, surface->w, surface->h, x, y, down, generated);
+        for (int i = 0; i < count; ++i) SDL_PushEvent(&generated[i]);
+        if (count && getenv("ONS_LVGL_INPUT_DEBUG"))
+            fprintf(stderr, "ONS touch: raw=%d,%d down=%d game=%d,%d events=%d\n", x, y, down, touch.x, touch.y, count);
     }
     return real_poll(event);
 }

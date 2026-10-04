@@ -12,9 +12,11 @@ build/%.o: $(LV)/%.c $(MENU)/lv_conf.h
 build/platform.o: $(MENU)/platform.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $<
-build/backend.o: ons_lvgl_backend.c
+build/backend.o: ons_lvgl_backend.c touch_events.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -Wall -Wextra -c -o $@ $<
 libons-lvgl.so: build/backend.o build/platform.o $(OBJECTS)
 	$(CC) -shared -Wl,--gc-sections -o $@ $^ -lSDL -ldl -lm
 -include build/backend.d build/platform.d $(OBJECTS:.o=.d)
+test-touch: test-touch.c touch_events.h
+	$(CC) -Os -Wall -Wextra -o $@ test-touch.c
