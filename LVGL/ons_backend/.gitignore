@@ -2,3 +2,5 @@ build/
 *.so
 test-game/0.txt
 test-game/default.ttf
+*.raw
+*.png

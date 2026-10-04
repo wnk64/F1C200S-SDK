@@ -11,7 +11,8 @@
 static SDL_Surface *surface;
 static int opened, quit_requested, old_down, old_x, old_y, mouse_captured;
 static lv_obj_t *canvas;
-static uint64_t tick, start;
+static uint64_t tick, start, test_next;
+static unsigned test_clicks;
 static void stop(int signal_number) { (void)signal_number; quit_requested = 1; }
 static void exit_clicked(lv_event_t *event) { (void)event; quit_requested = 1; }
 static void draw_game(lv_event_t *event)
@@ -98,6 +99,18 @@ int SDL_PollEvent(SDL_Event *event)
         const char *limit = getenv("ONS_LVGL_TEST_MS");
         if (limit && now - start >= strtoul(limit, NULL, 10)) quit_requested = 1;
         if (quit_requested) { memset(event, 0, sizeof(*event)); event->type = SDL_QUIT; return 1; }
+        /* Opt-in synthetic input for script progression, never enabled by launcher. */
+        const char *clicks = getenv("ONS_LVGL_TEST_CLICKS");
+        if (clicks && test_clicks < strtoul(clicks, NULL, 10) && now - start >= 3000 + test_next) {
+            memset(event, 0, sizeof(*event));
+            event->type = SDL_MOUSEBUTTONUP;
+            event->button.button = SDL_BUTTON_LEFT;
+            event->button.state = SDL_RELEASED;
+            event->button.x = surface->w / 2; event->button.y = surface->h / 2;
+            test_clicks++; test_next += 3000;
+            fprintf(stderr, "ONS probe: synthetic click %u at %llu ms\n", test_clicks, (unsigned long long)(now - start));
+            return 1;
+        }
         int x, y, down; platform_touch(&x, &y, &down);
         int sx = y - (800 - surface->w) / 2, sy = 479 - x - (480 - surface->h) / 2;
         int exit_area = x >= 388 && y >= 708;
