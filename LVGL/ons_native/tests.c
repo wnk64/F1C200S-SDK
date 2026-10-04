@@ -47,6 +47,13 @@ int main(int argc, char **argv)
     bmp[56] = 255; bmp[58] = 255;
     s = ons_image_decode(bmp, sizeof(bmp)); assert(s && s->pixels[0] == 0xffff0000 && s->pixels[1] == 0xff00ff00);
     ons_surface_free(s); assert(!ons_image_decode(bmp, 58));
+    uint8_t paletted[66] = {0};
+    paletted[0] = 'B'; paletted[1] = 'M'; paletted[10] = 62; paletted[14] = 40;
+    paletted[18] = 2; paletted[22] = 1; paletted[26] = 1; paletted[28] = 8; paletted[46] = 2;
+    paletted[56] = 255; paletted[59] = 255; paletted[63] = 1;
+    s = ons_image_decode(paletted, sizeof(paletted));
+    assert(s && s->pixels[0] == 0xffff0000 && s->pixels[1] == 0xff00ff00); ons_surface_free(s);
+    paletted[63] = 2; assert(!ons_image_decode(paletted, sizeof(paletted)));
     if (argc == 3) {
         const char *resources[] = {"cg/sayajpgfirstedition10244.png", "cg/000.jpg", "data/line.bmp"};
         for (unsigned i = 0; i < 3; ++i) {

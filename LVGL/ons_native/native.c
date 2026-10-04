@@ -104,10 +104,15 @@ static uint32_t le32(const uint8_t *p) { return le16(p) | (uint32_t)le16(p + 2) 
 static ons_surface *read_bmp(const uint8_t *bytes, size_t size)
 {
     if (size < 54 || le32(bytes + 14) < 40 || le16(bytes + 26) != 1 || le32(bytes + 30)) return NULL;
-    uint32_t offset = le32(bytes + 10);
+    uint32_t offset = le32(bytes + 10), dib = le32(bytes + 14);
     int32_t w = (int32_t)le32(bytes + 18), raw_h = (int32_t)le32(bytes + 22);
     unsigned depth = le16(bytes + 28);
-    if (w < 1 || w > 2048 || !raw_h || raw_h < -2048 || raw_h > 2048 || (depth != 24 && depth != 32)) return NULL;
+    if (w < 1 || w > 2048 || !raw_h || raw_h < -2048 || raw_h > 2048 ||
+        (depth != 8 && depth != 24 && depth != 32) || dib > size - 14) return NULL;
+    uint32_t palette_size = depth == 8 ? le32(bytes + 46) : 0;
+    if (depth == 8 && !palette_size) palette_size = 256;
+    if (offset < 14 + dib || (depth == 8 && (palette_size > 256 ||
+        (uint64_t)14 + dib + palette_size * 4 > offset))) return NULL;
     int h = raw_h < 0 ? -raw_h : raw_h;
     size_t stride = ((size_t)w * (depth / 8) + 3) & ~(size_t)3;
     if (offset < 54 || offset > size || stride * h > size - offset) return NULL;
@@ -117,6 +122,10 @@ static ons_surface *read_bmp(const uint8_t *bytes, size_t size)
         const uint8_t *row = bytes + offset + (raw_h < 0 ? y : h - 1 - y) * stride;
         for (int x = 0; x < w; ++x) {
             const uint8_t *p = row + x * (depth / 8);
+            if (depth == 8) {
+                if (*p >= palette_size) { ons_surface_free(result); return NULL; }
+                p = bytes + 14 + dib + *p * 4;
+            }
             result->pixels[y * w + x] = 0xff000000u | (uint32_t)p[2] << 16 | (uint32_t)p[1] << 8 | p[0];
         }
     }
