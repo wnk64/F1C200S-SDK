@@ -52,8 +52,14 @@ int main(int argc, char **argv)
         for (unsigned i = 0; i < 3; ++i) {
             uint8_t *data; size_t length;
             assert(!ons_nsa_read(argv[1], resources[i], &data, &length));
-            s = ons_image_decode(data, length); free(data);
-            if (!s) { fprintf(stderr, "Resource decode failed: %s\n", resources[i]); return 1; }
+            s = ons_image_decode(data, length);
+            if (!s) {
+                fprintf(stderr, "Resource decode failed: %s bytes=%zu bpp=%u compression=%u\n", resources[i], length,
+                    length > 30 ? data[28] | (unsigned)data[29] << 8 : 0,
+                    length > 34 ? data[30] : 0);
+                free(data); return 1;
+            }
+            free(data);
             printf("Resource PASS %s %dx%d\n", resources[i], s->w, s->h); ons_surface_free(s);
         }
         uint8_t *data = (void *)1; size_t length = 1;
