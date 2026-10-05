@@ -44,6 +44,15 @@ static VideoDecoder *cedar_display_decoder;
 static vd_cedar_ctx *cedar_display_context;
 static int cedar_plugins_loaded;
 
+int vd_cedar_picture_geometry(void *picture, struct cedar_picture_geometry *geometry)
+{
+    VideoPicture *frame = picture;
+    if (!frame || !geometry || frame->ePixelFormat != PIXEL_FORMAT_YUV_MB32_420) return -1;
+    *geometry = (struct cedar_picture_geometry){frame->nWidth, frame->nHeight, frame->nLineStride,
+        frame->nLeftOffset, frame->nTopOffset, frame->nRightOffset, frame->nBottomOffset};
+    return 0;
+}
+
 int64_t vd_cedar_picture_position(void *picture)
 {
     VideoPicture *frame = picture;

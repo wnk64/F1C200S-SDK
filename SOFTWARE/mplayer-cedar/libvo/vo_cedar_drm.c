@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <sys/mman.h>
 
 #include <drm/drm.h>
 #include <xf86drm.h>
@@ -21,6 +22,7 @@
 #include "video_out_internal.h"
 
 #include "f1c200s/cedar_display.h"
+#include "f1c200s/cedar_geometry.h"
 
 #define DRM_SRGN_ATOMIC_COMMIT 0x00
 #define DRM_SRGN_RESET_FB_CACHE 0x01
@@ -56,6 +58,10 @@ static enum display_mode display_mode = DISPLAY_FIT;
 static void *displayed_picture;
 static void *retired_picture;
 static int event_fd = -1;
+static int frontend_fd = -1, layout_valid;
+static volatile uint32_t *frontend_regs;
+static struct cedar_picture_geometry layout;
+static struct cedar_native_view native_view;
 
 static void notify_frame(void *picture)
 {
@@ -118,6 +124,37 @@ static int submit_crop_view(void)
     commit.size = 1;
     commit.data = (uint32_t)(uintptr_t)&data;
     return drmIoctl(drm_fd, DRM_IOCTL_SRGN_ATOMIC_COMMIT, &commit);
+}
+
+static int configure_native_picture(void *picture)
+{
+    struct cedar_picture_geometry geometry;
+    if (vd_cedar_picture_geometry(picture, &geometry)) return -1;
+    if (layout_valid && !memcmp(&geometry, &layout, sizeof(layout))) return 0;
+    struct cedar_native_view view;
+    if (cedar_native_geometry(&geometry, screen_w, screen_h, &view)) return -1;
+    if (!frontend_regs) {
+        frontend_fd = open("/dev/mem", O_RDWR | O_SYNC | O_CLOEXEC);
+        if (frontend_fd < 0) return -1;
+        void *mapping = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, frontend_fd, 0x01e00000);
+        if (mapping == MAP_FAILED) { close(frontend_fd); frontend_fd = -1; return -1; }
+        frontend_regs = mapping;
+    }
+    source_w = view_w = view.width; source_h = view_h = view.height;
+    view_x = view.x; view_y = view.y;
+    if (submit_view()) return -1;
+    if ((frontend_regs[0x4c / 4] & 0xf70) != 0x620) return -1;
+    /* The existing ioctl guesses pitch from visible width; MB32 storage can be wider. */
+    frontend_regs[0x40 / 4] = frontend_regs[0x44 / 4] = (view.stride - 31) * 32;
+    frontend_regs[0x30 / 4] = view.y_tile;
+    frontend_regs[0x34 / 4] = view.uv_tile;
+    __sync_synchronize(); frontend_regs[0x04 / 4] |= 1; __sync_synchronize();
+    layout = geometry; native_view = view; layout_valid = 1;
+    fprintf(stderr, "[cedar_drm] native visible=%dx%d storage=%dx%d stride=%d source=%d,%d output=%dx%d at %d,%d tile=%08x/%08x base=%lu/%lu\n",
+        geometry.right - geometry.left, geometry.bottom - geometry.top, geometry.width, geometry.height,
+        view.stride, view.source_x, view.source_y, view.width, view.height, view.x, view.y,
+        view.y_tile, view.uv_tile, (unsigned long)view.y_offset, (unsigned long)view.uv_offset);
+    return 0;
 }
 
 static int query_format(uint32_t format)
@@ -193,9 +230,8 @@ static int config(uint32_t width, uint32_t height, uint32_t d_width,
     if (display_mode == DISPLAY_CROP)
         return submit_crop_view() ? 1 : 0;
     if (display_mode == DISPLAY_NATIVE) {
-        view_w = source_w; view_h = source_h;
-        view_x = (screen_w - source_w) / 2;
-        view_y = (screen_h - source_h) / 2;
+        layout_valid = 0;
+        return 0;
     }
     return submit_view() ? 1 : 0;
 }
@@ -212,6 +248,11 @@ static int control(uint32_t request, void *data)
     mpi = data;
     if (!mpi || !mpi->priv)
         return VO_FALSE;
+    if (display_mode == DISPLAY_NATIVE && configure_native_picture(mpi->priv)) {
+        fprintf(stderr, "[cedar_drm] invalid or unsupported native picture layout\n");
+        vd_cedar_return_picture(mpi->priv);
+        return VO_FALSE;
+    }
     if (retired_picture) {
         drmVBlank blank;
         memset(&blank, 0, sizeof(blank));
@@ -227,8 +268,8 @@ static int control(uint32_t request, void *data)
     memset(commands, 0, sizeof(commands));
     commands[0].layer_id = 0;
     commands[0].type = DRM_SRGN_MOUNT_FB_YUV;
-    commands[0].arg0 = (uint32_t)(uintptr_t)mpi->planes[0];
-    commands[0].arg1 = (uint32_t)(uintptr_t)mpi->planes[1];
+    commands[0].arg0 = (uint32_t)(uintptr_t)(mpi->planes[0] + (display_mode == DISPLAY_NATIVE ? native_view.y_offset : 0));
+    commands[0].arg1 = (uint32_t)(uintptr_t)(mpi->planes[1] + (display_mode == DISPLAY_NATIVE ? native_view.uv_offset : 0));
     commands[0].arg2 = 0;
     commit.size = 1;
     commit.data = (uint32_t)(uintptr_t)commands;
@@ -264,4 +305,7 @@ static void uninit(void)
         close(drm_fd);
     drm_fd = -1;
     event_fd = -1;
+    if (frontend_regs) munmap((void *)frontend_regs, 4096);
+    if (frontend_fd >= 0) close(frontend_fd);
+    frontend_regs = NULL; frontend_fd = -1; layout_valid = 0;
 }
