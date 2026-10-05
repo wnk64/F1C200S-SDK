@@ -35,6 +35,13 @@ names = {
     "SDL_PIXELFORMAT_ARGB8888": "ONS_PIXELFORMAT_ARGB8888",
 }
 pattern = re.compile(r"\b(" + "|".join(re.escape(name) for name in names) + r")\b")
+def runtime_name(match):
+    word = match.group(0)
+    if word.startswith("SDLK_"): return "ONSK_" + word[5:]
+    if word == "SDLKey": return "ons_rt_Key"
+    if word == "SDLCALL": return "NR_CALL"
+    prefix, suffix = word.split("_", 1)
+    return {"SDL": "ons_rt_", "IMG": "ons_img_", "TTF": "ons_ttf_", "Mix": "ons_mix_", "MIX": "ons_mix_"}[prefix] + suffix
 for name, text in sources.items():
     if name == "FontInfo.cpp":
         constructor = text.index("FontInfo::FontInfo()")
@@ -48,7 +55,10 @@ for name, text in sources.items():
         text = text[:start] + text[end:]
         text = text[:text.index("unsigned char AnimationInfo::getAlpha(")]
     text = text.replace("#include <SDL.h>", '#include "engine_types.h"')
+    for header in ["SDL_image.h", "SDL_ttf.h", "SDL_mixer.h"]:
+        text = text.replace("#include <" + header + ">", '#include "engine_runtime.h"')
     text = pattern.sub(lambda match: names[match.group(0)], text)
+    text = re.sub(r"\b(?:SDLK_[A-Za-z0-9_]+|SDLKey|SDLCALL|(?:SDL|IMG|TTF|Mix|MIX)_[A-Za-z0-9_]+)\b", runtime_name, text)
     if "#include <SDL" in text or re.search(r"\bSDL_[A-Za-z0-9_]+", text):
         raise ValueError("Unported SDL dependency in generated source: " + name)
     (output / name).write_bytes(text.encode("latin1"))

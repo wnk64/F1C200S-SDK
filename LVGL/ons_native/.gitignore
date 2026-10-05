@@ -12,3 +12,5 @@ native-audio-tests
 ons-command-probe
 native-animation-tests
 native-font-tests
+ons-lvgl
+native-runtime-image-tests

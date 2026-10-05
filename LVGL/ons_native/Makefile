@@ -15,15 +15,17 @@ CFLAGS += -I$(HOST)/arm-buildroot-linux-gnueabi/sysroot/usr/include/freetype2
 LIBS := -lpng -ljpeg -lfreetype -lm -lpthread
 COMMAND_FILES := ScriptParser ScriptParser_command DirectReader SarReader NsaReader FontInfo AnimationInfo DirtyRect resize_image
 COMMAND_OBJECTS := $(addprefix build/engine/,$(addsuffix .o,$(COMMAND_FILES))) build/charset_bridge.o build/animation_alpha.o build/font_info_bridge.o build/ScriptHandler.o
-all: libons-native.a libons-script.a libons-commands.a native-tests native-event-tests native-sprite-tests native-audio-tests native-animation-tests native-font-tests ons-native-probe ons-script-probe ons-audio-probe ons-command-probe
+EXECUTION_FILES := ONScripter ONScripter_animation ONScripter_command ONScripter_effect ONScripter_effect_breakup ONScripter_event ONScripter_file ONScripter_file2 ONScripter_image ONScripter_lut ONScripter_rmenu ONScripter_sound ONScripter_text
+EXECUTION_OBJECTS := $(addprefix build/engine/,$(addsuffix .o,$(EXECUTION_FILES)))
+all: libons-native.a libons-script.a libons-commands.a native-tests native-event-tests native-sprite-tests native-audio-tests native-animation-tests native-font-tests native-runtime-image-tests ons-native-probe ons-script-probe ons-audio-probe ons-command-probe
 .PHONY: verify-script-source
 verify-script-source:
 	sha256sum -c source-baseline.sha256
 build/engine/generated.stamp: prepare_engine.py source-baseline.sha256 | verify-script-source
 	python3 prepare_engine.py build/engine
 $(COMMAND_OBJECTS): build/engine/generated.stamp
-$(addprefix build/engine/,$(addsuffix .o,$(COMMAND_FILES))): build/engine/%.o: build/engine/generated.stamp engine_types.h
-	$(CXX) -O2 -Wall -funsigned-char -fno-strict-aliasing -ffunction-sections -fdata-sections -MMD -MP -DCHARSET_GBK -DLINUX -D_FILE_OFFSET_BITS=64 -I. -Ibuild/engine -I$(ENGINE) -I$(EXT)/include -c -o $@ build/engine/$*.cpp
+$(addprefix build/engine/,$(addsuffix .o,$(COMMAND_FILES) $(EXECUTION_FILES))): build/engine/%.o: build/engine/generated.stamp engine_types.h engine_runtime.h
+	$(CXX) -O2 -Wall -funsigned-char -fno-strict-aliasing -ffunction-sections -fdata-sections -MMD -MP -DCHARSET_GBK -DLINUX -DPDA_AUTOSIZE -D_FILE_OFFSET_BITS=64 -I. -Ibuild/engine -I$(ENGINE) -I$(EXT)/include -c -o $@ build/engine/$*.cpp
 build/charset_bridge.o: charset_bridge.cpp native.h
 	@mkdir -p $(@D)
 	$(CXX) -O2 -Wall -MMD -MP -c -o $@ $<
@@ -33,6 +35,19 @@ build/command_probe.o: command_probe.cpp build/engine/generated.stamp engine_typ
 	$(CXX) -O2 -Wall -funsigned-char -MMD -MP -DCHARSET_GBK -DLINUX -D_FILE_OFFSET_BITS=64 -I. -Ibuild/engine -I$(ENGINE) -c -o $@ $<
 libons-commands.a: $(COMMAND_OBJECTS)
 	$(AR) rcs $@ $^
+.PHONY: execution-objects
+execution-objects: $(EXECUTION_OBJECTS)
+build/native_main.o: native_main.cpp build/engine/generated.stamp engine_runtime.h
+	$(CXX) -O2 -Wall -funsigned-char -MMD -MP -DCHARSET_GBK -DLINUX -I. -Ibuild/engine -c -o $@ $<
+# Link intentionally fails until all native runtime contracts have implementations.
+ons-lvgl: build/native_main.o $(EXECUTION_OBJECTS) libons-commands.a libons-native.a
+	$(CXX) -Wl,--gc-sections -o $@ $^ $(EXT)/lib/libvorbisfile.a $(EXT)/lib/libvorbis.a $(EXT)/lib/libogg.a $(EXT)/lib/libbz2.a $(LIBS) -lasound
+build/runtime_image.o: runtime_image.cpp engine_runtime.h
+	$(CXX) -O2 -Wall -ffunction-sections -fdata-sections -MMD -MP -c -o $@ $<
+build/runtime_image_tests.o: runtime_image_tests.cpp engine_runtime.h
+	$(CXX) -O2 -Wall -MMD -MP -c -o $@ $<
+native-runtime-image-tests: build/runtime_image_tests.o build/runtime_image.o libons-native.a
+	$(CXX) -Wl,--gc-sections -o $@ $^ $(LIBS)
 build/animation_tests.o: animation_tests.cpp build/engine/generated.stamp engine_types.h
 	$(CXX) -O2 -Wall -MMD -MP -I. -Ibuild/engine -c -o $@ $<
 native-animation-tests: build/animation_tests.o libons-commands.a build/native.o build/surface.o build/sprite.o build/gbk.o
