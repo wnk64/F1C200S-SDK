@@ -1,5 +1,12 @@
 # Worktree Change Log
 
+## 2026-10-05 / planned / startup menu media entry
+Baseline bb2932d; user confirmed playback controls/lyrics work. Keep frontend9eda73615eb9320c2aacdde3d24f4f3eb4019b9baf7779f543e667bfbf094bbf and backendff93 unchanged.
+Files: media_browser.c (independent adaptation of tracked ONS browser), media-app.sh, Makefile, SCRCPT/cast-and-menu-source/apps.conf.
+Browser: portrait480x800 large rows, directory traversal/paging, readable regular MP3/MP4 only, newline filenames rejected. Browser exits before player opens; player exits before browser returns. Selection path treated as data, never eval. Temporary selection removed on exit.
+Protected: ONS browser/menu UI/supervisor source, cast/wiliwili/network/kernel/audio configuration. Old apps.conf Git bb2932d hashf5bd02bbeeee6fb44e124c45592f423a65707402430c8288775c5814fc6abc7c rollback. Only add sixth app; preserve all five existing commands.
+Tests: supported-file check/list, browser timed render, opt-in selection/player selftest, launcher cleanup/menu return. Physical touch and three cold boots pending.
+
 ## 2026-10-05 / planned / MP3 controls and synchronized LRC
 Baseline: e5e99e8, existing video frontend8b978fd7368f0cbf8766c8c17494ad0d5849e083d8420dfdea151f855eea3f64 retained.
 Files: mplayer_ui.c audio-only mode; lyrics.c/.h bounded UTF8 LRC loader and tests; Makefile.

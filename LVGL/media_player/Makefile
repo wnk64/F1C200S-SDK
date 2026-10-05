@@ -7,6 +7,11 @@ SOURCES := $(wildcard $(LV)/src/*/*.c) $(wildcard $(LV)/src/*/*/*.c) $(wildcard 
 OBJECTS := $(patsubst $(LV)/%.c,build/%.o,$(SOURCES))
 .DEFAULT_GOAL := all
 all: mplayer-ui
+media-browser: build/media_browser.o build/browser_platform.o build/font.o $(OBJECTS)
+	$(CC) -Wl,--gc-sections -o $@ $^ -lm
+build/browser_platform.o: ../menu/platform.c lv_conf.h
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -c -o $@ $<
 build/%.o: $(LV)/%.c lv_conf.h
 	@mkdir -p $(@D)
 	@$(CC) $(CFLAGS) -c -o $@ $<
