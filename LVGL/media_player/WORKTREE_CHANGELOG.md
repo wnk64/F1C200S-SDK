@@ -13,3 +13,10 @@ Display: proven wiliwili86x800 RGB565 layer1 pattern, no devmem crop hacks, no S
 Position: hardware picture PTS with decoder origin, no fabricated wall-clock progress, loading until target-frame commit.
 Memory: LVGL128KiB, striped render buffers,137600-byte OSD, no full-screen bitmap cache.
 Tests: build/dependency, command parser and controls, actual layer appearance/hide, pause/seek/audio/exit plus menu recovery required; three cold boots pending.
+
+## 2026-10-05 / planned / control selftest
+Commits: a51b48a frontend/frame notification,35a99f8 opt-in selftest/hidden control rendering.
+Build: frontend ELF needs libdrm/libm/libc only; no SDL. Backendff93fecb429f642f1728d51959fc24826bdd9a3eaebf2f45bb46e3e354c3315d built.
+Files: mplayer_ui.c startup/pipe failure handling and selftest flag; parser selftest rejects malformed/nonfinite replies.
+Selftest: explicitly MPLAYER_UI_SELFTEST=1; pause stability, actual volume acknowledgement, drag-controller seek and target-frame readiness, hide request, exit/cleanup. Synthetic LVGL actions do not prove real touchscreen or visible hide.
+Default: no selftest,10s idle hide; control widgets hidden when OSD hidden; progress redraw4Hz.

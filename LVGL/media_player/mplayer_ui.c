@@ -182,9 +182,16 @@ static void build_ui(void)
 }
 static int start_player(const char *executable, const char *file)
 {
-    int input[2], output[2], events[2];
+    int input[2] = {-1, -1}, output[2] = {-1, -1}, events[2] = {-1, -1};
     if (pipe2(input, O_CLOEXEC) || pipe2(output, O_CLOEXEC) ||
-        socketpair(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0, events)) return -1;
+        socketpair(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0, events)) {
+        for (unsigned i = 0; i < 2; ++i) {
+            if (input[i] >= 0) close(input[i]);
+            if (output[i] >= 0) close(output[i]);
+            if (events[i] >= 0) close(events[i]);
+        }
+        return -1;
+    }
     player = fork();
     if (player == 0) {
         dup2(input[0], STDIN_FILENO); dup2(output[1], STDOUT_FILENO); dup2(events[1], 3);
@@ -235,7 +242,8 @@ int main(int argc, char **argv)
         media_osd_close(); platform_close(); return 1;
     }
     uint64_t tick = platform_ms(), query = 0, present = 0, update = 0, started = tick;
-    int selftest = getenv("MPLAYER_UI_SELFTEST") != NULL, stage = 0;
+    const char *selftest_env = getenv("MPLAYER_UI_SELFTEST");
+    int selftest = selftest_env && !strcmp(selftest_env, "1"), stage = 0;
     uint64_t stage_started = tick;
     double paused_position = 0;
     activity = tick;
