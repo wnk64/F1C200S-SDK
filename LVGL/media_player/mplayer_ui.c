@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "media_display.h"
+#include "lyrics.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -19,6 +20,8 @@ static int command_fd = -1, reply_fd = -1, frame_fd = -1;
 static volatile sig_atomic_t quit;
 static double duration, position, seek_target;
 static int paused, volume = 100, shown, dragging, seeking, ready, failed;
+static int audio_only, lyric_count, last_lyric = -2;
+static lv_obj_t *song_title, *song_artist, *lyric_previous, *lyric_current, *lyric_next;
 static int reported_volume = -1;
 static double reported_volume_exact = -1;
 static uint64_t activity, seek_started;
@@ -48,6 +51,14 @@ static void response(const char *line)
 {
     double number;
     if (value(line, "ANS_LENGTH=", &number) == 1) duration = number;
+    else if (audio_only && value(line, "ANS_TIME_POSITION=", &number) == 1) {
+        if (seeking && (number < seek_target - 1 || number > seek_target + 5)) return;
+        if (seeking) { seeking = 0; fprintf(stderr, "MPLAYER UI audio seek ready=%.3f target=%.3f\n", number, seek_target); }
+        ready = 1;
+        if (!dragging) position = number;
+    }
+    else if (audio_only && !strncmp(line, "ANS_META_TITLE=", 15)) lv_label_set_text(song_title, line + 15);
+    else if (audio_only && !strncmp(line, "ANS_META_ARTIST=", 16)) lv_label_set_text(song_artist, line + 16);
     else if (value(line, "ANS_volume=", &number) == 1 && number <= 100) {
         reported_volume_exact = number;
         reported_volume = (int)lround(number);
@@ -139,6 +150,7 @@ static void volume_changed(lv_event_t *event)
 }
 static void center_clicked(lv_event_t *event)
 {
+    if (audio_only) return;
     if (lv_event_get_target(event) != lv_scr_act()) return;
     lv_point_t point; lv_indev_get_point(lv_indev_get_act(), &point);
     if (point.x < 250 || point.x > 550 || point.y < 140 || point.y > 340) return;
@@ -159,11 +171,32 @@ static lv_obj_t *slider(int x, int width, int max)
     lv_obj_add_event_cb(object, touch_activity, LV_EVENT_ALL, NULL);
     return object;
 }
-static void build_ui(void)
+static void build_ui(const char *file)
 {
     lv_obj_t *root = lv_scr_act(); lv_obj_clear_flag(root, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(root, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_bg_color(root, lv_color_black(), 0); lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
+    if (audio_only) {
+        lv_obj_set_style_bg_color(root, lv_color_hex(0x10191d), 0);
+        const char *name = strrchr(file, '/'); name = name ? name + 1 : file;
+        song_title = label(root, name, 32, 26, 736);
+        lv_obj_set_style_text_font(song_title, &menu_font_stream, 0);
+        lv_label_set_long_mode(song_title, LV_LABEL_LONG_DOT);
+        song_artist = label(root, "", 32, 72, 736);
+        lv_obj_set_style_text_font(song_artist, &menu_font_stream, 0);
+        lv_label_set_long_mode(song_artist, LV_LABEL_LONG_DOT);
+        lyric_previous = label(root, "", 40, 140, 720);
+        lyric_current = label(root, lyric_count ? "" : "暂无歌词", 40, 210, 720);
+        lyric_next = label(root, "", 40, 310, 720);
+        lv_obj_t *lyrics[] = {lyric_previous, lyric_current, lyric_next};
+        for (unsigned i = 0; i < 3; ++i) {
+            lv_obj_set_style_text_font(lyrics[i], &menu_font_stream, 0);
+            lv_obj_set_style_text_align(lyrics[i], LV_TEXT_ALIGN_CENTER, 0);
+            lv_obj_set_height(lyrics[i], i == 1 ? 88 : 44);
+            lv_label_set_long_mode(lyrics[i], LV_LABEL_LONG_DOT);
+            lv_obj_set_style_text_color(lyrics[i], lv_color_hex(i == 1 ? 0x51d7b6 : 0x88989d), 0);
+        }
+    }
     lv_obj_add_event_cb(root, center_clicked, LV_EVENT_CLICKED, NULL);
     controls = lv_obj_create(root); lv_obj_remove_style_all(controls);
     lv_obj_set_pos(controls, 0, 394); lv_obj_set_size(controls, 800, 86);
@@ -179,7 +212,8 @@ static void build_ui(void)
     volume_slider = slider(624, 148, 100); lv_slider_set_value(volume_slider, 100, LV_ANIM_OFF);
     lv_obj_add_event_cb(volume_slider, volume_changed, LV_EVENT_VALUE_CHANGED, NULL);
     label(controls, "MPlayer", 624, 54, 148);
-    lv_obj_add_flag(controls, LV_OBJ_FLAG_HIDDEN);
+    if (!audio_only) lv_obj_add_flag(controls, LV_OBJ_FLAG_HIDDEN);
+    else shown = 1;
     lv_obj_update_layout(root); lv_refr_now(NULL);
 }
 static int start_player(const char *executable, const char *file)
@@ -201,6 +235,13 @@ static int start_player(const char *executable, const char *file)
         setenv("MPLAYER_OSD_FD", "3", 1); setenv("CEDAR_ROTATE", "90", 1);
         setenv("CEDAR_CMA_POOL_MB", "12", 1); setenv("TERM", "dumb", 1);
         const char *loop = getenv("MPLAYER_UI_LOOP");
+        if (audio_only) {
+            unsetenv("CEDAR_CMA_POOL_MB"); unsetenv("MPLAYER_OSD_FD");
+            execl(executable, executable, "-slave", "-noconsolecontrols", "-quiet", "-noconfig", "all",
+                "-softvol", "-softvol-max", "100", "-novideo", "-vo", "null", "-ao", "alsa",
+                "-loop", loop && !strcmp(loop, "1") ? "0" : "1", file, (char *)NULL);
+            _exit(127);
+        }
         execl(executable, executable, "-slave", "-noconsolecontrols", "-quiet", "-noconfig", "all",
             "-softvol", "-softvol-max", "100", "-afm", "faad", "-vc", "cedarh264", "-vo", "cedar_drm:native",
             "-ao", "alsa", "-loop", loop && !strcmp(loop, "1") ? "0" : "1", file, (char *)NULL);
@@ -227,6 +268,9 @@ static int close_player(void)
 }
 int main(int argc, char **argv)
 {
+    if (argc == 2 && !strcmp(argv[1], "--selftest-lyrics")) {
+        int result = lyrics_selftest(); puts(result ? "LRC parser FAIL" : "LRC parser PASS"); return result;
+    }
     if (argc == 2 && !strcmp(argv[1], "--selftest-parser")) {
         double number;
         assert(value("ANS_LENGTH=35.25", "ANS_LENGTH=", &number) == 1 && number == 35.25);
@@ -237,10 +281,13 @@ int main(int argc, char **argv)
         puts("MPlayer UI reply parser PASS"); return 0;
     }
     if (argc != 3) { fprintf(stderr, "usage: mplayer-ui media-file backend-executable\n"); return 1; }
+    const char *extension = strrchr(argv[1], '.');
+    audio_only = extension && !strcasecmp(extension, ".mp3");
+    if (audio_only) lyric_count = lyrics_load(argv[1]);
     signal(SIGTERM, stop); signal(SIGINT, stop); signal(SIGPIPE, SIG_IGN);
     if (platform_open()) { platform_close(); return 2; }
-    build_ui();
-    if (media_osd_open() || start_player(argv[2], argv[1])) {
+    build_ui(argv[1]);
+    if ((!audio_only && media_osd_open()) || start_player(argv[2], argv[1])) {
         media_osd_close(); platform_close(); return 1;
     }
     uint64_t tick = platform_ms(), query = 0, present = 0, update = 0, started = tick;
@@ -249,6 +296,10 @@ int main(int argc, char **argv)
     uint64_t stage_started = tick;
     double paused_position = 0;
     activity = tick;
+    if (audio_only) {
+        fprintf(stderr, "MPLAYER UI audio mode lyrics=%d\n", lyric_count);
+        send_command("get_meta_title\nget_meta_artist\n");
+    }
     while (!quit) {
         uint64_t now = platform_ms(); lv_tick_inc(now - tick); tick = now;
         read_player();
@@ -259,8 +310,9 @@ int main(int argc, char **argv)
         }
         if (now - query >= 500) {
             send_command("pausing_keep_force get_time_length\npausing_keep_force get_property volume\n"); query = now;
+            if (audio_only) send_command("pausing_keep_force get_time_pos\n");
         }
-        if (shown && !dragging && now - activity >= 10000) visibility(0);
+        if (!audio_only && shown && !dragging && now - activity >= 10000) visibility(0);
         if (now - update >= 250) {
         update = now;
         if (!dragging && duration > 0 && !seeking)
@@ -270,6 +322,15 @@ int main(int argc, char **argv)
         else snprintf(clock, sizeof(clock), "%02u:%02u / %02u:%02u", (unsigned)position / 60,
             (unsigned)position % 60, (unsigned)duration / 60, (unsigned)duration % 60);
         if (strcmp(lv_label_get_text(time_label), clock)) lv_label_set_text(time_label, clock);
+        if (audio_only && lyric_count) {
+            int current = lyrics_index(position);
+            if (current != last_lyric) {
+                last_lyric = current;
+                lv_label_set_text(lyric_previous, lyrics_text(current - 1));
+                lv_label_set_text(lyric_current, lyrics_text(current));
+                lv_label_set_text(lyric_next, lyrics_text(current + 1));
+            }
+        }
         }
         if (!ready && now - started > 15000) { fprintf(stderr, "MPlayer UI startup has no actual frame\n"); failed = 1; break; }
         if (seeking && now - seek_started > 15000) {
@@ -311,5 +372,6 @@ int main(int argc, char **argv)
     if (reply_fd >= 0) close(reply_fd);
     if (frame_fd >= 0) close(frame_fd);
     media_osd_close(); platform_close(); menu_font_stream_close();
+    lyrics_close();
     return failed ? 1 : 0;
 }

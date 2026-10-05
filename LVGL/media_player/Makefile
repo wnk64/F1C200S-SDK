@@ -16,6 +16,6 @@ build/%.o: %.c lv_conf.h
 build/font.o: ../menu/menu_font_stream.c lv_conf.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $<
-mplayer-ui: build/mplayer_ui.o build/media_display.o build/font.o $(OBJECTS)
+mplayer-ui: build/mplayer_ui.o build/media_display.o build/lyrics.o build/font.o $(OBJECTS)
 	$(CC) -Wl,--gc-sections -o $@ $^ -ldrm -lm
 -include build/*.d $(OBJECTS:.o=.d)

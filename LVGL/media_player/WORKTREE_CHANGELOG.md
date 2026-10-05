@@ -1,5 +1,11 @@
 # Worktree Change Log
 
+## 2026-10-05 / planned / MP3 controls and synchronized LRC
+Baseline: e5e99e8, existing video frontend8b978fd7368f0cbf8766c8c17494ad0d5849e083d8420dfdea151f855eea3f64 retained.
+Files: mplayer_ui.c audio-only mode; lyrics.c/.h bounded UTF8 LRC loader and tests; Makefile.
+MP3: mpg123/default ALSA, visible full framebuffer UI without video OSD or CMA reservation; audio position from MPlayer ANS_TIME_POSITION. Metadata title/artist; drag pause, seek release, volume, exit. Lyrics from same basename.lrc; no fabricated lyric if absent.
+Protected: video frame-driven position and private OSD, backend, kernel, Bluetooth/network configuration, startup menu. Test parser/LRC, MP3 controls with existing user file, video regression. Three cold boots pending.
+
 ## 2026-10-05 / planned / OSD plane enumeration
 Baseline: d86d841, frontend7d4a01b16d608a75fc6df34c5fb8a1be58ad8a16693de8b549e28c591a2d02cc.
 Hypothesis: without UNIVERSAL_PLANES, primary layer0 is omitted; planes[1] mounts layer2 while private visibility commands move layer1. Hidden widgets clear the still-visible layer2 to black.
