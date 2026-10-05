@@ -1,3 +1,6 @@
+## 2026-10-05 / planned / user-supplied TK032F8004 timing
+Baseline root1f3bd30/kernelb3d8ed3, source artifacts/release5.7.1 rechecked. User ZIP6029517d, exact example source70943fd3. Numeric timing from STM32 sample33MHz/524x809, retain board bus/polarity/init; complete evidence/build/rollback/dependencies in DRIVER/panel-and-board/vendor-timing-20261005.md. External DTS only; no kernel/application change, coldboots0 pending.
+
 ## 2026-10-05 / planned / kernel table timing comparison
 Baseline rootf5782ee/kernelb3d8ed3. Running zImagebffc71e8 and DTB7018246d match source artifacts; release5.7.1 and complete kernel metadata checked. New external DTS selects COM43H4M85ULC seven timing fields from current panel-simple.c, not custom reduced-clock extrapolation. Details, full hashes/build/protected dependencies/rollback in DRIVER/panel-and-board/ortustech-timing-20261005.md. Keep kernel, bus polarity, panel init, wiring, applications untouched. Physical red-band and coldboot0 pending.
 Sourcebcb5581, build PASS and bootfa37af22 exact candidate timing25MHz/515x809. User no change/still red bands; candidate rejected and original LG4573 DTB restored through verified filesystem copy/reboot. Full source/artifact/hash/test/rollback facts in ortustech-timing-20261005.md, coldboots0, no stable claim, kernel/apps untouched.

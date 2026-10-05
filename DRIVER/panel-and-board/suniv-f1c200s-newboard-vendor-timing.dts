@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR X11)
+#include "suniv-f1c200s-newboard-lg4573-timing.dts"
+
+/* User's TK032F8004 STM32F429 example, ltdc.c ID0x4384 branch.
+ * First compare clock/porches only; preserve board RGB666 and polarity.
+ */
+&panel {
+    panel-timing {
+        clock-frequency = <33000000>;
+        hfront-porch = <20>;
+        hsync-len = <4>;
+        hback-porch = <20>;
+        vfront-porch = <3>;
+        vsync-len = <3>;
+        vback-porch = <3>;
+    };
+};
