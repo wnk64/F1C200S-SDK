@@ -1,0 +1,13 @@
+*.o
+*.lo
+*.a
+*.so
+*.so.*
+*.d
+.deps/
+.libs/
+.git/
+config.log
+config.status
+libtool
+stamp-h1

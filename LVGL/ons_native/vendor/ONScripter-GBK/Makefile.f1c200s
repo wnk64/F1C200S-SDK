@@ -1,0 +1,55 @@
+# F1C200S lightweight GBK build
+ROOT ?= $(HOME)/LicheePi_Nano
+BUILDROOT ?= $(ROOT)/buildroot-2018.02.11
+HOST_BIN := $(BUILDROOT)/output/host/bin
+SYSROOT := $(BUILDROOT)/output/host/arm-buildroot-linux-gnueabi/sysroot
+CROSS := arm-buildroot-linux-gnueabi-
+
+EXESUFFIX =
+OBJSUFFIX = .o
+LDOUT =
+
+TARGET = onscripter-gbk$(EXESUFFIX)
+EXT_OBJS =
+
+SDL_CONFIG := $(BUILDROOT)/output/staging/usr/bin/sdl-config
+SMPEG_CONFIG := $(ROOT)/third_party/ONScripter-EN/extlib/bin/smpeg-config
+FREETYPE_CONFIG := $(BUILDROOT)/output/staging/usr/bin/freetype-config
+
+CC = $(HOST_BIN)/$(CROSS)g++
+LD = $(HOST_BIN)/$(CROSS)g++ -o
+RM = rm -f
+
+PATH := $(ROOT)/third_party/ONScripter-EN/extlib/bin:$(HOST_BIN):$(PATH)
+export PATH
+
+DEFS = -DLINUX -DUSE_SMPEG -DUSE_OGG_VORBIS -D_FILE_OFFSET_BITS=64 -DPDA_AUTOSIZE
+INCS = -I$(ROOT)/third_party/ONScripter-EN/extlib/include \
+       -I$(ROOT)/third_party/ONScripter-EN/extlib/include/smpeg \
+       $(shell $(SDL_CONFIG) --cflags) \
+       $(shell $(FREETYPE_CONFIG) --cflags)
+LIBS = -L$(ROOT)/third_party/ONScripter-EN/extlib/lib \
+       -L$(SYSROOT)/usr/lib \
+       -lSDL_ttf -lSDL_image -lSDL_mixer \
+       $(shell $(SDL_CONFIG) --libs) \
+       -lsmpeg -lvorbisfile -lvorbis -logg \
+       -lbz2 -ljpeg -ldl -lm -lpthread
+
+CFLAGS = -O2 -Wall -fomit-frame-pointer -pipe -funsigned-char -fno-strict-aliasing \
+         -march=armv5te -mtune=arm926ej-s -marm -msoft-float \
+         -c $(INCS) $(DEFS)
+
+CONFIG_CHARSET = GBK
+ifeq ($(CONFIG_CHARSET), GBK)
+CFLAGS += -DCHARSET_GBK
+else
+CFLAGS += -DCHARSET_SJIS
+endif
+
+include Makefile.onscripter
+
+onscripter-gbk$(EXESUFFIX): $(ONSCRIPTER_OBJS)
+	$(LD) $(LDOUT)$@ $(ONSCRIPTER_OBJS) $(LIBS)
+
+.PHONY: binary
+binary: onscripter-gbk$(EXESUFFIX)

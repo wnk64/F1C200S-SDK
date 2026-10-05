@@ -24,6 +24,16 @@ Details: environment_layout_20261002/README.md and /home/wnk/Desktop/F1c200S_SOF
 
 # Worktree Change Log
 
+## 2026-10-05 / planned / ONS application source baseline
+
+Base: 97bbebd; source-reproducible application, board candidate SHA256 dd18b6e499ecc36b0a010ccbdc37cc3c7143b38af26c9a78eedcf8362b15c9c9 retained.
+Files: LVGL/ons_native/vendor, BASELINE_20261005.md, changes_20261004.md.
+Purpose: preserve exact legacy engine and audio dependency sources before integer Vorbis experiments; no edits to original source trees.
+Build: make -C LVGL/ons_native -j2 all ons-lvgl, existing GCC 6.4 Buildroot toolchain.
+Protected: kernel, drivers, Miracast/player, network/audio services, user game/save data unchanged.
+Evidence: prior full-engine user feedback works; profile title-only RSS19616KiB/PSS18235KiB, 90s audio3938304frames/1underrun. Not stable; cold-boot gate pending.
+Decision: pending; archive and remote source verification required before decoder changes.
+
 ## 2026-10-02 pending / managed pool allocation and menu recovery verified
 Source98f6254, same helper/launcher f3333ad4/fe515f1c and supervisorc4a414cf.
 Validround3 Cma9120->16084KiB, pool9MiB, actual phone video. Normaldisconnect
