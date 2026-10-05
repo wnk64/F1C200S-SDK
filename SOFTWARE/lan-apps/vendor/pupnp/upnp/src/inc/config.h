@@ -85,7 +85,7 @@
  *
  * @{
  */
-#define MIN_THREADS 2
+#define MIN_THREADS 1
 /* @} */
 
 /*!
@@ -102,7 +102,7 @@
  *
  * @{
  */
-#define MAX_THREADS 12
+#define MAX_THREADS 3
 /* @} */
 
 /*!
@@ -119,7 +119,7 @@
  *
  * @{
  */
-#define THREAD_STACK_SIZE (size_t)0
+#define THREAD_STACK_SIZE (size_t)131072
 /* @} */
 
 /*! \name MAX_JOBS_TOTAL
