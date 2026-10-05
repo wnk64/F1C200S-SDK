@@ -13,7 +13,8 @@ static void *bounded_malloc(size_t size)
 }
 static void bounded_free(void *pointer)
 {
-    if (!pointer) return; allocation *a = (allocation *)pointer - 1;
+    if (!pointer) return;
+    allocation *a = (allocation *)pointer - 1;
     live -= a->size; free(a);
 }
 static void *bounded_realloc(void *pointer, size_t size)
@@ -49,7 +50,8 @@ uint16_t *image_open(const char *path, int native, unsigned *width, unsigned *he
     else if (w > 480 || h > 600) {
         if ((int64_t)w * 600 > (int64_t)h * 480) { out_w = 480; out_h = (uint64_t)h * 480 / w; }
         else { out_h = 600; out_w = (uint64_t)w * 600 / h; }
-        if (!out_w) out_w = 1; if (!out_h) out_h = 1;
+        if (!out_w) out_w = 1;
+        if (!out_h) out_h = 1;
     }
     uint16_t *pixels = malloc((size_t)out_w * out_h * 2);
     if (!pixels) { stbi_image_free(source); snprintf(error, sizeof(error), "内存不足"); return NULL; }

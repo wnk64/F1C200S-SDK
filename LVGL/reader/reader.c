@@ -28,13 +28,14 @@ static lv_obj_t *button(int x,int y,const char *symbol)
     lv_obj_t *o=lv_btn_create(lv_scr_act());lv_obj_remove_style_all(o);lv_obj_set_pos(o,x,y);lv_obj_set_size(o,72,72);
     lv_obj_set_style_bg_opa(o,LV_OPA_COVER,0);lv_obj_set_style_bg_color(o,lv_color_white(),0);
     lv_obj_set_style_bg_color(o,lv_color_hex(0xd5dfe3),LV_STATE_PRESSED);lv_obj_set_style_radius(o,4,0);
-    lv_obj_t *text=label(o,symbol,0,0,72);lv_obj_set_style_text_font(text,&lv_font_montserrat_28,0);lv_obj_set_style_text_align(text,LV_TEXT_ALIGN_CENTER,0);lv_obj_center(text);return o;
+    lv_obj_t *text=label(o,symbol,0,0,72);lv_obj_set_style_text_font(text,&lv_font_montserrat_32,0);lv_obj_set_style_text_align(text,LV_TEXT_ALIGN_CENTER,0);lv_obj_center(text);return o;
 }
 static void set_enabled(lv_obj_t *object,int enabled){if(enabled)lv_obj_clear_state(object,LV_STATE_DISABLED);else lv_obj_add_state(object,LV_STATE_DISABLED);}
 static int image_name(const char *name)
 {
     const char *dot=strrchr(name,'.');const char *types[]={".jpg",".jpeg",".png",".bmp",".gif",".tga",".ppm",".pgm",".pnm",".psd"};
-    for(unsigned i=0;dot&&i<sizeof(types)/sizeof(*types);++i)if(!strcasecmp(dot,types[i]))return 1;return 0;
+    for(unsigned i=0;dot&&i<sizeof(types)/sizeof(*types);++i)if(!strcasecmp(dot,types[i]))return 1;
+    return 0;
 }
 static int compare(const void *a,const void *b){return strcmp(a,b);}
 static void images_scan(void)
@@ -107,6 +108,8 @@ int main(int argc,char **argv)
         if(selftest&&is_text&&stage==0&&now-started>500){lv_event_send(next,LV_EVENT_CLICKED,NULL);stage=1;
             if(page!=1||offsets[1]!=initial){fprintf(stderr,"READER next-page FAIL\n");quit=1;stage=-1;}}
         if(selftest&&is_text&&stage==1&&now-started>1000){lv_event_send(previous,LV_EVENT_CLICKED,NULL);stage=2;if(page||next_offset!=initial){fprintf(stderr,"READER previous-page FAIL\n");stage=-1;}else puts("READER page roundtrip PASS");quit=1;}
-        if(test_ms&&now-started>=test_ms)quit=1;usleep(delay*1000);}
-    if(picture)lv_obj_del(picture);free(pixels);text_close();platform_close();menu_font_stream_close();return stage<0?1:0;
+        if(test_ms&&now-started>=test_ms)quit=1;
+        usleep(delay*1000);}
+    if(picture)lv_obj_del(picture);
+    free(pixels);text_close();platform_close();menu_font_stream_close();return stage<0?1:0;
 }
