@@ -43,7 +43,7 @@ static int request(struct mg_connection *c){
     }
     if(!strcmp(r->local_uri,"/api/files")&&!strcmp(r->request_method,"GET")){
         mg_printf(c,"HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n[");
-        DIR *d=fdopendir(dup(directory_fd));struct dirent *e;int first=1;
+        DIR *d=fdopendir(openat(directory_fd,".",O_RDONLY|O_DIRECTORY));struct dirent *e;int first=1;
         if(d){while((e=readdir(d))){struct stat s;if(!safe_name(e->d_name)||fstatat(directory_fd,e->d_name,&s,AT_SYMLINK_NOFOLLOW)||!S_ISREG(s.st_mode))continue;
             mg_printf(c,"%s{\"name\":",first?"":",");json_name(c,e->d_name);mg_printf(c,",\"size\":%lld}",(long long)s.st_size);first=0;}closedir(d);}
         mg_printf(c,"]");return 200;
@@ -73,7 +73,8 @@ static int request(struct mg_connection *c){
     char buffer[32768];long long left=r->content_length;int failed=0;
     while(left&&!quit){int amount=mg_read(c,buffer,left<(long long)sizeof(buffer)?(size_t)left:sizeof(buffer));
         if(amount<=0){failed=1;break;}int off=0;while(off<amount){ssize_t count=write(fd,buffer+off,amount-off);if(count<=0){failed=1;break;}off+=count;}if(failed)break;left-=amount;}
-    if(left||fsync(fd))failed=1;close(fd);
+    if(left||fsync(fd))failed=1;
+    close(fd);
     /* One HTTP worker serializes publication; renameat2 forbids external overwrites. */
     if(!failed&&syscall(__NR_renameat2,directory_fd,temp,directory_fd,name,1))failed=1;
     if(failed){unlinkat(directory_fd,temp,0);return reply(c,409,"Upload interrupted or target exists");}

@@ -20,6 +20,7 @@ static float volume=1;
 static output_transition_cb_t feedback;
 static char replies[4096];static size_t reply_used;
 static const char *backend="/root/roms/candidates/mplayer_geometry_20261005/mplayer-native-geometry";
+void cedar_shutdown(void);
 static void command(const char *s){if(input>=0){ssize_t n=write(input,s,strlen(s));if(n<0&&errno!=EAGAIN)fprintf(stderr,"DLNA command write failed\n");}}
 static void reap(GPid *pid){
     if(!*pid)return;
@@ -51,7 +52,7 @@ static gboolean monitor(gpointer unused){
 static int init(void){
     signal(SIGPIPE,SIG_IGN);setenv("CEDAR_ROTATE","90",1);setenv("CEDAR_CMA_POOL_MB","12",1);setenv("TERM","dumb",1);
     register_mime_type("video/mp4");register_mime_type("audio/mpeg");register_mime_type("audio/mp4");register_mime_type("audio/aac");
-    wait_ui();g_timeout_add(500,monitor,NULL);return 0;
+    atexit(cedar_shutdown);wait_ui();g_timeout_add(500,monitor,NULL);return 0;
 }
 static void set_uri(const char *value,output_update_meta_cb_t unused){
     (void)unused;pthread_mutex_lock(&lock);release_player();free(uri);uri=NULL;
