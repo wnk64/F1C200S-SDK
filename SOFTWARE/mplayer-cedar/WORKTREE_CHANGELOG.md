@@ -1,5 +1,11 @@
 # Worktree Change Log
 
+## 2026-10-05 / planned / non800 native geometry diagnosis
+Baseline e2a8f5a, backendff93fecb429f642f1728d51959fc24826bdd9a3eaebf2f45bb46e3e354c3315d retained. User reports non800x480 displays misplaced.
+First scoped diagnostic: CEDAR_DEBUG=1 logs actual rotated VideoPicture storage/stride/visible offsets, disabled by default. Files vd_cedar.c only. No guessed display correction before observing640x480/620x480/480x270/800x480.
+Current VO uses stream dimensions for view and ignores picture crop/stride. Kernel private type6 is not implemented in current source; do not blindly invoke it or change kernel. Protected MP3/lyrics/UI/ONS/network/BT and kernel5.7.1 unchanged.
+Build: incremental make using same GCC6.4/config, CEDAR_TARGET_LIBDIR=current target/usr/lib. Restore old backend via media-app.sh Git baseline; diagnostic candidate separate. Three cold boots pending.
+
 Worktree: /home/wnk/Desktop/F1c200S_SOFT
 Component: SOFTWARE/mplayer-cedar userspace application
 Base: GitHub wnk64/licheepi_nano b96fac2dd917284bf6eedf780840cf6a9b623b3c, full source

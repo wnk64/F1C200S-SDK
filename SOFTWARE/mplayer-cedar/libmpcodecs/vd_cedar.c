@@ -405,6 +405,11 @@ static mp_image_t *decode(sh_video_t *sh, void *data, int len, int flags)
                "[cedar] frame result without a picture\\n");
         return NULL;
     }
+    if (ctx->debug && ctx->trace_decode_calls <= 40)
+        fprintf(stderr, "[cedar] picture storage=%dx%d stride=%d visible=%d,%d..%d,%d format=%d\n",
+                picture->nWidth, picture->nHeight, picture->nLineStride,
+                picture->nLeftOffset, picture->nTopOffset, picture->nRightOffset,
+                picture->nBottomOffset, picture->ePixelFormat);
 
     mpi = mpcodecs_get_image(sh, MP_IMGTYPE_EXPORT, MP_IMGFLAG_PRESERVE,
                              picture->nWidth, picture->nHeight);
