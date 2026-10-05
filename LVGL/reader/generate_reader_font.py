@@ -49,7 +49,11 @@ try:
         buffer = c.create_string_buffer(size)
         gdi.GetGlyphOutlineW(dc, code, 6, c.byref(metrics), size, buffer, c.byref(matrix))
         raw = buffer.raw
+        if size == 0:
+            metrics.width = metrics.height = 0
         stride = (metrics.width + 3) & ~3
+        if metrics.height * stride > len(raw):
+            raise ValueError("Glyph U+%04X: %dx%d stride=%d bitmap=%d" % (code, metrics.width, metrics.height, stride, len(raw)))
         pixels = [(raw[y * stride + x] * 15 + 32) // 64
                   for y in range(metrics.height) for x in range(metrics.width)]
         if len(pixels) % 2:
