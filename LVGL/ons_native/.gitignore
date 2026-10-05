@@ -18,3 +18,5 @@ native-runtime-event-tests
 native-runtime-mixer-tests
 ons-lvgl-tremor
 native-runtime-mixer-tests-tremor
+codec-probe-tremor
+codec-probe-float

@@ -20,3 +20,13 @@ native-runtime-mixer-tests-tremor: build/runtime_mixer_tests.o build/tremor/runt
 	$(CXX) -Wl,--gc-sections -o $@ $^ $(LIBS) -lasound
 
 -include $(TREMOR_OBJECTS:.o=.d) build/tremor/runtime_mixer.d build/tremor/ONScripter_sound.d
+
+build/tremor/codec_probe.o: codec_probe.cpp native.h vorbis_backend.h
+	@mkdir -p $(@D)
+	$(CXX) $(TREMOR_FLAGS) -c -o $@ $<
+build/codec_probe.o: codec_probe.cpp native.h vorbis_backend.h
+	$(CXX) -O2 -Wall -I$(EXT)/include -c -o $@ $<
+codec-probe-tremor: build/tremor/codec_probe.o $(TREMOR_OBJECTS) libons-native.a
+	$(CXX) -Wl,--gc-sections -o $@ $^ $(LIBS)
+codec-probe-float: build/codec_probe.o libons-native.a
+	$(CXX) -Wl,--gc-sections -o $@ $^ $(EXT)/lib/libvorbisfile.a $(EXT)/lib/libvorbis.a $(EXT)/lib/libogg.a $(LIBS)
