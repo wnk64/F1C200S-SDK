@@ -1,7 +1,6 @@
 #ifndef ONS_NATIVE_SPRITE_H
 #define ONS_NATIVE_SPRITE_H
 #include "native.h"
-typedef struct { int x, y, w, h; } ons_rect;
 enum ons_transparency { ONS_ALPHA, ONS_COPY, ONS_KEY_TOPLEFT, ONS_KEY_TOPRIGHT, ONS_KEY_COLOR, ONS_MASK };
 enum ons_blend { ONS_BLEND_OVER, ONS_BLEND_ADD, ONS_BLEND_SUBTRACT };
 typedef struct { ons_surface *image; int cells, cell; } ons_sprite;

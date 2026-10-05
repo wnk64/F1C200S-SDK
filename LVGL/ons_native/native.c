@@ -11,11 +11,7 @@
 ons_surface *ons_surface_new(int w, int h)
 {
     if (w < 1 || h < 1 || w > 2048 || h > 2048 || (size_t)w * h > 2097152) return NULL;
-    ons_surface *s = calloc(1, sizeof(*s));
-    if (!s) return NULL;
-    s->pixels = calloc((size_t)w * h, sizeof(*s->pixels));
-    if (!s->pixels) { free(s); return NULL; }
-    s->w = w; s->h = h; return s;
+    return ons_surface_create(0, w, h, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
 }
 void ons_surface_free(ons_surface *s) { if (s) { free(s->pixels); free(s); } }
 uint32_t ons_over(uint32_t s, uint32_t d)

@@ -14,3 +14,7 @@ f2b81de4476357564619cf0839ea5a0a6f5083a061bccde595916e34411bc937  ../../SOFTWARE
 e61d50c5c542d1b4ca92feebde8d4b8fa173e54b67639a57f6c1a6e101431e0f  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/SarReader.h
 9c1f12cce4cb841f20e9874406d3f34c8fbacc10437892d93973550bcb0aeb5e  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/NsaReader.cpp
 f41089bf512464be0c6a23ebbdfed08635548378b673f17e3ff701404c342878  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/NsaReader.h
+8aa1fc4ac0aefc269de4bc9c1845f6f00bc983bdb50d684fcfca29fef3513cda  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/DirtyRect.cpp
+4a0d27654765834903ddc0bf403b2fcfa7a6b0508519c3cd0710851f84ee9804  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/DirtyRect.h
+3278961e098ccc09d6149e681406599ebf7066ad5d2b5f71fe8a8e160368d54b  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/resize_image.cpp
+8387707c31cbadb6348fda6ee515c808712090975a10915b8a4b2fecaeb2a021  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/resize_image.h

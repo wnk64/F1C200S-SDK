@@ -24,6 +24,12 @@ names = {
     "Uint8": "uint8_t", "Uint16": "uint16_t", "Uint32": "uint32_t",
     "Sint8": "int8_t", "Sint16": "int16_t", "Sint32": "int32_t",
     "SDL_FreeSurface": "ons_surface_free", "_SDL_pixels_h": "_ONS_pixels_h",
+    "SDL_PixelFormat": "ons_pixel_format", "SDL_CreateRGBSurface": "ons_surface_create",
+    "SDL_LockSurface": "ons_surface_lock", "SDL_UnlockSurface": "ons_surface_unlock",
+    "SDL_SetAlpha": "ons_surface_alpha", "SDL_SWSURFACE": "ONS_SWSURFACE",
+    "SDL_ALPHA_OPAQUE": "ONS_ALPHA_OPAQUE", "SDL_BYTEORDER": "ONS_BYTEORDER", "SDL_LIL_ENDIAN": "ONS_LIL_ENDIAN",
+    "SDL_RENDERER": "ONS_RENDERER", "SDL_BLENDMODE_NONE": "ONS_BLENDMODE_NONE",
+    "SDL_SetSurfaceBlendMode": "ons_surface_blend_mode",
     "SDL_PIXELFORMAT_RGB565": "ONS_PIXELFORMAT_RGB565",
     "SDL_PIXELFORMAT_ABGR8888": "ONS_PIXELFORMAT_ABGR8888",
     "SDL_PIXELFORMAT_ARGB8888": "ONS_PIXELFORMAT_ARGB8888",
@@ -37,7 +43,10 @@ for name, text in sources.items():
         license_end = text.index('#include "FontInfo.h"')
         text = text[:license_end] + '#include "FontInfo.h"\n' + text[constructor:opening] + text[geometry:]
     elif name == "AnimationInfo.cpp":
-        text = text[:text.index("void AnimationInfo::stepAnimation(")]
+        start = text.index("SDL_Surface *AnimationInfo::setupImageAlpha(")
+        end = text.index("void AnimationInfo::setImage(", start)
+        text = text[:start] + text[end:]
+        text = text[:text.index("unsigned char AnimationInfo::getAlpha(")]
     text = text.replace("#include <SDL.h>", '#include "engine_types.h"')
     text = pattern.sub(lambda match: names[match.group(0)], text)
     if "#include <SDL" in text or re.search(r"\bSDL_[A-Za-z0-9_]+", text):
