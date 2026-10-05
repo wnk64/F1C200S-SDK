@@ -14,9 +14,9 @@ unset READER_START_DIR READER_SELFTEST READER_TEST_TIMER_UI
 expected="$test_dir/space directory"
 "$SELF/reader-browser" "$expected" --list
 [ "$(cat "$READER_PATH_STATE")" = "$expected" ]
-inode=$(stat -c %i "$READER_PATH_STATE")
+inode=$(ls -i "$READER_PATH_STATE" | awk '{ print $1 }')
 "$SELF/reader-browser" "$expected" --list
-[ "$(stat -c %i "$READER_PATH_STATE")" = "$inode" ]
+[ "$(ls -i "$READER_PATH_STATE" | awk '{ print $1 }')" = "$inode" ]
 MEDIA_BROWSER_TEST_MS=300 "$SELF/reader-app.sh"
 [ "$(cat "$READER_PATH_STATE")" = "$expected" ]
 echo 'READER remembered directory restart/space/unchanged-write PASS'
