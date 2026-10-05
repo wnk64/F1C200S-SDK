@@ -107,7 +107,19 @@ int main(int argc,char **argv){
     lv_obj_clear_flag(lv_scr_act(),LV_OBJ_FLAG_SCROLLABLE);
     label(dlna?"DLNA 播放器":"网页传输",40);char address[100];snprintf(address,sizeof(address),"http://%s:%d",ip,dlna?49494:8080);label(address,160);
     if(dlna){label("F1C200S-DLNA",260);label("等待连接",350);}else{char login[100];snprintf(login,sizeof(login),"admin\n%s",password);label(login,280);label("SD / Uploads",430);}
-    lv_obj_t *exit=lv_btn_create(lv_scr_act());lv_obj_set_pos(exit,24,650);lv_obj_set_size(exit,432,96);lv_obj_t *text=lv_label_create(exit);lv_label_set_text(text,LV_SYMBOL_LEFT);lv_obj_center(text);lv_obj_add_event_cb(exit,back,LV_EVENT_CLICKED,NULL);
+    lv_obj_t *exit=lv_btn_create(lv_scr_act());lv_obj_remove_style_all(exit);
+    lv_obj_set_pos(exit,24,650);lv_obj_set_size(exit,432,96);
+    lv_obj_set_style_radius(exit,4,0);
+    lv_obj_set_style_bg_opa(exit,LV_OPA_COVER,0);
+    lv_obj_set_style_bg_color(exit,lv_color_white(),0);
+    lv_obj_set_style_bg_color(exit,lv_color_hex(0xdceee6),LV_STATE_PRESSED);
+    lv_obj_set_style_border_width(exit,2,0);
+    lv_obj_set_style_border_opa(exit,LV_OPA_COVER,0);
+    lv_obj_set_style_border_color(exit,lv_color_hex(0x52636c),0);
+    lv_obj_t *text=lv_label_create(exit);lv_label_set_text(text,LV_SYMBOL_LEFT);
+    lv_obj_set_style_text_font(text,&lv_font_montserrat_32,0);
+    lv_obj_set_style_text_color(text,lv_color_hex(0x172329),0);lv_obj_center(text);
+    lv_obj_add_event_cb(exit,back,LV_EVENT_CLICKED,NULL);
     uint64_t tick=platform_ms();const char *limit=getenv("F1_LAN_TEST_MS");uint64_t end=limit?tick+strtoul(limit,NULL,10):0;
     while(!quit){uint64_t now=platform_ms();lv_tick_inc(now-tick);tick=now;lv_timer_handler();if(end&&now>=end)quit=1;usleep(16000);}
     platform_close();menu_font_stream_close();if(server){mg_stop(server);mg_exit_library();close(directory_fd);}return 0;
