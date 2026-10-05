@@ -14,8 +14,8 @@ CFLAGS += -DLV_CONF_INCLUDE_SIMPLE -I$(MENU) -I$(ROOT)/LVGL/touch -I$(LV)
 CFLAGS += -I$(HOST)/arm-buildroot-linux-gnueabi/sysroot/usr/include/freetype2
 LIBS := -lpng -ljpeg -lfreetype -lm -lpthread
 COMMAND_FILES := ScriptParser ScriptParser_command DirectReader SarReader NsaReader FontInfo AnimationInfo DirtyRect resize_image
-COMMAND_OBJECTS := $(addprefix build/engine/,$(addsuffix .o,$(COMMAND_FILES))) build/charset_bridge.o build/animation_alpha.o build/ScriptHandler.o
-all: libons-native.a libons-script.a libons-commands.a native-tests native-event-tests native-sprite-tests native-audio-tests native-animation-tests ons-native-probe ons-script-probe ons-audio-probe ons-command-probe
+COMMAND_OBJECTS := $(addprefix build/engine/,$(addsuffix .o,$(COMMAND_FILES))) build/charset_bridge.o build/animation_alpha.o build/font_info_bridge.o build/ScriptHandler.o
+all: libons-native.a libons-script.a libons-commands.a native-tests native-event-tests native-sprite-tests native-audio-tests native-animation-tests native-font-tests ons-native-probe ons-script-probe ons-audio-probe ons-command-probe
 .PHONY: verify-script-source
 verify-script-source:
 	sha256sum -c source-baseline.sha256
@@ -36,6 +36,12 @@ libons-commands.a: $(COMMAND_OBJECTS)
 build/animation_tests.o: animation_tests.cpp build/engine/generated.stamp engine_types.h
 	$(CXX) -O2 -Wall -MMD -MP -I. -Ibuild/engine -c -o $@ $<
 native-animation-tests: build/animation_tests.o libons-commands.a build/native.o build/surface.o build/sprite.o build/gbk.o
+	$(CXX) -Wl,--gc-sections -o $@ $^ $(LIBS)
+build/font_info_bridge.o: font_info_bridge.cpp font.h build/engine/generated.stamp
+	$(CXX) -O2 -Wall -MMD -MP -I. -Ibuild/engine -c -o $@ $<
+build/font_tests.o: font_tests.cpp font.h build/engine/generated.stamp
+	$(CXX) -O2 -Wall -MMD -MP -I. -Ibuild/engine -c -o $@ $<
+native-font-tests: build/font_tests.o libons-commands.a build/native.o build/font.o build/surface.o build/sprite.o build/gbk.o
 	$(CXX) -Wl,--gc-sections -o $@ $^ $(LIBS)
 ons-command-probe: build/command_probe.o libons-commands.a build/native.o build/surface.o build/sprite.o build/gbk.o
 	$(CXX) -Wl,--gc-sections -o $@ $^ $(EXT)/lib/libbz2.a $(LIBS)
@@ -62,7 +68,7 @@ build/%.o: %.c native.h
 build/platform.o: $(MENU)/platform.c $(MENU)/platform.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $<
-libons-native.a: build/native.o build/surface.o build/archive.o build/gbk.o build/events.o build/sprite.o build/audio.o
+libons-native.a: build/native.o build/font.o build/surface.o build/archive.o build/gbk.o build/events.o build/sprite.o build/audio.o
 	$(AR) rcs $@ $^
 native-tests: build/tests.o build/native.o build/surface.o build/archive.o build/gbk.o
 	$(CC) -Wl,--gc-sections -o $@ $^ $(LIBS)

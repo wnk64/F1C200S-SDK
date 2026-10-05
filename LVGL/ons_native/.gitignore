@@ -11,3 +11,4 @@ ons-audio-probe
 native-audio-tests
 ons-command-probe
 native-animation-tests
+native-font-tests
