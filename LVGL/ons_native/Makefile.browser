@@ -1,0 +1,8 @@
+include Makefile
+
+build/rom_browser.o: rom_browser.c
+	$(CC) $(CFLAGS) -std=gnu99 -D_DEFAULT_SOURCE -c -o $@ $<
+build/browser_font.o: $(MENU)/menu_font_stream.c
+	$(CC) $(CFLAGS) -std=gnu99 -c -o $@ $<
+ons-rom-browser: build/rom_browser.o build/browser_font.o build/platform.o $(OBJECTS)
+	$(CC) -Wl,--gc-sections -o $@ $^ -lm
