@@ -9,7 +9,7 @@
 | 脚本、标签、变量、存读档 | 现有ONS核心 | 原ScriptHandler已独立链接并验证标签/表达式/变量；完整命令执行及存读档待接入 |
 | NSA资源 | ONS读取接口 | 原生索引读取、大小写/斜杠匹配、LZSS已验证；SPB/NBZ/加密包待实现 |
 | JPEG/PNG/BMP | SDL_image | libjpeg/libpng/原生BMP已验证；BMP目前BI_RGB的8/24/32位 |
-| 像素缓冲、透明合成 | SDL_Surface/Blit | ARGB8888、直通alpha合成、矩形裁剪已验证；特效接入待做 |
+| 像素缓冲、透明合成 | SDL_Surface/Blit | ARGB8888、alpha/色键/遮罩、多帧cell、缩放/裁剪、命中、脏区及加减合成已验证；原命令/特效接入待做 |
 | 中文字体 | SDL_ttf | FreeType+只读GBK码表已验证；字号可变、无需系统gconv |
 | 显示、触摸 | SDL video/event | LVGL8.2 framebuffer与FT6236预览已显示；游戏事件适配待做 |
 | 计时、线程 | SDL timer/thread | POSIX有界事件队列/单调计时已自测；原游戏事件循环待接入 |
@@ -38,6 +38,8 @@ ROOTFS/buildroot-2018.02.11/output/host/bin/arm-buildroot-linux-gnueabi-nm -u LV
 `libons-script.a`直接编译原ONS的未改ScriptHandler.cpp；source-baseline.sha256锁定引用源，校验失败则停止构建。调用顺序必须是构造、reset()、setKeyTable(NULL)、openScript()，不能省略原引擎要求的初始化。`ons-script-probe`仅验证词法/标签/表达式，不执行图像和声音命令。
 
 events.h提供64项有界线程安全队列及16项单调计时器。队列满时返回错误，由调用方处理，不能静默丢弃松开/退出事件。先close唤醒线程，再join所有使用者，最后destroy；测试目标native-event-tests验证这些基础路径。
+
+sprite.h实现原生精灵基础处理。`ons_sprite_open`复制源并应用指定透明规则；`ons_sprite_adopt`仅用于无需转换的已解码图像，接管所有权且清空源指针，不多复制一张整图。两种初始化只能在空精灵上调用，使用后`ons_sprite_close`释放。每帧右半边遮罩要求cell宽度为偶数；非法cell/尺寸/遮罩明确失败。`ons_sprite_draw`的placement与clip均为目标画布坐标，dirty仅包含像素发生变化的区域；缩放横向映射固定上限2048项，每行复用，避免ARM逐像素整数除法。
 
 板端自测：
 
