@@ -29,4 +29,6 @@ reader: build/reader.o build/image.o build/text.o build/document.o build/reader_
 	$(CC) -Wl,--gc-sections -o $@ $(filter-out $(DOC_LIBS),$^) -Wl,--start-group $(DOC_LIBS) -Wl,--end-group -ljpeg -lz -lstdc++ -lm -lpthread
 reader-browser: build/reader_browser.o build/platform.o build/font.o $(OBJECTS)
 	$(CC) -Wl,--gc-sections -o $@ $^ -lm
+document-page-probe: build/document_page_probe.o build/document.o $(DOC_LIBS)
+	$(CC) -Wl,--gc-sections -Wl,-s -o $@ build/document_page_probe.o build/document.o -Wl,--start-group $(DOC_LIBS) -Wl,--end-group -ljpeg -lz -lstdc++ -lm -lpthread
 -include build/*.d $(OBJECTS:.o=.d)

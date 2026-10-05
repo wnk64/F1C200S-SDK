@@ -1,5 +1,8 @@
 # Worktree Change Log
 
+## 2026-10-05 / planned / downloaded PDF EPUB sample testing
+User requests several public samples; no implementation changes authorized/needed for this test turn. Sources/hashes and scope in public-test-record.md. Four downloadedPDFs (text/vector/image/CCITT), two genuineEPUBs (Alice and Chinese三字經). Same deployed82fe435 codee7a9e37. Sequential parser/page-render checks with timeout, representative LVGL controls and screenshots; preserve menu/apps and restore after tests. No new backup or compiled artifacts, temp raw framebuffer/command scaffolding cleaned after use. Actual touch/coldboots pending.
+
 ## 2026-10-05 / planned / PDF and EPUB
 Baseline31c66ef, readere1003bb95776d45873755324926d5bd5a081c8a9788c12e946f2d8c54188f1bc; user requests native PDF/EPUB. Acquire complete MuPDF1.24.9 official source archive (AGPL) with bundled dependencies, track under LVGL/reader/vendor, no SDL. Inspect build features before cross compile; use current system freetype/jpeg/zlib and bundled required codecs, no rootfs/kernel rebuild.
 Hypothesis: single document open, page render to bounded480x600 RGB pixmap then RGB565, small MuPDF store and allocation budget; EPUB layout to screen page. Previous/next, page count, EPUB text reflow. Keep text/image paths and menu sequential ownership. Encrypted/DRM and oversized-memory documents must fail safely, not OOM system.
