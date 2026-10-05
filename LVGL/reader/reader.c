@@ -8,7 +8,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-extern const lv_font_t menu_font_stream;
+extern const lv_font_t reader_font_28;
 void menu_font_stream_close(void);
 static volatile sig_atomic_t quit;
 static int is_text, native, page, image_index, image_count;
@@ -21,7 +21,7 @@ static void stop(int signal){(void)signal;quit=1;}
 static lv_obj_t *label(lv_obj_t *parent,const char *value,int x,int y,int width)
 {
     lv_obj_t *o=lv_label_create(parent);lv_obj_set_pos(o,x,y);lv_obj_set_width(o,width);
-    lv_obj_set_style_text_font(o,&menu_font_stream,0);lv_obj_set_style_text_color(o,lv_color_hex(0x172329),0);
+    lv_obj_set_style_text_font(o,&reader_font_28,0);lv_obj_set_style_text_color(o,lv_color_hex(0x172329),0);
     lv_label_set_text(o,value);return o;
 }
 static lv_obj_t *button(int x,int y,const char *symbol)

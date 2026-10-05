@@ -6,7 +6,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <assert.h>
-extern const lv_font_t menu_font_stream;
+extern const lv_font_t reader_font_28;
 static int file_fd = -1, encoding;
 static off_t size, beginning;
 enum { UTF8, GBK, UTF16LE, UTF16BE };
@@ -81,7 +81,7 @@ int text_page(off_t start,char *output,size_t capacity,off_t *end)
         out+=bytes;map[out]=consumed;
     }
     output[out]=0;unsigned cut=0;
-    for(unsigned line=0;line<16&&cut<out;++line){unsigned bytes=_lv_txt_get_next_line(output+cut,&menu_font_stream,0,440,NULL,LV_TEXT_FLAG_NONE);if(!bytes)break;cut+=bytes;}
+    for(unsigned line=0;line<16&&cut<out;++line){unsigned bytes=_lv_txt_get_next_line(output+cut,&reader_font_28,0,440,NULL,LV_TEXT_FLAG_NONE);if(!bytes)break;cut+=bytes;}
     if(cut>out)cut=out;
     *end=start+(cut?map[cut]:consumed);output[cut]=0;return 0;
 }

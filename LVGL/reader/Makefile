@@ -19,7 +19,7 @@ build/platform.o: ../menu/platform.c lv_conf.h
 build/font.o: ../menu/menu_font_stream.c lv_conf.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $<
-reader: build/reader.o build/image.o build/text.o build/platform.o build/font.o $(OBJECTS)
+reader: build/reader.o build/image.o build/text.o build/reader_font_28.o build/platform.o build/font.o $(OBJECTS)
 	$(CC) -Wl,--gc-sections -o $@ $^ -lm
 reader-browser: build/reader_browser.o build/platform.o build/font.o $(OBJECTS)
 	$(CC) -Wl,--gc-sections -o $@ $^ -lm
