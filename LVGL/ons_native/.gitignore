@@ -14,3 +14,4 @@ native-animation-tests
 native-font-tests
 ons-lvgl
 native-runtime-image-tests
+native-runtime-event-tests
