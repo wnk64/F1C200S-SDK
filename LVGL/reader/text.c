@@ -81,7 +81,7 @@ int text_page(off_t start,char *output,size_t capacity,off_t *end)
         out+=bytes;map[out]=consumed;
     }
     output[out]=0;unsigned cut=0;
-    for(unsigned line=0;line<16&&cut<out;++line){unsigned bytes=_lv_txt_get_next_line(output+cut,&reader_font_28,0,440,NULL,LV_TEXT_FLAG_NONE);if(!bytes)break;cut+=bytes;}
+    for(unsigned line=0;line<READER_TEXT_LINES&&cut<out;++line){unsigned bytes=_lv_txt_get_next_line(output+cut,&reader_font_28,0,440,NULL,LV_TEXT_FLAG_NONE);if(!bytes)break;cut+=bytes;}
     if(cut>out)cut=out;
     *end=start+(cut?map[cut]:consumed);output[cut]=0;return 0;
 }

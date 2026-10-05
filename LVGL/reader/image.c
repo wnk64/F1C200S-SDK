@@ -46,10 +46,11 @@ uint16_t *image_open(const char *path, int native, unsigned *width, unsigned *he
     unsigned char *source = stbi_load(path, &w, &h, &channels, 3);
     if (!source) { snprintf(error, sizeof(error), "解码失败或内存不足"); return NULL; }
     unsigned out_w = w, out_h = h;
-    if (native) { if (out_w > 480) out_w = 480; if (out_h > 600) out_h = 600; }
-    else if (w > 480 || h > 600) {
-        if ((int64_t)w * 600 > (int64_t)h * 480) { out_w = 480; out_h = (uint64_t)h * 480 / w; }
-        else { out_h = 600; out_w = (uint64_t)w * 600 / h; }
+    if (native) { if (out_w > READER_WIDTH) out_w = READER_WIDTH; if (out_h > READER_HEIGHT) out_h = READER_HEIGHT; }
+    else if (w > READER_WIDTH || h > READER_HEIGHT) {
+        if ((int64_t)w * READER_HEIGHT > (int64_t)h * READER_WIDTH) {
+            out_w = READER_WIDTH; out_h = (uint64_t)h * READER_WIDTH / w;
+        } else { out_h = READER_HEIGHT; out_w = (uint64_t)w * READER_HEIGHT / h; }
         if (!out_w) out_w = 1;
         if (!out_h) out_h = 1;
     }

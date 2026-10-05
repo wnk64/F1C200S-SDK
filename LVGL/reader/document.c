@@ -1,4 +1,5 @@
 #include "document.h"
+#include "content.h"
 #include <mupdf/fitz.h>
 #include <math.h>
 #include <stdio.h>
@@ -64,7 +65,7 @@ int document_open(const char *path)
         document = fz_open_document(context, path);
         if (fz_needs_password(context, document)) fz_throw(context, FZ_ERROR_ARGUMENT, "encrypted document needs a password");
         reflow = fz_is_document_reflowable(context, document);
-        if (reflow) fz_layout_document(context, document, 480, 600, font_sizes[font_step]);
+        if (reflow) fz_layout_document(context, document, READER_WIDTH, READER_HEIGHT, font_sizes[font_step]);
         pages = fz_count_pages(context, document);
         if (pages <= 0 || pages > 100000) fz_throw(context, FZ_ERROR_LIMIT, "invalid or excessive page count");
     }
@@ -85,7 +86,7 @@ int document_resize_text(int page)
     fz_try(context) {
         fz_bookmark bookmark = fz_make_bookmark(context, document, fz_location_from_page_number(context, document, page));
         font_step = (font_step + 1) % 3;
-        fz_layout_document(context, document, 480, 600, font_sizes[font_step]);
+        fz_layout_document(context, document, READER_WIDTH, READER_HEIGHT, font_sizes[font_step]);
         pages = fz_count_pages(context, document);
         target = fz_page_number_from_location(context, document, fz_lookup_bookmark(context, document, bookmark));
         if (target < 0) target = 0;
@@ -109,9 +110,9 @@ uint16_t *document_render(int number, unsigned *width, unsigned *height)
         float w = bounds.x1 - bounds.x0, h = bounds.y1 - bounds.y0;
         if (!isfinite(w) || !isfinite(h) || !isfinite(bounds.x0) || !isfinite(bounds.y0) || w <= 0 || h <= 0)
             fz_throw(context, FZ_ERROR_ARGUMENT, "invalid page bounds");
-        float scale = fminf(480 / w, 600 / h);
-        unsigned out_w = (unsigned)fmaxf(1, fminf(480, ceilf(w * scale)));
-        unsigned out_h = (unsigned)fmaxf(1, fminf(600, ceilf(h * scale)));
+        float scale = fminf(READER_WIDTH / w, READER_HEIGHT / h);
+        unsigned out_w = (unsigned)fmaxf(1, fminf(READER_WIDTH, ceilf(w * scale)));
+        unsigned out_h = (unsigned)fmaxf(1, fminf(READER_HEIGHT, ceilf(h * scale)));
         fz_irect box = {0, 0, out_w, out_h};
         pixmap = fz_new_pixmap_with_bbox(context, fz_device_rgb(context), box, NULL, 0);
         fz_clear_pixmap_with_value(context, pixmap, 255);

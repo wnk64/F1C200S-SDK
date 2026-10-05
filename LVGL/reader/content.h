@@ -2,6 +2,7 @@
 #define READER_CONTENT_H
 #include <stdint.h>
 #include <sys/types.h>
+enum { READER_WIDTH = 480, READER_HEIGHT = 800, READER_TEXT_LINES = 21 };
 int text_open(const char *path);
 void text_close(void);
 int text_page(off_t start, char *output, size_t capacity, off_t *end);
