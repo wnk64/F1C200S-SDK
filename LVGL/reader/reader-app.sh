@@ -10,7 +10,16 @@ cleanup() {
 }
 trap cleanup EXIT
 trap 'exit 0' INT TERM
+READER_PATH_STATE=${READER_PATH_STATE:-/root/roms/.reader-last-directory}
+export READER_PATH_STATE
 browse=${READER_START_DIR:-/root/roms}
+if [ -z "${READER_START_DIR:-}" ] && [ -r "$READER_PATH_STATE" ]; then
+    remembered=
+    IFS= read -r remembered < "$READER_PATH_STATE" || true
+    case "$remembered" in
+        /*) if [ -d "$remembered" ] && [ -r "$remembered" ] && [ -x "$remembered" ]; then browse=$remembered; fi ;;
+    esac
+fi
 while :; do
     rc=0
     "$SELF/reader-browser" "$browse" > "$selection" & child=$!

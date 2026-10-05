@@ -45,6 +45,30 @@ static int compare(const void *a, const void *b)
     const struct entry *left = a, *right = b;
     return left->directory != right->directory ? right->directory - left->directory : strcmp(left->name, right->name);
 }
+static void remember_directory(void)
+{
+    const char *state = getenv("READER_PATH_STATE");
+    if (!state || !*state) return;
+    char saved[PATH_MAX], temporary[PATH_MAX];
+    FILE *old = fopen(state, "r");
+    if (old) {
+        int same = fgets(saved, sizeof(saved), old) &&
+            (saved[strcspn(saved, "\n")] = 0, !strcmp(saved, current));
+        fclose(old);
+        if (same) return;
+    }
+    int n = snprintf(temporary, sizeof(temporary), "%s.XXXXXX", state);
+    if (n < 0 || n >= (int)sizeof(temporary)) return;
+    int fd = mkstemp(temporary);
+    if (fd < 0) { perror("Reader directory memory"); return; }
+    FILE *out = fdopen(fd, "w");
+    if (!out) { close(fd); unlink(temporary); return; }
+    int failed = fprintf(out, "%s\n", current) < 0;
+    if (fflush(out) || fsync(fd)) failed = 1;
+    if (fclose(out)) failed = 1;
+    if (!failed && rename(temporary, state)) failed = 1;
+    if (failed) { perror("Reader directory memory"); unlink(temporary); }
+}
 static int scan(const char *directory)
 {
     char canonical[PATH_MAX];
@@ -65,6 +89,7 @@ static int scan(const char *directory)
     }
     closedir(dir); qsort(items, count, sizeof(*items), compare);
     strcpy(current, canonical); page = 0;
+    remember_directory();
     return 0;
 }
 static lv_obj_t *text(lv_obj_t *parent, const char *value, int x, int y, int width)
