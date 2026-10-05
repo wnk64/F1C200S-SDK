@@ -70,6 +70,7 @@ int document_open(const char *path)
     }
     fz_catch(context) {
         snprintf(error, sizeof(error), "打开失败：%.110s", fz_caught_message(context));
+        fz_report_error(context);
         document_close(); return -1;
     }
     snprintf(mode, sizeof(mode), reflow ? "%u px" : "Fit", font_sizes[font_step]);
@@ -91,7 +92,7 @@ int document_resize_text(int page)
         if (target >= pages) target = pages - 1;
         snprintf(mode, sizeof(mode), "%u px", font_sizes[font_step]);
     }
-    fz_catch(context) { snprintf(error, sizeof(error), "排版失败：%.110s", fz_caught_message(context)); return -1; }
+    fz_catch(context) { snprintf(error, sizeof(error), "排版失败：%.110s", fz_caught_message(context)); fz_report_error(context); return -1; }
     return target;
 }
 uint16_t *document_render(int number, unsigned *width, unsigned *height)
@@ -135,6 +136,7 @@ uint16_t *document_render(int number, unsigned *width, unsigned *height)
     }
     fz_catch(context) {
         snprintf(error, sizeof(error), "页面失败：%.110s", fz_caught_message(context));
+        fz_report_error(context);
         free(pixels); return NULL;
     }
     return pixels;
