@@ -15,7 +15,8 @@ static int utf8_code(const unsigned char *s, unsigned n, unsigned *code)
     if (!n) return 0;
     if (s[0] < 128) { *code = s[0]; return 1; }
     int length = s[0]>=0xc2 && s[0]<=0xdf ? 2 : s[0]>=0xe0 && s[0]<=0xef ? 3 : s[0]>=0xf0 && s[0]<=0xf4 ? 4 : -1;
-    if (length < 0) return -1; if ((unsigned)length > n) return 0;
+    if (length < 0) return -1;
+    if ((unsigned)length > n) return 0;
     unsigned value = s[0] & (0x7f >> length);
     for (int i = 1; i < length; ++i) { if ((s[i]&0xc0)!=0x80) return -1; value=(value<<6)|(s[i]&63); }
     if ((length==2 && value<128)||(length==3 && value<2048)||(length==4 && value<65536)||value>0x10ffff||(value>=0xd800 && value<=0xdfff)) return -1;
@@ -74,13 +75,15 @@ int text_page(off_t start,char *output,size_t capacity,off_t *end)
         if(used<0){code=0xfffd;used=encoding>=UTF16LE&&n-consumed>=2?2:1;}
         consumed+=used;
         if(code=='\r')continue;
-        if(code=='\t')code=' ';if(!code)code=0xfffd;
+        if(code=='\t')code=' ';
+        if(!code)code=0xfffd;
         unsigned bytes=encode(output+out,code);for(unsigned i=0;i<bytes;++i)map[out+i]=consumed-used;
         out+=bytes;map[out]=consumed;
     }
     output[out]=0;unsigned cut=0;
     for(unsigned line=0;line<16&&cut<out;++line){unsigned bytes=_lv_txt_get_next_line(output+cut,&menu_font_stream,0,440,NULL,LV_TEXT_FLAG_NONE);if(!bytes)break;cut+=bytes;}
-    if(cut>out)cut=out;*end=start+(cut?map[cut]:consumed);output[cut]=0;return 0;
+    if(cut>out)cut=out;
+    *end=start+(cut?map[cut]:consumed);output[cut]=0;return 0;
 }
 int text_selftest(void)
 {

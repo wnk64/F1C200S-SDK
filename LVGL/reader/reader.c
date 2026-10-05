@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 extern const lv_font_t menu_font_stream;
 void menu_font_stream_close(void);
@@ -43,7 +44,13 @@ static void images_scan(void)
     strcpy(directory,path);char *slash=strrchr(directory,'/');if(!slash)return;
     if(slash==directory)slash[1]=0;else *slash=0;
     DIR *dir=opendir(directory);if(!dir)return;struct dirent *item;
-    while((item=readdir(dir))&&image_count<256){if(!image_name(item->d_name)||strchr(item->d_name,'\n')||strlen(item->d_name)>=256)continue;strcpy(names[image_count++],item->d_name);}
+    while((item=readdir(dir))&&image_count<256){
+        if(!image_name(item->d_name)||strchr(item->d_name,'\n')||strlen(item->d_name)>=256)continue;
+        char candidate[PATH_MAX];struct stat st;
+        int n=snprintf(candidate,sizeof(candidate),"%s/%s",directory,item->d_name);
+        if(n<0||n>=(int)sizeof(candidate)||stat(candidate,&st)||!S_ISREG(st.st_mode))continue;
+        strcpy(names[image_count++],item->d_name);
+    }
     closedir(dir);qsort(names,image_count,sizeof(names[0]),compare);
     const char *name=strrchr(path,'/');name=name?name+1:path;
     for(int i=0;i<image_count;++i)if(!strcmp(names[i],name)){image_index=i;break;}
@@ -104,10 +111,14 @@ int main(int argc,char **argv)
     status=label(root,"",98,734,284);lv_obj_set_style_text_font(status,&lv_font_montserrat_16,0);lv_obj_set_style_text_align(status,LV_TEXT_ALIGN_CENTER,0);
     render();uint64_t tick=platform_ms(),started=tick;const char *limit=getenv("READER_TEST_MS");unsigned long test_ms=limit?strtoul(limit,NULL,10):0;
     const char *test=getenv("READER_SELFTEST");int selftest=test&&!strcmp(test,"1"),stage=0;off_t initial=next_offset;
+    int initial_image=image_index;
     while(!quit){uint64_t now=platform_ms();lv_tick_inc(now-tick);tick=now;unsigned delay=lv_timer_handler();if(delay<1)delay=1;if(delay>16)delay=16;
         if(selftest&&is_text&&stage==0&&now-started>500){lv_event_send(next,LV_EVENT_CLICKED,NULL);stage=1;
             if(page!=1||offsets[1]!=initial){fprintf(stderr,"READER next-page FAIL\n");quit=1;stage=-1;}}
         if(selftest&&is_text&&stage==1&&now-started>1000){lv_event_send(previous,LV_EVENT_CLICKED,NULL);stage=2;if(page||next_offset!=initial){fprintf(stderr,"READER previous-page FAIL\n");stage=-1;}else puts("READER page roundtrip PASS");quit=1;}
+        if(selftest&&!is_text&&stage==0&&now-started>500){lv_event_send(mode,LV_EVENT_CLICKED,NULL);stage=1;if(!pixels||!native){stage=-1;quit=1;}}
+        if(selftest&&!is_text&&stage==1&&now-started>1000){lv_event_send(mode,LV_EVENT_CLICKED,NULL);lv_event_send(next,LV_EVENT_CLICKED,NULL);stage=2;if(!pixels||image_index!=initial_image+1){stage=-1;quit=1;}}
+        if(selftest&&!is_text&&stage==2&&now-started>1500){lv_event_send(previous,LV_EVENT_CLICKED,NULL);if(!pixels||image_index!=initial_image){stage=-1;}else puts("READER image fit/native/next/previous PASS");quit=1;}
         if(test_ms&&now-started>=test_ms)quit=1;
         usleep(delay*1000);}
     if(picture)lv_obj_del(picture);
