@@ -1,5 +1,8 @@
 # Worktree Change Log
 
+## 2026-10-05 / planned / menu geometry backend selection
+Switch media-app.sh BACKEND only to /root/roms/candidates/mplayer_geometry_20261005/mplayer-native-geometry SHA2563cff48d26822847db9fdf466d6d3f9168b4073086d291187fc56c480a04808c2. Backend source85440d9/6ceb14f validates decoded MB32 stride/window; multi-size decode tests fallback0/live0,800UI and MP3 controls regressions PASS,620 full UI EOF0. No kernel or UI changes. Existing menu-launched playback7192 untouched; new path applies on next script launch. Rollback previous backendff93 retained, media-app.sh commit767f6ba/55189f1. Actual visible non800 geometry pending user confirmation, not stable baseline.
+
 ## 2026-10-05 / planned / startup menu media entry
 Baseline bb2932d; user confirmed playback controls/lyrics work. Keep frontend9eda73615eb9320c2aacdde3d24f4f3eb4019b9baf7779f543e667bfbf094bbf and backendff93 unchanged.
 Files: media_browser.c (independent adaptation of tracked ONS browser), media-app.sh, Makefile, SCRCPT/cast-and-menu-source/apps.conf.

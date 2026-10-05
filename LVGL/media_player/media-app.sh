@@ -3,7 +3,7 @@ set -u
 SELF=$(CDPATH= cd "$(dirname "$0")" && pwd)
 BROWSER="$SELF/media-browser"
 UI=/root/aic_miracast/candidates/mplayer_ui_20261005/mplayer-ui-lyrics-test
-BACKEND=/root/aic_miracast/candidates/mplayer_ui_20261005/mplayer-cedar-ui
+BACKEND=/root/roms/candidates/mplayer_geometry_20261005/mplayer-native-geometry
 selection=$(mktemp /tmp/f1-media-selection.XXXXXX) || exit 1
 child=
 cleanup() {
