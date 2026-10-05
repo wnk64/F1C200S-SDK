@@ -9,8 +9,8 @@
 | 脚本、标签、变量、存读档 | 现有ONS核心 | 原ScriptHandler/ScriptParser与基本命令已链接；游戏37条定义实测；正文图形执行及存读档待接入 |
 | NSA资源 | ONS读取接口 | 原生索引读取、大小写/斜杠匹配、LZSS已验证；SPB/NBZ/加密包待实现 |
 | JPEG/PNG/BMP | SDL_image | libjpeg/libpng/原生BMP已验证；BMP目前BI_RGB的8/24/32位 |
-| 像素缓冲、透明合成 | SDL_Surface/Blit | ARGB8888、alpha/色键/遮罩、多帧cell、缩放/裁剪、命中、脏区及加减合成已验证；原命令/特效接入待做 |
-| 中文字体 | SDL_ttf | FreeType+只读GBK码表已验证；字号可变、无需系统gconv |
+| 像素缓冲、透明合成 | SDL_Surface/Blit | 原AnimationInfo完整绘制/变换代码已编译，合成/帧切换/动画/字形实测；原图形命令/特效接入待做 |
+| 中文字体 | SDL_ttf | 原FontInfo已接FreeType句柄、度量、加粗与描边；字形通过原文字合成实测，无需系统gconv |
 | 显示、触摸 | SDL video/event | LVGL8.2 framebuffer与FT6236预览已显示；游戏事件适配待做 |
 | 计时、线程 | SDL timer/thread | POSIX有界事件队列/单调计时已自测；原游戏事件循环待接入 |
 | OGG与混音 | SDL_mixer/SMPEG | 单路OGG/NSA范围流/ALSA/暂停音量已实测；多路音效混音及命令接入待做 |
@@ -37,13 +37,17 @@ ROOTFS/buildroot-2018.02.11/output/host/bin/arm-buildroot-linux-gnueabi-nm -u LV
 
 `libons-script.a`直接编译原ONS的未改ScriptHandler.cpp；source-baseline.sha256锁定引用源，校验失败则停止构建。调用顺序必须是构造、reset()、setKeyTable(NULL)、openScript()，不能省略原引擎要求的初始化。`ons-script-probe`仅验证词法/标签/表达式，不执行图像和声音命令。
 
-`libons-commands.a`编译原ScriptParser/ScriptParser_command和原Nsa/Sar/DirectReader。prepare_engine.py校验哈希后，在build/engine生成原生类型版本：没有SDL头文件/运行库，不改原源。AnimationInfo只提供已迁移的元数据生命周期，FontInfo只提供布局计算；尚未迁移的图像/字体方法保持无链接定义，不能用空stub伪装可用。生成器保留原版权和GPL声明，是需保留的正式构建工具，不是临时诊断脚本。
+`libons-commands.a`编译原ScriptParser/ScriptParser_command和原Nsa/Sar/DirectReader、AnimationInfo、FontInfo、DirtyRect、resize_image。prepare_engine.py校验哈希后，在build/engine生成原生类型版本：没有SDL头文件/运行库，不改原源。AnimationInfo原绘制/变换/动画方法已纳入；仅透明预处理和alpha命中改为带边界检查的原生实现。FontInfo原布局代码保留，openFont通过16项路径/实际字号缓存接FreeType。生成器保留原版权和GPL声明，是需保留的正式构建工具，不是临时诊断脚本。
 
 `ons-command-probe`调用原命令实现验证整数运算、字符串与别名，并从游戏*define执行37条真实命令至game边界，确认3个用户子程序注册。原NSA资源读取后交原生图像解码器。探针遇到未覆盖定义命令明确报错，不忽略未知命令；它不是新的部分游戏解释器，不执行game/正文、不写存档。
 
 events.h提供64项有界线程安全队列及16项单调计时器。队列满时返回错误，由调用方处理，不能静默丢弃松开/退出事件。先close唤醒线程，再join所有使用者，最后destroy；测试目标native-event-tests验证这些基础路径。
 
 sprite.h实现原生精灵基础处理。`ons_sprite_open`复制源并应用指定透明规则；`ons_sprite_adopt`仅用于无需转换的已解码图像，接管所有权且清空源指针，不多复制一张整图。两种初始化只能在空精灵上调用，使用后`ons_sprite_close`释放。每帧右半边遮罩要求cell宽度为偶数；非法cell/尺寸/遮罩明确失败。`ons_sprite_draw`的placement与clip均为目标画布坐标，dirty仅包含像素发生变化的区域；缩放横向映射固定上限2048项，每行复用，避免ARM逐像素整数除法。
+
+surface.c提供带pitch和通道mask的CPU像素缓冲，8位字形/16位RGB565/32位像素格式可分配；原绘制算法直接访问这些缓冲。lock/unlock只验证并返回，因缓冲由单渲染线程独占，不是硬件设备表面；不能以此保护多线程修改同一像素缓冲。现有native/sprite工具的像素数组操作以标准ARGB8888为前提，不能把RGB565/8位buffer传给它们当32位图片使用。
+
+font.h提供FreeType句柄、度量、字形和描边，native-font-tests验证原FontInfo -> FreeType -> 原AnimationInfo文字合成。缓存上限16项，每项普通/描边两个face，满时返回错误不删除仍被引用的face；缓存由进程退出析构释放。完整版文字布局、ruby/竖排和全游戏字形行为仍需后续执行层测试。
 
 audio.h提供单路OGG BGM：复用现有libvorbisfile/libvorbis/libogg静态库，使用NSA范围流及32KiB PCM块，ALSA缓冲目标350ms，默认设备沿用系统default。不生成压缩或PCM缓存文件。生命周期为open、start、pause/volume/snapshot、stop、close，主线程管理start/stop，worker不依赖SDL。音量0~100%，暂停尽量用ALSA硬件pause，无此能力的设备暂停时可能耗尽已有PCM并在恢复后prepare；不能宣称所有蓝牙/声卡都已无缝验证。
 
