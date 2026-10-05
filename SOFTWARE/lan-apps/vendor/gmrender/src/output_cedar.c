@@ -3,6 +3,7 @@
 #include "upnp_connmgr.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <linux/input.h>
 #include <math.h>
 #include <pthread.h>
 #include <signal.h>
@@ -19,6 +20,8 @@ static double duration,position;
 static float volume=1;
 static output_transition_cb_t feedback;
 static char replies[4096];static size_t reply_used;
+static int touch_fd=-1,touch_x,touch_y,touch_down,touch_slot,tap_count;
+static gint64 tap_started;
 static const char *backend="/root/roms/candidates/mplayer_geometry_20261005/mplayer-native-geometry";
 void cedar_shutdown(void);
 static void command(const char *s){if(input>=0){ssize_t n=write(input,s,strlen(s));if(n<0&&errno!=EAGAIN)fprintf(stderr,"DLNA command write failed\n");}}
@@ -39,6 +42,25 @@ static gboolean monitor(gpointer unused){
     (void)unused;output_transition_cb_t done=NULL;pthread_mutex_lock(&lock);
     if(waiting&&waitpid(waiting,NULL,WNOHANG)==waiting){waiting=0;closing=1;kill(getpid(),SIGTERM);}
     if(player){
+        struct input_event event;
+        while(touch_fd>=0&&read(touch_fd,&event,sizeof(event))==sizeof(event)){
+            if(event.type==EV_ABS&&event.code==ABS_MT_SLOT)touch_slot=event.value;
+            if(event.type==EV_ABS&&!touch_slot){
+                if(event.code==ABS_MT_POSITION_X||event.code==ABS_X)touch_x=event.value;
+                if(event.code==ABS_MT_POSITION_Y||event.code==ABS_Y)touch_y=event.value;
+            }
+            int edge=-1;
+            if(event.type==EV_KEY&&event.code==BTN_TOUCH)edge=!!event.value;
+            if(event.type==EV_ABS&&!touch_slot&&event.code==ABS_MT_TRACKING_ID)edge=event.value>=0;
+            if(edge==0&&touch_down){
+                gint64 now=g_get_monotonic_time();
+                if(touch_x>=120&&touch_x<=360&&touch_y>=200&&touch_y<=600){
+                    if(now-tap_started>2000000){tap_count=0;tap_started=now;}
+                    if(++tap_count>=3){closing=1;kill(getpid(),SIGTERM);}
+                }else tap_count=0;
+            }
+            if(edge>=0)touch_down=edge;
+        }
         command("pausing_keep_force get_time_pos\npausing_keep_force get_time_length\n");
         char data[512];ssize_t count;
         while((count=read(output,data,sizeof(data)))>0)for(ssize_t i=0;i<count;i++){
@@ -52,6 +74,7 @@ static gboolean monitor(gpointer unused){
 static int init(void){
     signal(SIGPIPE,SIG_IGN);setenv("CEDAR_ROTATE","90",1);setenv("CEDAR_CMA_POOL_MB","12",1);setenv("TERM","dumb",1);
     register_mime_type("video/mp4");register_mime_type("audio/mpeg");register_mime_type("audio/mp4");register_mime_type("audio/aac");
+    touch_fd=open("/dev/input/event0",O_RDONLY|O_NONBLOCK|O_CLOEXEC);
     atexit(cedar_shutdown);wait_ui();g_timeout_add(500,monitor,NULL);return 0;
 }
 static void set_uri(const char *value,output_update_meta_cb_t unused){
@@ -69,7 +92,7 @@ static int play(output_transition_cb_t cb){
     fcntl(input,F_SETFL,O_NONBLOCK);fcntl(output,F_SETFL,O_NONBLOCK);feedback=cb;pthread_mutex_unlock(&lock);return 0;
 }
 static int stop(void){pthread_mutex_lock(&lock);release_player();position=0;feedback=NULL;wait_ui();pthread_mutex_unlock(&lock);return 0;}
-void cedar_shutdown(void){pthread_mutex_lock(&lock);closing=1;release_player();reap(&waiting);pthread_mutex_unlock(&lock);free(uri);uri=NULL;}
+void cedar_shutdown(void){pthread_mutex_lock(&lock);closing=1;release_player();reap(&waiting);if(touch_fd>=0)close(touch_fd);touch_fd=-1;pthread_mutex_unlock(&lock);free(uri);uri=NULL;}
 static int pause_player(void){pthread_mutex_lock(&lock);if(!player){pthread_mutex_unlock(&lock);return -1;}if(!paused){command("pause\n");paused=1;}pthread_mutex_unlock(&lock);return 0;}
 static int seek(gint64 ns){pthread_mutex_lock(&lock);char line[80];snprintf(line,sizeof(line),"pausing_keep_force seek %.3f 2\n",(double)ns/1e9);command(line);pthread_mutex_unlock(&lock);return 0;}
 static int get_position(gint64 *d,gint64 *p){pthread_mutex_lock(&lock);*d=duration*1e9;*p=position*1e9;pthread_mutex_unlock(&lock);return 0;}

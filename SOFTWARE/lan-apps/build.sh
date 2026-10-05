@@ -16,7 +16,7 @@ make install
 cd "$SELF/vendor/gmrender"
 autoreconf -fi
 PKG_CONFIG_LIBDIR="$SELF/stage/lib/pkgconfig:$SYSROOT/usr/lib/pkgconfig" PKG_CONFIG_SYSROOT_DIR="$SYSROOT" \
-    ./configure --host=arm-buildroot-linux-gnueabi --prefix="$SELF/stage" CC="$CC" CFLAGS='-Os' --without-gstreamer \
+    ./configure --host=arm-buildroot-linux-gnueabi --prefix="$SELF/stage" --datadir=/root/roms/candidates/lan_apps_20261005/data CC="$CC" CFLAGS='-Os' --without-gstreamer \
     GLIB_CFLAGS="-I$SYSROOT/usr/include/glib-2.0 -I$SYSROOT/usr/lib/glib-2.0/include" GLIB_LIBS='-lgthread-2.0 -lglib-2.0' \
     LIBUPNP_CFLAGS="-I$SELF/stage/include/upnp" LIBUPNP_LIBS="$SELF/stage/lib/libupnp.a $SELF/stage/lib/libixml.a -lpthread"
 make -j2
