@@ -2,6 +2,7 @@
 
 ## Planned / exit button border
 User confirms DLNA playback and exit work; request only visible button frame. Baselinef2549b3/lan-ui e0164e07. Scope lan_ui.c explicit96px exit button style: white fill,2px dark border,radius4,pressed fill and32px arrow. Shared web exit gets same style; no touch/renderer/player/protocol changes. Existing renderer unchanged. Build same build.sh GCC6.4; timed waiting UI show/exit and screenshot, physical/coldboots pending. Prior sourcef2549b3 reproducible rollback, no extra backup.
+Result984593a buildPASS/no new warnings, lan-ui c593976d205d31f39368e2f7b5d3ea847c8ef75e13ad1ed441439b79f6b288e8 SCPverified. Renderer remains3f216f68, no playback/exit-logic change. Actual portrait framebuffer exit-border.png shows full432x96 outlined button/32px arrow; borderpixel(240,650)=82,97,107, fill(60,700)=255,255,255 PASS. Timed waiting-page exits0, menu restored. Temporary screenshot helper removed, no board rawdump created; screenshot retained as evidence. Physical pressed style and coldboots0 pending, not stable claim.
 Worktree: /home/wnk/Desktop/F1c200S_SOFT
 Component: SOFTWARE/lan-apps userspace/menu applications
 Base:5029985 source-reproducible menu/platform and MPlayer backend
