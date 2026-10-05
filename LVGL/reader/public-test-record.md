@@ -14,3 +14,22 @@ Retain publisher licenses/notices embedded in samples; no assertion of public-do
 
 Initial results: fourPDFs and Alice pass CLI; Alice450 reflow pages/control selftest0. Chinese三字經72 layout pages but cover fails malloc11520000 due20MiB allocation cap. ZIP image inspection: embedded PNG1600x2400 (3.84Mpx). Original file preserved. UI screenshot explicitly shows error; safe error/normal UI exit not acceptance. Previous selftest screenshot attempt missed page transition and captured restored menu; not proof of Chinese-body display.
 Plan add standalone document-page-probe (test target only) using exact same document.c allocator/render adapter, selecting arbitrary page to verify body. No reader runtime/decoder/memory-budget/menu change. PPM output is diagnostic page evidence only, not a workaround substituting for EPUB acceptance. Keep this reproducible test tool source tracked; temporary shell wrappers removed after tests.
+
+## Results
+
+All six SSH-transferred input SHA256 values match host. Sequential CLI30s watchdog never fired. Same reader binary82fe435 unchanged; no driver/kernel/menu/config changes.
+
+| File | Pages | CLI Result | Seconds | Document Allocator Peak |
+| --- | --- | --- | --- | --- |
+| w3c-dummy.pdf | 1 | PASS | 0 | 2348218 bytes |
+| mozilla-tracemonkey.pdf | 14 | PASS first/last | 2 | 2269804 bytes |
+| mozilla-images.pdf | 1 | PASS | 3 | 6929540 bytes |
+| mozilla-ccitt.pdf | 1 | PASS | 0 | 1270500 bytes |
+| alice.epub | 450 | PASS first/last | 4 | 11332031 bytes |
+| chinese-sanzijing.epub | 72 | FAIL cover render | 1 | 15904344 bytes before refusal |
+
+UI: TraceMonkey14-page PDF and Alice450-page EPUB next/previous/font-reflow selftests exit0. Mozilla imagePDF and Alice covers independently framebuffer-captured, visible/nonblank and correctly fitted. PreviewRSS9784KiB for imagePDF,8088KiB Alice,6268KiB Chinese error screen. Normal timed preview exit0 is lifecycle result, not acceptance of the Chinese failed render. EPUB3 version warning is emitted by engine; successful Alice shows warning alone is not a failure.
+
+Chinese ZIP inspection:1600x2400 PNG cover, compressed45656 bytes. Requested additional11520000 bytes for cover raster exceeds20MiB current heap budget with simultaneously held decode intermediates. Independent same-adapter probes pages4/6/10/35/72 render480x600 successfully, peaks about1.8MiB. Page6 PNG evidence shows actual Chinese三字經正文. Pages35/72 are publisher license text, not substitute proof of Chinese body. Original EPUB unchanged. Classified partial compatibility failure: large embedded PNG cover path needs streaming/downsample investigation, not blindly raising RAM cap. No implementation fix made in this test-only turn.
+
+Probe source8f7c3da, c17d0a6e9bea8423ad5a1b4f1654d6bc1685e79e7f2856b1efa8c3a84553d919. Build `make -C LVGL/reader document-page-probe -j2`, no effect on default reader executable; probe retained in reader_documents candidate for immediate follow-up and tracked source. PNG screenshots retained as evidence; own raw dumps/PPM intermediates and two temporary shell wrappers removed. Sample input files retained per request at `/root/roms/reader_samples/public` with logs subdirectory. Menu restored; no reading process/selection temp left. Three cold boots not done, no stable label.
