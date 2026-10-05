@@ -7,6 +7,8 @@ OBJ := menu.o platform.o menu_font_28.o menu_font_stream.o connections.o net_pro
 SYSROOT := $(shell $(CC) --print-sysroot)
 .DEFAULT_GOAL := all
 all: f1-menu connections-helper
+f1-console-mode: console-mode.c
+	$(CC) -Os -std=gnu99 -Wall -Wextra -Werror -o $@ $<
 cast-wait-touch: cast-wait-touch.c ../touch/touch_orientation.h
 	$(CC) -Os -std=gnu99 -Wall -Wextra -Werror -o $@ $<
 $(OBJ): lv_conf.h

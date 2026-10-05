@@ -1,3 +1,6 @@
+## 2026-10-05 / planned / application console handoff
+Baseline370d46b. Exact hypothesis/files/rollback/dependencies in SCRCPT/cast-and-menu-source/console-handoff-20261005.md. Supervisor acquires graphics for session and restores previous mode only at service shutdown; application platform code unchanged. Helper explicit GCC6.4 target, SD deployment. Tests repeated reader/browser lifecycles and service mode restoration; all-app physical and three cold boots pending0.
+
 ## 2026-10-02 / Planned / Register wiliwili menu entry
 Files: SCRCPT/cast-and-menu-source/apps.conf; add one external application row only.
 Command: /root/aic_miracast/candidates/wiliwili_lvgl_port_20261002/launch-with-menu.sh.

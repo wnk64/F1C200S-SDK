@@ -11,13 +11,18 @@ esac
 LOCK=/run/f1-menu.lock
 mkdir "$LOCK" 2>/dev/null || { echo 'menu supervisor already active' >&2; exit 1; }
 child=
+CONSOLE=/root/roms/candidates/menu_console_20261005/f1-console-mode
+console_mode=
 cleanup() {
     trap - EXIT INT TERM
     if [ -n "$child" ]; then kill -TERM "$child" 2>/dev/null || true; wait "$child" 2>/dev/null || true; fi
+    if [ -n "$console_mode" ]; then "$CONSOLE" "$console_mode" >/dev/null || true; fi
     rmdir "$LOCK"
 }
 trap cleanup EXIT
 trap 'exit 0' INT TERM
+# Keep fbcon suppressed across menu/app handoffs; children restore graphics.
+console_mode=$("$CONSOLE" graphics)
 error=
 while :; do
     rc=0
