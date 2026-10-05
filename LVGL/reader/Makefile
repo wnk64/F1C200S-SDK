@@ -21,8 +21,10 @@ build/platform.o: ../menu/platform.c lv_conf.h
 build/font.o: ../menu/menu_font_stream.c lv_conf.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $<
-$(DOC_LIBS): build-document-lib.sh
+$(word 1,$(DOC_LIBS)): build-document-lib.sh
 	sh build-document-lib.sh
+$(word 2,$(DOC_LIBS)): $(word 1,$(DOC_LIBS))
+	@test -f $@ || sh build-document-lib.sh
 reader: build/reader.o build/image.o build/text.o build/document.o build/reader_font_28.o build/platform.o build/font.o $(OBJECTS) $(DOC_LIBS)
 	$(CC) -Wl,--gc-sections -o $@ $(filter-out $(DOC_LIBS),$^) -Wl,--start-group $(DOC_LIBS) -Wl,--end-group -ljpeg -lz -lstdc++ -lm -lpthread
 reader-browser: build/reader_browser.o build/platform.o build/font.o $(OBJECTS)

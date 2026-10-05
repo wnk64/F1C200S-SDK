@@ -80,7 +80,7 @@ int document_resize_text(int page)
 {
     if (!context || !document || !reflow) return page;
     int target = page;
-    fz_var(target);
+    fz_var(target); fz_var(page);
     fz_try(context) {
         fz_bookmark bookmark = fz_make_bookmark(context, document, fz_location_from_page_number(context, document, page));
         font_step = (font_step + 1) % 3;
