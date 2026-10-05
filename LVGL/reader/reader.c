@@ -210,6 +210,7 @@ int main(int argc,char **argv)
     const char *show_ui=getenv("READER_TEST_SHOW_UI");if(show_ui&&!strcmp(show_ui,"1"))visibility(1);
     render();uint64_t tick=platform_ms(),started=tick;const char *limit=getenv("READER_TEST_MS");unsigned long test_ms=limit?strtoul(limit,NULL,10):0;
     const char *test=getenv("READER_SELFTEST");int selftest=test&&!strcmp(test,"1"),stage=0;off_t initial=next_offset;
+    const char *visibility_test=getenv("READER_TEST_VISIBILITY_ONLY");
     int initial_image=image_index;
     int visibility_checked=0;
     while(!quit){uint64_t now=platform_ms();lv_tick_inc(now-tick);tick=now;unsigned delay=lv_timer_handler();if(delay<1)delay=1;if(delay>16)delay=16;
@@ -224,6 +225,7 @@ int main(int argc,char **argv)
             if(shown||!lv_obj_has_flag(ui_layer,LV_OBJ_FLAG_HIDDEN)||pixels!=before){stage=-1;quit=1;}
             visibility_checked=1;fprintf(stderr,"READER center tap show/hide without redecode %s\n",quit?"FAIL":"PASS");
         }
+        if(visibility_checked&&visibility_test&&!strcmp(visibility_test,"1"))selftest=0;
         if(selftest&&is_text&&stage==0&&now-started>500){test_touch(380,400,80,400);stage=1;
             if(page!=1||offsets[1]!=initial){fprintf(stderr,"READER next-page FAIL\n");quit=1;stage=-1;}}
         if(selftest&&is_text&&stage==1&&now-started>1000){test_touch(80,400,380,400);stage=2;if(page||next_offset!=initial){fprintf(stderr,"READER previous-page FAIL\n");stage=-1;}else puts("READER swipe page roundtrip PASS");quit=1;}
