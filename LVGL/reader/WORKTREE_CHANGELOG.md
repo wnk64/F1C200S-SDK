@@ -3,6 +3,7 @@
 ## 2026-10-05 / planned / each-image automatic aspect fit
 Baselineb76fb1e/reader335dd3f9dfe302812741f2fabd82bf4ca7d8e079d59b609a889361a5b53fd15f. Existing default scales oversized images proportionally to480x600 content viewport, no stretching and no small-image enlargement. A manual1:1 selection currently carries to next image; fix resets new-image view toFit and tests transition directly from1:1. PDF/CBZ/CBR remain unsupported; extracted image-folder comics work within existing2Mpx/12MiB limits.
 Files reader.c only plus records. Protected text pagination/decoder/font/menu/media/kernel/network unchanged. Rollbackreader sourceb76fb1e; no ad-hoc backup. Build make -C LVGL/reader -j2, board gallery selftest and menu return; three cold boots pending.
+Commitdfb67e1, incremental buildPASS, readere1003bb95776d45873755324926d5bd5a081c8a9788c12e946f2d8c54188f1bc; board SSH hash matches. Gallery switches directly1:1->nextFit, returns previousFit; selftest0/live0; TXT page roundtrip regression0. Menu restored; no temporary helper scripts created, /tmp/reader-fit-build.log removed. Three cold boots0/real touch pending, candidate not stable label.
 Worktree: /home/wnk/Desktop/F1c200S_SOFT
 Component: LVGL/reader independent userspace app
 Base:4216e5e, menu/browser/player full sources tracked
