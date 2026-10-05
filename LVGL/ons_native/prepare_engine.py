@@ -59,6 +59,11 @@ for name, text in sources.items():
         text = text.replace("#include <" + header + ">", '#include "engine_runtime.h"')
     text = pattern.sub(lambda match: names[match.group(0)], text)
     text = re.sub(r"\b(?:SDLK_[A-Za-z0-9_]+|SDLKey|SDLCALL|(?:SDL|IMG|TTF|Mix|MIX)_[A-Za-z0-9_]+)\b", runtime_name, text)
+    if name == "ONScripter_sound.cpp":
+        start = text.index('        FILE *gbk_music_fp = ::fopen(ONS_GBK_MUSIC_TMP_FILE, "wb");')
+        end = text.index("        ons_mix_VolumeMusic( music_volume );", start)
+        text = text[:start] + "        music_info = ons_mix_LoadMUS_RW(ons_rt_RWFromMem(buffer, length));\n" + text[end:]
+        text = text.replace("static void gbkCloseOggMusic()\n{", "static void gbkCloseOggMusic()\n{\n    ons_mix_HookMusic(NULL, NULL);")
     if "#include <SDL" in text or re.search(r"\bSDL_[A-Za-z0-9_]+", text):
         raise ValueError("Unported SDL dependency in generated source: " + name)
     (output / name).write_bytes(text.encode("latin1"))

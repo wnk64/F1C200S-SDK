@@ -17,7 +17,7 @@ COMMAND_FILES := ScriptParser ScriptParser_command DirectReader SarReader NsaRea
 COMMAND_OBJECTS := $(addprefix build/engine/,$(addsuffix .o,$(COMMAND_FILES))) build/charset_bridge.o build/animation_alpha.o build/font_info_bridge.o build/ScriptHandler.o
 EXECUTION_FILES := ONScripter ONScripter_animation ONScripter_command ONScripter_effect ONScripter_effect_breakup ONScripter_event ONScripter_file ONScripter_file2 ONScripter_image ONScripter_lut ONScripter_rmenu ONScripter_sound ONScripter_text
 EXECUTION_OBJECTS := $(addprefix build/engine/,$(addsuffix .o,$(EXECUTION_FILES)))
-all: libons-native.a libons-script.a libons-commands.a native-tests native-event-tests native-sprite-tests native-audio-tests native-animation-tests native-font-tests native-runtime-image-tests native-runtime-event-tests ons-native-probe ons-script-probe ons-audio-probe ons-command-probe
+all: libons-native.a libons-script.a libons-commands.a native-tests native-event-tests native-sprite-tests native-audio-tests native-animation-tests native-font-tests native-runtime-image-tests native-runtime-event-tests native-runtime-mixer-tests ons-native-probe ons-script-probe ons-audio-probe ons-command-probe
 .PHONY: verify-script-source
 verify-script-source:
 	sha256sum -c source-baseline.sha256
@@ -40,7 +40,7 @@ execution-objects: $(EXECUTION_OBJECTS)
 build/native_main.o: native_main.cpp build/engine/generated.stamp engine_runtime.h
 	$(CXX) -O2 -Wall -funsigned-char -MMD -MP -DCHARSET_GBK -DLINUX -I. -Ibuild/engine -c -o $@ $<
 # Link intentionally fails until all native runtime contracts have implementations.
-ons-lvgl: build/native_main.o $(EXECUTION_OBJECTS) build/runtime_image.o build/runtime_display.o build/platform.o $(OBJECTS) libons-commands.a libons-native.a
+ons-lvgl: build/native_main.o $(EXECUTION_OBJECTS) build/runtime_image.o build/runtime_display.o build/runtime_mixer.o build/platform.o $(OBJECTS) libons-commands.a libons-native.a
 	$(CXX) -Wl,--gc-sections -o $@ $^ $(EXT)/lib/libvorbisfile.a $(EXT)/lib/libvorbis.a $(EXT)/lib/libogg.a $(EXT)/lib/libbz2.a $(LIBS) -lasound
 build/runtime_image.o: runtime_image.cpp engine_runtime.h
 	$(CXX) -O2 -Wall -ffunction-sections -fdata-sections -MMD -MP -c -o $@ $<
@@ -50,6 +50,12 @@ native-runtime-image-tests: build/runtime_image_tests.o build/runtime_image.o li
 	$(CXX) -Wl,--gc-sections -o $@ $^ $(LIBS)
 build/runtime_display.o: runtime_display.cpp engine_runtime.h
 	$(CXX) $(CFLAGS) -c -o $@ $<
+build/runtime_mixer.o: runtime_mixer.cpp engine_runtime.h
+	$(CXX) -O2 -Wall -ffunction-sections -fdata-sections -MMD -MP -I$(EXT)/include -c -o $@ $<
+build/runtime_mixer_tests.o: runtime_mixer_tests.cpp engine_runtime.h
+	$(CXX) -O2 -Wall -MMD -MP -c -o $@ $<
+native-runtime-mixer-tests: build/runtime_mixer_tests.o build/runtime_mixer.o build/runtime_image.o libons-native.a
+	$(CXX) -Wl,--gc-sections -o $@ $^ $(EXT)/lib/libvorbisfile.a $(EXT)/lib/libvorbis.a $(EXT)/lib/libogg.a $(LIBS) -lasound
 build/runtime_event_tests.o: runtime_event_tests.cpp engine_runtime.h
 	$(CXX) -O2 -Wall -MMD -MP -c -o $@ $<
 native-runtime-event-tests: build/runtime_event_tests.o build/runtime_display.o build/platform.o $(OBJECTS) libons-native.a

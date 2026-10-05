@@ -1,6 +1,15 @@
 extern "C" {
 #include "native.h"
 }
+#include <cstdio>
+#include <cstdlib>
+void initGBK2UTF16(void)
+{
+    uint32_t code;
+    if (ons_gbk_decode("\xd6\xd0", &code, 1) != 1 || code != 0x4e2d) {
+        std::fprintf(stderr, "Native GBK readonly table validation failed\n"); std::abort();
+    }
+}
 unsigned short convGBK2UTF16(unsigned short input)
 {
     char text[3] = {(char)(input >> 8), (char)input, 0};

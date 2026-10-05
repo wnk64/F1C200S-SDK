@@ -138,5 +138,7 @@ int ons_mix_SetMusicPosition(double seconds);
 int ons_mix_HaltMusic(void);
 void ons_mix_FreeMusic(ons_mix_Music *music);
 const char *ons_mix_GetError(void);
+void ons_mix_Diagnostics(uint64_t *frames, unsigned *underruns);
+void ons_mix_LastSample(int16_t output[2]);
 }
 #endif
