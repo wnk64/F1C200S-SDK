@@ -11,8 +11,8 @@
 | JPEG/PNG/BMP | SDL_image | libjpeg/libpng/原生BMP已验证；BMP目前BI_RGB的8/24/32位 |
 | 像素缓冲、透明合成 | SDL_Surface/Blit | 原AnimationInfo完整绘制/变换代码已编译，合成/帧切换/动画/字形实测；原图形命令/特效接入待做 |
 | 中文字体 | SDL_ttf | 原FontInfo已接FreeType句柄、度量、加粗与描边；字形通过原文字合成实测，无需系统gconv |
-| 显示、触摸 | SDL video/event | LVGL8.2 framebuffer与FT6236预览已显示；游戏事件适配待做 |
-| 计时、线程 | SDL timer/thread | POSIX有界事件队列/单调计时已自测；原游戏事件循环待接入 |
+| 显示、触摸 | SDL video/event | 正文运行时LVGL8.2/FT6236绝对触摸/局部刷新已实现；完整引擎实机显示待链接 |
+| 计时、线程 | SDL timer/thread | 正文运行时128项筛选队列/独立32项timer线程已板端自测；完整引擎回归待做 |
 | OGG与混音 | SDL_mixer/SMPEG | 单路OGG/NSA范围流/ALSA/暂停音量已实测；多路音效混音及命令接入待做 |
 
 ## 内存与刷新原则
@@ -54,6 +54,16 @@ audio.h提供单路OGG BGM：复用现有libvorbisfile/libvorbis/libogg静态库
 尚未支持语音+BGM+音效多路混音、设备断连自动重开、游戏音频结束事件或脚本音频命令。因此单路音频自测通过不代表游戏全部音频已迁移。当前Vorbis为软件浮点，进一步降低CPU可评估整数解码器，但未替换现有库。
 
 联合资源测试时显式设置ONS_NATIVE_AUDIO_ARCHIVE指向arc1.nsa，程序播放该测试游戏BGM并显示暂停按钮；默认不打开音频。此探针只做媒体并发验证，不会解释游戏脚本。
+
+## 完整执行器目标
+
+`make execution-objects`现在编译全部原ONScripter正文执行源（含文字、特效、存读档和原声音逻辑），不是重写一个少量命令解释器。runtime_image.cpp、runtime_display.cpp实现生成代码需要的原生图像、图片、字体、LVGL显示、触摸、事件和计时契约；接口采用原生名字和数据类型，没有SDL头或库。
+
+`make ons-lvgl`是最终目标，仍因多路混音运行时未实现而链接失败，不能部署或称可玩。native_main.cpp会调用原openScript/init/executeLabel，完整启动的正确性尚未实测。PDA_AUTOSIZE保持640宽等比游戏显示，未改用户脚本。
+
+runtime_display的计时器由独立线程调度；取消等待回调结束，回调不得调用LVGL。LVGL和像素提交只允许主线程。事件128项有界FIFO，可按类型peek/get筛选；motion可合并，按下/松开按顺序保留。触点先motion命中再button，释放到画面外取消旧按钮。timer当前32个固定slot，ID生命周期按原调用约定使用，不应持过期handle再取消重新分配的timer。
+
+`native-runtime-image-tests`和`native-runtime-event-tests`验证这些接口，不等于完整游戏通过。显示脏区有90度旋转映射，完整执行器还需截图、触摸、音视频、多路音效、存读档与冷启动回归。
 
 板端自测：
 
