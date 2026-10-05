@@ -6,7 +6,7 @@ CFLAGS := -Os -std=gnu99 -Wall -Wextra -D_GNU_SOURCE -DLV_CONF_INCLUDE_SIMPLE -I
 SOURCES := $(wildcard $(LV)/src/*/*.c) $(wildcard $(LV)/src/*/*/*.c) $(wildcard $(LV)/src/*/*/*/*.c)
 OBJECTS := $(patsubst $(LV)/%.c,build/%.o,$(SOURCES))
 .DEFAULT_GOAL := all
-all: mplayer-ui
+all: mplayer-ui media-browser
 media-browser: build/media_browser.o build/browser_platform.o build/font.o $(OBJECTS)
 	$(CC) -Wl,--gc-sections -o $@ $^ -lm
 build/browser_platform.o: ../menu/platform.c lv_conf.h
