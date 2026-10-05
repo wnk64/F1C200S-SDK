@@ -43,6 +43,17 @@ Integer binary SHA2565a3cbbb597e6528b0217e63e5d0d87adf87fed49f5a363f9ece0fd3d7fc
 Test: diagnostic SHA25622802b2b50a0875888143d88cdfee6beab7d34018e0b2f92b9fd0083b1a06381 verified, real OGG chunk28928bytes versus28224expected; assert failed. Integer full engine not run.
 Decision: rejected for full-game deployment, frame-count mismatch unresolved; old float runtime retained, menu running, cold boots pending.
 
+## 2026-10-05 / pending / Integer ONS and rotated touch controls
+
+Hypothesis: initial seekable Tremor stream requires PCM origin; legacy object transform does not rotate child labels in LVGL8.2.
+Files: LVGL/ons_native/vorbis_backend.h, codec_probe.cpp, runtime_display.cpp, runtime_controls_tests.cpp, Makefile.tremor, .gitignore, BASELINE_20261005.md and Chinese change record.
+Commits: 8c96929 probe, f913c65 origin fix, 09afad8 controls, 8551709 ineffective style rotation, c8f36d2 raster rotation, 249eac2 refresh context fix.
+Build: make -f Makefile.tremor -j2 ons-lvgl-tremor native-runtime-controls-tests; original GCC6.4. Float full build still SHA256dd18b6e499ecc36b0a010ccbdc37cc3c7143b38af26c9a78eedcf8362b15c9c9.
+Deploy: separate /root/aic_miracast/candidates/ons_tremor_20261005/ons-lvgl-tremor-controls-rotated SHA256210571105eaaced5d5c28165e81226d1622366c7162e5532e8e9423668c50f37; SCP hash verified. Prior origin2 retained as rollback.
+Tests: correct short OGG frames and mixer PASS; 60s real full engine/user works/0underruns/rc0; 90s controls engine Auto+Skip logged/0underruns/rc0. Raster layout/key-pair/exit test SHA25690d9699c550315abe46fd4a856485a59b8f65977e6a908c709c7cd3e44e59efe PASS.
+Screenshot: SHA2562c941382aedd2135b598229bfc58a8ea3a93a96468609093ab9286df5590dff1 verifies actual rotated control text/icons outside game viewport; style-only candidate rejected. Temporary board raw captures cleaned.
+Decision: candidate running for real touch confirmation; exit restores menu. No kernel/driver/network/player/game script edits, no persistent menu entry; saves remain original engine behavior. Save/load/long-run/cold-boot gates pending.
+
 ## 2026-10-02 pending / managed pool allocation and menu recovery verified
 Source98f6254, same helper/launcher f3333ad4/fe515f1c and supervisorc4a414cf.
 Validround3 Cma9120->16084KiB, pool9MiB, actual phone video. Normaldisconnect
