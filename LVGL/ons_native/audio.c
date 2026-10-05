@@ -92,7 +92,7 @@ static void *worker(void *argument)
     if (!info || info->channels < 1 || info->channels > 2 || info->rate < 8000 || info->rate > 96000) goto done;
     unsigned channels = info->channels, rate = info->rate;
     if (snd_pcm_open(&pcm, audio->device, SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK) < 0 ||
-        snd_pcm_set_params(pcm, SND_PCM_FORMAT_S16_LE, SND_PCM_ACCESS_RW_INTERLEAVED, channels, rate, 1, 180000) < 0) goto done;
+        snd_pcm_set_params(pcm, SND_PCM_FORMAT_S16_LE, SND_PCM_ACCESS_RW_INTERLEAVED, channels, rate, 1, 350000) < 0) goto done;
     pthread_mutex_lock(&audio->lock); audio->stats.rate = rate; audio->stats.channels = channels; pthread_mutex_unlock(&audio->lock);
     unsigned consecutive_holes = 0;
     for (;;) {
