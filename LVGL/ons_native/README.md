@@ -13,7 +13,7 @@
 | 中文字体 | SDL_ttf | FreeType+只读GBK码表已验证；字号可变、无需系统gconv |
 | 显示、触摸 | SDL video/event | LVGL8.2 framebuffer与FT6236预览已显示；游戏事件适配待做 |
 | 计时、线程 | SDL timer/thread | POSIX有界事件队列/单调计时已自测；原游戏事件循环待接入 |
-| OGG与混音 | SDL_mixer/SMPEG | 后续独立解码+ALSA有界PCM队列，尚未实现 |
+| OGG与混音 | SDL_mixer/SMPEG | 单路OGG/NSA范围流/ALSA/暂停音量已实测；多路音效混音及命令接入待做 |
 
 ## 内存与刷新原则
 
@@ -40,6 +40,12 @@ ROOTFS/buildroot-2018.02.11/output/host/bin/arm-buildroot-linux-gnueabi-nm -u LV
 events.h提供64项有界线程安全队列及16项单调计时器。队列满时返回错误，由调用方处理，不能静默丢弃松开/退出事件。先close唤醒线程，再join所有使用者，最后destroy；测试目标native-event-tests验证这些基础路径。
 
 sprite.h实现原生精灵基础处理。`ons_sprite_open`复制源并应用指定透明规则；`ons_sprite_adopt`仅用于无需转换的已解码图像，接管所有权且清空源指针，不多复制一张整图。两种初始化只能在空精灵上调用，使用后`ons_sprite_close`释放。每帧右半边遮罩要求cell宽度为偶数；非法cell/尺寸/遮罩明确失败。`ons_sprite_draw`的placement与clip均为目标画布坐标，dirty仅包含像素发生变化的区域；缩放横向映射固定上限2048项，每行复用，避免ARM逐像素整数除法。
+
+audio.h提供单路OGG BGM：复用现有libvorbisfile/libvorbis/libogg静态库，使用NSA范围流及32KiB PCM块，ALSA缓冲目标350ms，默认设备沿用系统default。不生成压缩或PCM缓存文件。生命周期为open、start、pause/volume/snapshot、stop、close，主线程管理start/stop，worker不依赖SDL。音量0~100%，暂停尽量用ALSA硬件pause，无此能力的设备暂停时可能耗尽已有PCM并在恢复后prepare；不能宣称所有蓝牙/声卡都已无缝验证。
+
+尚未支持语音+BGM+音效多路混音、设备断连自动重开、游戏音频结束事件或脚本音频命令。因此单路音频自测通过不代表游戏全部音频已迁移。当前Vorbis为软件浮点，进一步降低CPU可评估整数解码器，但未替换现有库。
+
+联合资源测试时显式设置ONS_NATIVE_AUDIO_ARCHIVE指向arc1.nsa，程序播放该测试游戏BGM并显示暂停按钮；默认不打开音频。此探针只做媒体并发验证，不会解释游戏脚本。
 
 板端自测：
 
