@@ -84,7 +84,7 @@ static void change(lv_event_t *event)
 {
     int direction=(int)(intptr_t)lv_event_get_user_data(event);
     if(is_text){if(direction<0){if(!page)return;--page;}else{if(page==4095||next_offset>=text_size()||next_offset<=offsets[page])return;offsets[++page]=next_offset;}}
-    else{int target=image_index+direction;if(target<0||target>=image_count)return;image_index=target;
+    else{int target=image_index+direction;if(target<0||target>=image_count)return;image_index=target;native=0;
         int n=snprintf(path,sizeof(path),"%s%s%s",directory,!strcmp(directory,"/")?"":"/",names[target]);if(n<0||n>=(int)sizeof(path))return;}
     render();
 }
@@ -117,7 +117,7 @@ int main(int argc,char **argv)
             if(page!=1||offsets[1]!=initial){fprintf(stderr,"READER next-page FAIL\n");quit=1;stage=-1;}}
         if(selftest&&is_text&&stage==1&&now-started>1000){lv_event_send(previous,LV_EVENT_CLICKED,NULL);stage=2;if(page||next_offset!=initial){fprintf(stderr,"READER previous-page FAIL\n");stage=-1;}else puts("READER page roundtrip PASS");quit=1;}
         if(selftest&&!is_text&&stage==0&&now-started>500){lv_event_send(mode,LV_EVENT_CLICKED,NULL);stage=1;if(!pixels||!native){stage=-1;quit=1;}}
-        if(selftest&&!is_text&&stage==1&&now-started>1000){lv_event_send(mode,LV_EVENT_CLICKED,NULL);lv_event_send(next,LV_EVENT_CLICKED,NULL);stage=2;if(!pixels||image_index!=initial_image+1){stage=-1;quit=1;}}
+        if(selftest&&!is_text&&stage==1&&now-started>1000){lv_event_send(next,LV_EVENT_CLICKED,NULL);stage=2;if(!pixels||native||image_index!=initial_image+1){stage=-1;quit=1;}}
         if(selftest&&!is_text&&stage==2&&now-started>1500){lv_event_send(previous,LV_EVENT_CLICKED,NULL);if(!pixels||image_index!=initial_image){stage=-1;}else puts("READER image fit/native/next/previous PASS");quit=1;}
         if(test_ms&&now-started>=test_ms)quit=1;
         usleep(delay*1000);}

@@ -1,4 +1,8 @@
 # Worktree Change Log
+
+## 2026-10-05 / planned / each-image automatic aspect fit
+Baselineb76fb1e/reader335dd3f9dfe302812741f2fabd82bf4ca7d8e079d59b609a889361a5b53fd15f. Existing default scales oversized images proportionally to480x600 content viewport, no stretching and no small-image enlargement. A manual1:1 selection currently carries to next image; fix resets new-image view toFit and tests transition directly from1:1. PDF/CBZ/CBR remain unsupported; extracted image-folder comics work within existing2Mpx/12MiB limits.
+Files reader.c only plus records. Protected text pagination/decoder/font/menu/media/kernel/network unchanged. Rollbackreader sourceb76fb1e; no ad-hoc backup. Build make -C LVGL/reader -j2, board gallery selftest and menu return; three cold boots pending.
 Worktree: /home/wnk/Desktop/F1c200S_SOFT
 Component: LVGL/reader independent userspace app
 Base:4216e5e, menu/browser/player full sources tracked
