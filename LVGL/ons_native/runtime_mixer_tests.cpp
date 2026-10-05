@@ -39,7 +39,9 @@ int main(int argc, char **argv)
         ons_mix_Music *track = ons_mix_LoadMUS_RW(ons_rt_RWFromMem(ogg, length)); assert(track);
         assert(!ons_mix_PlayMusic(track, 0)); wait(350); assert(!ons_mix_PlayingMusic() && music_end.load() == 1);
         ons_mix_FreeMusic(track);
-        chunk = ons_mix_LoadWAV_RW(ons_rt_RWFromMem(ogg, length), 1); assert(chunk && chunk->alen == 7056 * 4);
+        chunk = ons_mix_LoadWAV_RW(ons_rt_RWFromMem(ogg, length), 1);
+        std::fprintf(stderr, "OGG chunk bytes=%u expected=%u error=%s\n", chunk ? chunk->alen : 0, 7056 * 4, ons_mix_GetError());
+        assert(chunk && chunk->alen == 7056 * 4);
         assert(ons_mix_PlayChannel(0, chunk, 0) == 0); wait(350); assert(finished.load() == 2);
         ons_mix_FreeChunk(chunk); std::free(ogg);
     }
