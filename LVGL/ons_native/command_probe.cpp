@@ -26,6 +26,44 @@ public:
     }
     int number(int id) { return script_h.getVariableData(id).num; }
     const char *string(int id) { return script_h.getVariableData(id).str; }
+    void define()
+    {
+        setCurrentLabel("define");
+        struct Entry { const char *name; int (ScriptParser::*method)(); };
+        const Entry entries[] = {
+            {"nsa", &ScriptParser::nsaCommand}, {"menusetwindow", &ScriptParser::menusetwindowCommand},
+            {"savenumber", &ScriptParser::savenumberCommand}, {"rmenu", &ScriptParser::rmenuCommand},
+            {"linepage", &ScriptParser::linepageCommand}, {"defaultspeed", &ScriptParser::defaultspeedCommand},
+            {"underline", &ScriptParser::underlineCommand}, {"windowback", &ScriptParser::windowbackCommand},
+            {"globalon", &ScriptParser::globalonCommand}, {"transmode", &ScriptParser::transmodeCommand},
+            {"humanz", &ScriptParser::humanzCommand}, {"numalias", &ScriptParser::numaliasCommand},
+            {"defsub", &ScriptParser::defsubCommand}
+        };
+        unsigned commands = 0;
+        for (unsigned tokens = 0; tokens < 4096; ++tokens) {
+            const char *token = script_h.readToken();
+            if (!token || !*token) throw std::string("Unexpected end of define test");
+            if (*token == ';') { script_h.skipLine(); continue; }
+            if (*token == '\n' || *token == ':' || *token == '\r') continue;
+            if (!std::strcmp(token, "game")) {
+                unsigned functions = 0;
+                for (unsigned i = 0; i < 26; ++i)
+                    for (UserFuncLUT *p = user_func_hash[i].root.next; p; p = p->next) ++functions;
+                assert(globalon_flag && functions == 3);
+                std::printf("Real game define PASS commands=%u user-functions=%u transmode=%d\n", commands, functions, trans_mode);
+                return;
+            }
+            bool handled = false;
+            for (unsigned i = 0; i < sizeof(entries) / sizeof(*entries); ++i)
+                if (!std::strcmp(token, entries[i].name)) {
+                    int result = (this->*entries[i].method)();
+                    if (result & RET_SKIP_LINE) script_h.skipLine();
+                    ++commands; handled = true; break;
+                }
+            if (!handled) throw std::string("Define test has no handler for: ") + token;
+        }
+        throw std::string("Define test token limit exceeded");
+    }
     void tests()
     {
         execute("mov %1,7", &ScriptParser::movCommand); assert(number(1) == 7);
@@ -40,6 +78,7 @@ public:
         execute("mov %4,native_value*2", &ScriptParser::movCommand); assert(number(4) == 42);
         setCurrentLabel("start"); assert(!std::strcmp(current_label_info.name, "start"));
         std::printf("Original command arithmetic/string/alias/label PASS mode=%dx%d\n", screen_width, screen_height);
+        define();
         execute("nsa", &ScriptParser::nsaCommand);
         const char *names[] = {"cg/sayajpgfirstedition10244.png", "cg/000.jpg", "data/line.bmp"};
         for (unsigned i = 0; i < 3; ++i) {
