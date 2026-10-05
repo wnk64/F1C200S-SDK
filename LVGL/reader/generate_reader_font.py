@@ -44,6 +44,8 @@ try:
         size = gdi.GetGlyphOutlineW(dc, code, 6, c.byref(metrics), 0, None, c.byref(matrix))
         if size == 0xffffffff:
             raise OSError("Missing glyph U+%04X" % code)
+        if size == 0:
+            metrics.width = metrics.height = 0
         buffer = c.create_string_buffer(size)
         gdi.GetGlyphOutlineW(dc, code, 6, c.byref(metrics), size, buffer, c.byref(matrix))
         raw = buffer.raw
