@@ -6,7 +6,7 @@
 
 | 功能 | 原依赖 | 目标/当前进度 |
 |---|---|---|
-| 脚本、标签、变量、存读档 | 现有ONS核心 | 原ScriptHandler已独立链接并验证标签/表达式/变量；完整命令执行及存读档待接入 |
+| 脚本、标签、变量、存读档 | 现有ONS核心 | 原ScriptHandler/ScriptParser与基本命令已链接；游戏37条定义实测；正文图形执行及存读档待接入 |
 | NSA资源 | ONS读取接口 | 原生索引读取、大小写/斜杠匹配、LZSS已验证；SPB/NBZ/加密包待实现 |
 | JPEG/PNG/BMP | SDL_image | libjpeg/libpng/原生BMP已验证；BMP目前BI_RGB的8/24/32位 |
 | 像素缓冲、透明合成 | SDL_Surface/Blit | ARGB8888、alpha/色键/遮罩、多帧cell、缩放/裁剪、命中、脏区及加减合成已验证；原命令/特效接入待做 |
@@ -36,6 +36,10 @@ ROOTFS/buildroot-2018.02.11/output/host/bin/arm-buildroot-linux-gnueabi-nm -u LV
 `libons-native.a`提供native.h中的图像/字体/NSA接口，无SDL头文件或链接选项。生成GBK码表只在主机构建时用Python标准编码库；板端不需要Python或iconv模块。
 
 `libons-script.a`直接编译原ONS的未改ScriptHandler.cpp；source-baseline.sha256锁定引用源，校验失败则停止构建。调用顺序必须是构造、reset()、setKeyTable(NULL)、openScript()，不能省略原引擎要求的初始化。`ons-script-probe`仅验证词法/标签/表达式，不执行图像和声音命令。
+
+`libons-commands.a`编译原ScriptParser/ScriptParser_command和原Nsa/Sar/DirectReader。prepare_engine.py校验哈希后，在build/engine生成原生类型版本：没有SDL头文件/运行库，不改原源。AnimationInfo只提供已迁移的元数据生命周期，FontInfo只提供布局计算；尚未迁移的图像/字体方法保持无链接定义，不能用空stub伪装可用。生成器保留原版权和GPL声明，是需保留的正式构建工具，不是临时诊断脚本。
+
+`ons-command-probe`调用原命令实现验证整数运算、字符串与别名，并从游戏*define执行37条真实命令至game边界，确认3个用户子程序注册。原NSA资源读取后交原生图像解码器。探针遇到未覆盖定义命令明确报错，不忽略未知命令；它不是新的部分游戏解释器，不执行game/正文、不写存档。
 
 events.h提供64项有界线程安全队列及16项单调计时器。队列满时返回错误，由调用方处理，不能静默丢弃松开/退出事件。先close唤醒线程，再join所有使用者，最后destroy；测试目标native-event-tests验证这些基础路径。
 
