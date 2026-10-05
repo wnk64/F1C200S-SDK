@@ -1,3 +1,16 @@
 4a71216be34b060b33fba274235129e6654549ecdd22d7dc481365758e336500  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/ScriptHandler.cpp
 66b3d27a8a6c27bcb81d80bbc64d54e9e9e75e3045a735b2e79dc4d8b9ea337b  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/ScriptHandler.h
 811fcc3d611e8726813681e85c17efa57322c6475623b803d4c04b59870620e3  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/BaseReader.h
+111c2f75ef6dc38b5310065c835ef05018644baeb7bae3e85aad0329dacf7193  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/ScriptParser.cpp
+1873fc544fa4f9ad88d730a48a1bf90a5bf6ff5f40d20c50086748b2d1e9c28b  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/ScriptParser.h
+57adf4843a94b5d65841836692af9f576c808e9271d555fec43d82275b665fcc  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/ScriptParser_command.cpp
+9993eef760263e2b3dde4a0f7c7ce2cbc0fd45e7bb448932fbfcebe989011ab7  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/AnimationInfo.cpp
+bc9d1741906d94b7c7f48dba1b43eb76810a3934a38ce775abe4fbdc2b58f56d  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/AnimationInfo.h
+8b6a83d4bd3a85ba26ab169cb4659d39e12c75b4db917cb4c214c3914c163118  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/FontInfo.cpp
+c58a7084557f2250c157e219cb88860a89486ccfef7cbb567e0e71a51384228b  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/FontInfo.h
+b4d1d7f1a03c22246be7fd29b6ae0bde3b219e685eb10d5444afc12017034074  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/DirectReader.cpp
+1ac86ad71e4a38795868046dcabe97d950b96bcb83afc4382993559617895e97  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/DirectReader.h
+f2b81de4476357564619cf0839ea5a0a6f5083a061bccde595916e34411bc937  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/SarReader.cpp
+e61d50c5c542d1b4ca92feebde8d4b8fa173e54b67639a57f6c1a6e101431e0f  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/SarReader.h
+9c1f12cce4cb841f20e9874406d3f34c8fbacc10437892d93973550bcb0aeb5e  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/NsaReader.cpp
+f41089bf512464be0c6a23ebbdfed08635548378b673f17e3ff701404c342878  ../../SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK/NsaReader.h

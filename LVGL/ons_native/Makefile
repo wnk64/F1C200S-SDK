@@ -13,10 +13,26 @@ CFLAGS := -Os -Wall -Wextra -ffunction-sections -fdata-sections -MMD -MP -D_FILE
 CFLAGS += -DLV_CONF_INCLUDE_SIMPLE -I$(MENU) -I$(ROOT)/LVGL/touch -I$(LV)
 CFLAGS += -I$(HOST)/arm-buildroot-linux-gnueabi/sysroot/usr/include/freetype2
 LIBS := -lpng -ljpeg -lfreetype -lm -lpthread
-all: libons-native.a libons-script.a native-tests native-event-tests native-sprite-tests native-audio-tests ons-native-probe ons-script-probe ons-audio-probe
+COMMAND_FILES := ScriptParser ScriptParser_command DirectReader SarReader NsaReader FontInfo AnimationInfo
+COMMAND_OBJECTS := $(addprefix build/engine/,$(addsuffix .o,$(COMMAND_FILES))) build/charset_bridge.o build/ScriptHandler.o
+all: libons-native.a libons-script.a libons-commands.a native-tests native-event-tests native-sprite-tests native-audio-tests ons-native-probe ons-script-probe ons-audio-probe ons-command-probe
 .PHONY: verify-script-source
 verify-script-source:
 	sha256sum -c source-baseline.sha256
+build/engine/generated.stamp: prepare_engine.py source-baseline.sha256 | verify-script-source
+	python3 prepare_engine.py build/engine
+$(COMMAND_OBJECTS): build/engine/generated.stamp
+build/engine/%.o: build/engine/generated.stamp engine_types.h
+	$(CXX) -O2 -Wall -funsigned-char -fno-strict-aliasing -ffunction-sections -fdata-sections -MMD -MP -DCHARSET_GBK -DLINUX -D_FILE_OFFSET_BITS=64 -I. -Ibuild/engine -I$(ENGINE) -I$(EXT)/include -c -o $@ build/engine/$*.cpp
+build/charset_bridge.o: charset_bridge.cpp native.h
+	@mkdir -p $(@D)
+	$(CXX) -O2 -Wall -MMD -MP -c -o $@ $<
+build/command_probe.o: command_probe.cpp build/engine/generated.stamp engine_types.h
+	$(CXX) -O2 -Wall -funsigned-char -MMD -MP -DCHARSET_GBK -DLINUX -D_FILE_OFFSET_BITS=64 -I. -Ibuild/engine -I$(ENGINE) -c -o $@ $<
+libons-commands.a: $(COMMAND_OBJECTS)
+	$(AR) rcs $@ $^
+ons-command-probe: build/command_probe.o libons-commands.a build/native.o build/gbk.o
+	$(CXX) -Wl,--gc-sections -o $@ $^ $(EXT)/lib/libbz2.a $(LIBS)
 build/ScriptHandler.o: $(ENGINE)/ScriptHandler.cpp $(ENGINE)/ScriptHandler.h $(ENGINE)/BaseReader.h | verify-script-source
 	@mkdir -p $(@D)
 	$(CXX) -O2 -Wall -funsigned-char -fno-strict-aliasing -ffunction-sections -fdata-sections -MMD -MP -DCHARSET_GBK -DLINUX -D_FILE_OFFSET_BITS=64 -I$(ENGINE) -c -o $@ $<
@@ -63,4 +79,4 @@ ons-audio-probe: build/audio_probe.o build/audio.o build/archive.o build/events.
 	$(CC) -Wl,--gc-sections -o $@ $^ $(EXT)/lib/libvorbisfile.a $(EXT)/lib/libvorbis.a $(EXT)/lib/libogg.a -lasound -lm -lpthread
 ons-native-probe: build/probe.o build/native.o build/archive.o build/gbk.o build/sprite.o build/audio.o build/events.o build/platform.o $(OBJECTS)
 	$(CC) -Wl,--gc-sections -o $@ $^ $(LIBS) $(EXT)/lib/libvorbisfile.a $(EXT)/lib/libvorbis.a $(EXT)/lib/libogg.a -lasound
--include $(wildcard build/*.d) $(OBJECTS:.o=.d)
+-include $(wildcard build/*.d) $(wildcard build/engine/*.d) $(OBJECTS:.o=.d)
