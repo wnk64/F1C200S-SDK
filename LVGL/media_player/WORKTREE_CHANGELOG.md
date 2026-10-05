@@ -6,6 +6,10 @@ Hypothesis: without UNIVERSAL_PLANES, primary layer0 is omitted; planes[1] mount
 Files: media_display.c only; enable atomic/universal plane enumeration before selecting primary0/OSD1, log selected IDs and validate primary type.
 Protected: Cedar decoder/backend, native rotated geometry, audio, network, kernel, menu and wiliwili sources unchanged.
 Rollback: existing mplayer-ui-volume candidate; source d86d841. Build: make -C LVGL/media_player -j2. Visual hide and three cold boots pending.
+Commit: ee528d0. Build PASS with existing _GNU_SOURCE redefinition warning; SHA256 8b978fd7368f0cbf8766c8c17494ad0d5849e083d8420dfdea151f855eea3f64.
+Deploy: SSH/SCP to /root/aic_miracast/candidates/mplayer_ui_20261005/mplayer-ui-planes; board SHA256 matches, old mplayer-ui-volume untouched.
+Board selftest exit0: primary0=31 OSD1=35; pause/volume/seek/frame-ready/hide PASS, pool peak10358784 fallback0 live0.
+Interactive looping playback started with same backend/test_800x480.mp4; exit returns startup menu. Decision: pending actual visible hide confirmation and three cold boots; synthetic hide is not visual proof. No kernel/service configuration changed.
 
 Worktree: /home/wnk/Desktop/F1c200S_SOFT
 Component: LVGL/media_player frontend and optional Cedar MPlayer frame notification
