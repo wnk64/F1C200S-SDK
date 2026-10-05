@@ -180,6 +180,8 @@ static void paint_control(unsigned index, const char *symbol, const char *name)
     lv_color_t pixels[64 * 64];
     for (unsigned i = 0; i < 64 * 64; ++i) pixels[i] = lv_color_black();
     lv_draw_sw_ctx_t context; lv_draw_sw_init_ctx(NULL, &context.base_draw);
+    lv_disp_t *refreshing = _lv_refr_get_disp_refreshing();
+    _lv_refr_set_disp_refreshing(lv_disp_get_default());
     lv_area_t area = {0, 0, 63, 63};
     context.base_draw.buf = pixels; context.base_draw.buf_area = &area; context.base_draw.clip_area = &area;
     lv_draw_rect_dsc_t rectangle; lv_draw_rect_dsc_init(&rectangle);
@@ -194,6 +196,7 @@ static void paint_control(unsigned index, const char *symbol, const char *name)
     for (unsigned y = 0; y < 64; ++y)
         for (unsigned x = 0; x < 64; ++x) control_pixels[index][x * 64 + 63 - y] = pixels[y * 64 + x];
     lv_draw_sw_deinit_ctx(NULL, &context.base_draw);
+    _lv_refr_set_disp_refreshing(refreshing);
 }
 static void draw_control(lv_event_t *event)
 {
