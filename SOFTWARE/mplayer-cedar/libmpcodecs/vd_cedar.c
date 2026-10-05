@@ -212,6 +212,8 @@ static int init(sh_video_t *sh)
 
     if (InitializeVideoDecoder(ctx->decoder, &info, &config) != 0)
         goto fail;
+    if (ctx->rotate_90 && sh->aspect > 0)
+        sh->aspect = 1.0 / sh->aspect;
     if (!mpcodecs_config_vo(sh, ctx->rotate_90 ? info.nHeight : info.nWidth,
                             ctx->rotate_90 ? info.nWidth : info.nHeight, IMGFMT_YV12))
         goto fail;

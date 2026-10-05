@@ -27,3 +27,12 @@ Rotation: explicit CEDAR_ROTATE=90 only, native geometry available through cedar
 Lifecycle: release VO-held picture before decoder reset/destruction, wait next vblank before recycling previous scanout frame, open/close bookkeeping.
 Memory: CEDAR_CMA_POOL_MB remains opt-in1..16; copied original allocator fallback behavior retained. No fixed guessed reservation.
 Tests: decode/EOF/seek/rotation/local800x480 plus audio and menu recovery required. Not a network-TV validation or stable label.
+
+## 2026-10-05 / pending / first local decode observation
+
+Commits: 3415c6c baseline, ed33a98 noSDL script, 7eb31fb current rotation/pool/lifecycle.
+Build: full noSDL succeeded; candidate4c65834b823384b27f06090311d502d62bcc0d60338dff6ef70bbd4ca0de3c97 SSH hash verified. SDL=no, SDL_IMAGE=no; original codec/status listing uses exit1 normally and prints Cedar entries without segfault.
+Deploy: /root/aic_miracast/candidates/mplayer_current_nosdl_20261005/mplayer-cedar-current-nosdl; old binaries untouched.
+Test: local test_800x480.mp4 is H26430fps, CEDAR_ROTATE90/cedarh264/cedar_drm:native/nosound/endpos30, exit0 and menu restored. Hardware decode/picture output logged, visual confirmation pending.
+Memory observation: during decode MemAvailable24912KiB/CmaFree1120KiB; after exit/menu37516KiB/13520KiB. CMA free includes cache accounting; no proof of leak from this alone.
+Planned: invert stream display aspect metadata when90degree rotation, retain native pixel mapping. No scaling based on misleading MPlayer d_width/d_height; optional allocator and audio still to test.
