@@ -25,6 +25,8 @@ int main(int argc, char **argv)
     if (path.empty() || path.size() > 200) return 1;
     if (path.back() != '/') path += '/';
     ScriptHandler script;
+    script.reset();
+    script.setKeyTable(NULL);
     std::clock_t begin = std::clock();
     if (script.openScript(&path[0]) < 0) return 1;
     std::printf("Original ONS GBK script opened: %dx%d variables=%d CPU=%ld ms\n",
