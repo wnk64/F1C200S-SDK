@@ -134,8 +134,9 @@ static int configure_native_picture(void *picture)
     struct cedar_native_view view;
     if (cedar_native_geometry(&geometry, screen_w, screen_h, &view)) return -1;
     if (!frontend_regs) {
-        frontend_fd = open("/dev/mem", O_RDWR | O_SYNC | O_CLOEXEC);
+        frontend_fd = open("/dev/mem", O_RDWR | O_SYNC);
         if (frontend_fd < 0) return -1;
+        if (fcntl(frontend_fd, F_SETFD, FD_CLOEXEC)) { close(frontend_fd); frontend_fd = -1; return -1; }
         void *mapping = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, frontend_fd, 0x01e00000);
         if (mapping == MAP_FAILED) { close(frontend_fd); frontend_fd = -1; return -1; }
         frontend_regs = mapping;
