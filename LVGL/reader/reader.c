@@ -19,6 +19,7 @@ static char path[PATH_MAX], directory[PATH_MAX], names[256][256], page_text[1228
 static lv_obj_t *body, *title, *status, *previous, *next, *mode_label, *picture;
 static lv_obj_t *content_layer, *gesture_layer, *ui_layer;
 static int shown, pressed, injected;
+static int timer_test_active;
 static lv_point_t press_point, injected_point;
 static uint64_t pressed_at, ui_activity;
 static uint16_t *pixels;
@@ -126,6 +127,7 @@ static enum gesture_action classify(lv_point_t from,lv_point_t to,uint64_t elaps
 }
 static void gesture_event(lv_event_t *event)
 {
+    if(timer_test_active&&!injected)return;
     lv_event_code_t code=lv_event_get_code(event);
     if(code==LV_EVENT_PRESS_LOST){pressed=0;return;}
     if(code!=LV_EVENT_PRESSED&&code!=LV_EVENT_RELEASED)return;
@@ -228,6 +230,7 @@ int main(int argc,char **argv)
     const char *timer_test_env=getenv("READER_TEST_TIMER_UI");
     int timer_test=timer_test_env&&!strcmp(timer_test_env,"1"),timer_seen=0;
     uint64_t timer_activity=0;
+    timer_test_active=timer_test;
     if(timer_test)lv_timer_create(timer_ui_test,250,NULL);
     while(!quit){uint64_t now=platform_ms();lv_tick_inc(now-tick);tick=now;unsigned delay=lv_timer_handler();if(delay<1)delay=1;if(delay>16)delay=16;
         /* Input callbacks may refresh ui_activity inside lv_timer_handler. */
@@ -238,7 +241,7 @@ int main(int argc,char **argv)
                 if(!shown){fprintf(stderr,"READER timer callback persistence FAIL\n");stage=-1;quit=1;}
                 timer_seen=1;timer_activity=ui_activity;
             }
-            if(timer_seen&&now-timer_activity<10000&&!shown){stage=-1;quit=1;}
+            if(timer_seen&&now-timer_activity<10000&&!shown){fprintf(stderr,"READER timer early hide FAIL age=%llu\n",(unsigned long long)(now-timer_activity));stage=-1;quit=1;}
             if(timer_seen&&now-timer_activity>=10000){
                 if(shown){stage=-1;}
                 fprintf(stderr,"READER timer callback persistence/10s expiry %s\n",stage<0?"FAIL":"PASS");quit=1;
