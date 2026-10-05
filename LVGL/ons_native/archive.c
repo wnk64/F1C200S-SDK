@@ -49,6 +49,31 @@ static int same_name(const char *a, const char *b)
     while (*a && *b && normalized((uint8_t)*a) == normalized((uint8_t)*b)) { ++a; ++b; }
     return !*a && !*b;
 }
+int ons_nsa_stream(const char *path, const char *name, FILE **file, uint32_t *offset, uint32_t *length)
+{
+    if (!path || !name || !file || !offset || !length) return -1;
+    *file = NULL; *offset = *length = 0;
+    FILE *f = fopen(path, "rb"); if (!f) return -1;
+    if (fseeko(f, 0, SEEK_END)) goto fail;
+    off_t total = ftello(f); if (total < 6 || fseeko(f, 0, SEEK_SET)) goto fail;
+    uint32_t count, base;
+    if (be(f, 2, &count) || be(f, 4, &base) || base < 6 || base > (uint64_t)total) goto fail;
+    for (uint32_t i = 0; i < count; ++i) {
+        char entry[512]; size_t n = 0; int c;
+        while ((c = fgetc(f)) != EOF && c) { if (n + 1 >= sizeof(entry)) goto fail; entry[n++] = c; }
+        if (c == EOF) goto fail;
+        entry[n] = 0;
+        int compression = fgetc(f); uint32_t relative, size, raw;
+        if (compression == EOF || be(f, 4, &relative) || be(f, 4, &size) || be(f, 4, &raw) || ftello(f) > base) goto fail;
+        if (!same_name(entry, name)) continue;
+        uint64_t absolute = (uint64_t)base + relative;
+        if (compression != 0 || !size || size > 8388608 || absolute > UINT32_MAX || absolute + size > (uint64_t)total ||
+            fseeko(f, absolute, SEEK_SET)) goto fail;
+        *file = f; *offset = absolute; *length = size; return 0;
+    }
+fail:
+    fclose(f); return -1;
+}
 int ons_nsa_read(const char *path, const char *name, uint8_t **bytes, size_t *length)
 {
     if (!path || !name || !bytes || !length) return -1;

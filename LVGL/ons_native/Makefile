@@ -6,13 +6,14 @@ AR := $(HOST)/bin/arm-buildroot-linux-gnueabi-ar
 MENU := $(ROOT)/LVGL/menu
 LV := $(ROOT)/LVGL/touch/lvgl
 ENGINE := $(ROOT)/SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-GBK
+EXT := $(ROOT)/SOFTWARE/legacy-LicheePi_Nano/third_party/ONScripter-EN/extlib
 SOURCES := $(wildcard $(LV)/src/*/*.c) $(wildcard $(LV)/src/*/*/*.c) $(wildcard $(LV)/src/*/*/*/*.c)
 OBJECTS := $(patsubst $(LV)/%.c,build/%.o,$(SOURCES))
 CFLAGS := -Os -Wall -Wextra -ffunction-sections -fdata-sections -MMD -MP -D_FILE_OFFSET_BITS=64
 CFLAGS += -DLV_CONF_INCLUDE_SIMPLE -I$(MENU) -I$(ROOT)/LVGL/touch -I$(LV)
 CFLAGS += -I$(HOST)/arm-buildroot-linux-gnueabi/sysroot/usr/include/freetype2
 LIBS := -lpng -ljpeg -lfreetype -lm -lpthread
-all: libons-native.a libons-script.a native-tests native-event-tests native-sprite-tests ons-native-probe ons-script-probe
+all: libons-native.a libons-script.a native-tests native-event-tests native-sprite-tests ons-native-probe ons-script-probe ons-audio-probe
 .PHONY: verify-script-source
 verify-script-source:
 	sha256sum -c source-baseline.sha256
@@ -39,7 +40,7 @@ build/%.o: %.c native.h
 build/platform.o: $(MENU)/platform.c $(MENU)/platform.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $<
-libons-native.a: build/native.o build/archive.o build/gbk.o build/events.o build/sprite.o
+libons-native.a: build/native.o build/archive.o build/gbk.o build/events.o build/sprite.o build/audio.o
 	$(AR) rcs $@ $^
 native-tests: build/tests.o build/native.o build/archive.o build/gbk.o
 	$(CC) -Wl,--gc-sections -o $@ $^ $(LIBS)
@@ -51,6 +52,12 @@ build/sprite.o: sprite.h
 build/sprite_tests.o: sprite.h
 native-sprite-tests: build/sprite_tests.o build/sprite.o build/native.o build/gbk.o
 	$(CC) -Wl,--gc-sections -o $@ $^ $(LIBS)
+build/audio.o: audio.c audio.h events.h native.h
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -I$(EXT)/include -c -o $@ $<
+build/audio_probe.o: audio.h events.h
+ons-audio-probe: build/audio_probe.o build/audio.o build/archive.o build/events.o
+	$(CC) -Wl,--gc-sections -o $@ $^ $(EXT)/lib/libvorbisfile.a $(EXT)/lib/libvorbis.a $(EXT)/lib/libogg.a -lasound -lm -lpthread
 ons-native-probe: build/probe.o build/native.o build/archive.o build/gbk.o build/sprite.o build/platform.o $(OBJECTS)
 	$(CC) -Wl,--gc-sections -o $@ $^ $(LIBS)
 -include $(wildcard build/*.d) $(OBJECTS:.o=.d)
