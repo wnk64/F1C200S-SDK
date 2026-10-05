@@ -23,6 +23,14 @@ uint32_t ons_over(uint32_t s, uint32_t d)
     unsigned a = s >> 24, da = d >> 24;
     if (!a) return d;
     if (a == 255) return s;
+    if (da == 255) {
+        uint32_t result = 0xff000000u;
+        for (unsigned shift = 0; shift < 24; shift += 8) {
+            unsigned sc = (s >> shift) & 255, dc = (d >> shift) & 255;
+            result |= ((sc * a + dc * (255 - a) + 127) / 255) << shift;
+        }
+        return result;
+    }
     unsigned oa = a * 255 + da * (255 - a);
     uint32_t result = ((oa + 127) / 255) << 24;
     for (unsigned shift = 0; shift < 24; shift += 8) {

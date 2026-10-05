@@ -92,7 +92,7 @@ int ons_sprite_draw(ons_surface *destination, const ons_sprite *sprite, ons_rect
                     ons_rect clip, uint8_t opacity, enum ons_blend blend, ons_rect *dirty)
 {
     if (dirty) memset(dirty, 0, sizeof(*dirty));
-    if (!destination || !destination->pixels || !valid(sprite, placement) ||
+    if (!destination || !destination->pixels || destination->w < 1 || destination->w > 2048 || !valid(sprite, placement) ||
         blend < ONS_BLEND_OVER || blend > ONS_BLEND_SUBTRACT || clip.w < 0 || clip.h < 0) return -1;
     if (!opacity || !clip.w || !clip.h) return 0;
     int x1 = (int)maximum(0, maximum(placement.x, clip.x));
@@ -100,11 +100,18 @@ int ons_sprite_draw(ons_surface *destination, const ons_sprite *sprite, ons_rect
     int64_t x2 = minimum(destination->w, minimum((int64_t)placement.x + placement.w, (int64_t)clip.x + clip.w));
     int64_t y2 = minimum(destination->h, minimum((int64_t)placement.y + placement.h, (int64_t)clip.y + clip.h));
     if (x2 <= x1 || y2 <= y1) return 0;
+    int xmap[2048], cw = sprite->image->w / sprite->cells;
+    for (int x = x1; x < x2; ++x)
+        xmap[x - x1] = sprite->cell * cw + (int)(((int64_t)x - placement.x) * cw / placement.w);
     int touched = 0, min_x = (int)x2, min_y = (int)y2, max_x = x1, max_y = y1;
-    for (int y = y1; y < y2; ++y)
+    for (int y = y1; y < y2; ++y) {
+        int sy = (int)(((int64_t)y - placement.y) * sprite->image->h / placement.h);
+        const uint32_t *row = sprite->image->pixels + sy * sprite->image->w;
         for (int x = x1; x < x2; ++x) {
             uint32_t *pixel = destination->pixels + y * destination->w + x;
-            uint32_t next = composite(sample(sprite, placement, x, y, opacity), *pixel, blend);
+            uint32_t source = row[xmap[x - x1]];
+            if (opacity != 255) source = (source & 0xffffff) | (((source >> 24) * opacity + 127) / 255) << 24;
+            uint32_t next = composite(source, *pixel, blend);
             if (next == *pixel) continue;
             *pixel = next; touched = 1;
             if (x < min_x) min_x = x;
@@ -112,6 +119,7 @@ int ons_sprite_draw(ons_surface *destination, const ons_sprite *sprite, ons_rect
             if (x > max_x) max_x = x;
             if (y > max_y) max_y = y;
         }
+    }
     if (dirty && touched) { dirty->x = min_x; dirty->y = min_y; dirty->w = max_x - min_x + 1; dirty->h = max_y - min_y + 1; }
     return touched;
 }
