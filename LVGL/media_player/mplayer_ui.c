@@ -20,7 +20,7 @@ static int command_fd = -1, reply_fd = -1, frame_fd = -1;
 static volatile sig_atomic_t quit;
 static double duration, position, seek_target;
 static int paused, volume = 100, shown, dragging, seeking, ready, failed;
-static int audio_only, lyric_count, last_lyric = -2;
+static int audio_only, lyric_count, last_lyric = -2, debug;
 static lv_obj_t *song_title, *song_artist, *lyric_previous, *lyric_current, *lyric_next;
 static int reported_volume = -1;
 static double reported_volume_exact = -1;
@@ -290,6 +290,8 @@ int main(int argc, char **argv)
         puts("MPlayer UI reply parser PASS"); return 0;
     }
     if (argc != 3) { fprintf(stderr, "usage: mplayer-ui media-file backend-executable\n"); return 1; }
+    const char *debug_env = getenv("MPLAYER_UI_DEBUG");
+    debug = debug_env && !strcmp(debug_env, "1");
     const char *extension = strrchr(argv[1], '.');
     audio_only = extension && !strcasecmp(extension, ".mp3");
     if (audio_only) lyric_count = lyrics_load(argv[1]);
@@ -338,6 +340,7 @@ int main(int argc, char **argv)
                 lv_label_set_text(lyric_previous, lyrics_text(current - 1));
                 lv_label_set_text(lyric_current, lyrics_text(current));
                 lv_label_set_text(lyric_next, lyrics_text(current + 1));
+                if (debug) fprintf(stderr, "MPLAYER UI lyric position=%.3f index=%d\n", position, current);
             }
         }
         }
@@ -370,6 +373,13 @@ int main(int argc, char **argv)
                 lv_event_send(seek_slider, LV_EVENT_RELEASED, NULL);
                 stage = 4; stage_started = now;
             } else if (stage == 4 && !seeking && now - stage_started > 1000) {
+                if (audio_only && lyric_count) {
+                    int expected = lyrics_index(position);
+                    if (last_lyric != expected || strcmp(lv_label_get_text(lyric_current), lyrics_text(expected))) {
+                        fprintf(stderr, "UI lyric seek position did not update\n"); failed = 1; break;
+                    }
+                    fprintf(stderr, "MPLAYER UI lyric seek PASS position=%.3f index=%d\n", position, expected);
+                }
                 visibility(0); fprintf(stderr, "MPLAYER UI pause/volume/seek/frame-ready/hide PASS\n"); quit = 1;
             }
             if (now - started > 25000) { fprintf(stderr, "UI selftest timeout\n"); failed = 1; break; }

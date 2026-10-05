@@ -7,6 +7,7 @@ MP3: mpg123/default ALSA, visible full framebuffer UI without video OSD or CMA r
 Protected: video frame-driven position and private OSD, backend, kernel, Bluetooth/network configuration, startup menu. Test parser/LRC, MP3 controls with existing user file, video regression. Three cold boots pending.
 Code commit907a7df; build8bf41cc04eabfc8d893fd398e96bcf18d847713825feae9aec9e0adad06d12ad. Board parser/LRC selftests PASS; audio UI seek86.000 target86.000, pause/volume PASS; video regression PASS/fallback0/live0. Screenshot confirms metadata/Chinese no-lyric state/controls. Paused get_time_pos emits ALSA DELAY(-77) because paused device state; planned skip position polling while paused, retain last played position. Strip MPlayer metadata transport quotes.
 User requested real matching MP3/LRC download: Code Monkey by Jonathan Coulton, public Internet Archive audio and LRCLIB18493616 timed lyrics. Verify download hashes, playback duration, visible lyric advancement and seek reset; do not fabricate lyrics. Preserve test.mp3 and old binaries.
+Probe: MPLAYER_UI_DEBUG=1 opt-in index/position logging (default off); selftest now verifies post-seek displayed lyric equals the timed LRC entry. Paused-position fix be6333c rebuilt3ee1174eab509bc983b6dea00bbd9f7b4d9cbe5d46d7ae2947d1ff1cea91dd46; user MP3 selftest PASS without previous ALSA warnings.
 
 ## 2026-10-05 / planned / OSD plane enumeration
 Baseline: d86d841, frontend7d4a01b16d608a75fc6df34c5fb8a1be58ad8a16693de8b549e28c591a2d02cc.
