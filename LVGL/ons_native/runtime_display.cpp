@@ -188,6 +188,8 @@ static void create_controls()
     for (unsigned i = 0; i < 6; ++i) {
         lv_obj_t *button = lv_btn_create(controls); lv_obj_remove_style_all(button);
         lv_obj_set_pos(button, 8 + i * 80, (margin - 64) / 2); lv_obj_set_size(button, 64, 64);
+        // LVGL 8.2 rotates object layers about their center, including children.
+        lv_obj_set_style_transform_angle(button, 900, 0);
         lv_obj_clear_flag(button, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_set_style_radius(button, 4, 0);
         lv_obj_set_style_bg_opa(button, LV_OPA_COVER, 0);
