@@ -23,3 +23,4 @@ Generate fixtures with `python3 LVGL/reader/generate_document_samples.py` (stdli
 Tests recorded in WORKTREE_CHANGELOG.md. Menu integration and interactive candidate installed, not three-cold-boot stable acceptance.
 
 Reader directory memory: launcher exports READER_PATH_STATE, default /root/roms/.reader-last-directory on SD. Browser atomically saves each successfully opened directory (same path skips write); next application launch restores that directory, not the last file or reading page. Missing/invalid/unavailable directory falls back to /root/roms. Explicit READER_START_DIR overrides remembered state. Save errors are nonfatal; optional READER_PATH_STATE can isolate tests. No per-frame memory writes.
+Regression: run sh test-directory-memory.sh on board only after stopping the menu/app display owner. Uses isolated SD state, actual timed browser launches, cleanup trap. Restore menu service after test; does not modify normal remembered directory.
