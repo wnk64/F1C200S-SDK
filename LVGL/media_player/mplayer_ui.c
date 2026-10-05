@@ -20,6 +20,7 @@ static volatile sig_atomic_t quit;
 static double duration, position, seek_target;
 static int paused, volume = 100, shown, dragging, seeking, ready, failed;
 static int reported_volume = -1;
+static double reported_volume_exact = -1;
 static uint64_t activity, seek_started;
 static lv_obj_t *controls, *play_button, *play_label, *seek_slider, *volume_slider, *time_label;
 static void visibility(int visible)
@@ -48,9 +49,10 @@ static void response(const char *line)
     double number;
     if (value(line, "ANS_LENGTH=", &number) == 1) duration = number;
     else if (value(line, "ANS_volume=", &number) == 1 && number <= 100) {
-        reported_volume = (int)number;
+        reported_volume_exact = number;
+        reported_volume = (int)lround(number);
         if (!lv_slider_is_dragged(volume_slider)) {
-            volume = (int)number; lv_slider_set_value(volume_slider, volume, LV_ANIM_OFF);
+            volume = reported_volume; lv_slider_set_value(volume_slider, volume, LV_ANIM_OFF);
         }
     }
 }
@@ -288,8 +290,10 @@ int main(int argc, char **argv)
                 lv_event_send(volume_slider, LV_EVENT_VALUE_CHANGED, NULL);
                 stage = 3; stage_started = now;
             } else if (stage == 3 && now - stage_started >= 1000) {
-                if (reported_volume != 30) { fprintf(stderr, "UI volume not acknowledged=%d\n", reported_volume); failed = 1; break; }
-                fprintf(stderr, "MPLAYER UI volume acknowledged=30\n");
+                if (reported_volume != 30 || fabs(reported_volume_exact - 30) > 0.1) {
+                    fprintf(stderr, "UI volume not acknowledged=%.6f\n", reported_volume_exact); failed = 1; break;
+                }
+                fprintf(stderr, "MPLAYER UI volume acknowledged=%.6f\n", reported_volume_exact);
                 lv_event_send(seek_slider, LV_EVENT_PRESSED, NULL);
                 lv_slider_set_value(seek_slider, 500, LV_ANIM_OFF);
                 lv_event_send(seek_slider, LV_EVENT_VALUE_CHANGED, NULL);

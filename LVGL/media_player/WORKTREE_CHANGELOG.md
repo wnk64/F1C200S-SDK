@@ -20,3 +20,5 @@ Build: frontend ELF needs libdrm/libm/libc only; no SDL. Backendff93fecb429f642f
 Files: mplayer_ui.c startup/pipe failure handling and selftest flag; parser selftest rejects malformed/nonfinite replies.
 Selftest: explicitly MPLAYER_UI_SELFTEST=1; pause stability, actual volume acknowledgement, drag-controller seek and target-frame readiness, hide request, exit/cleanup. Synthetic LVGL actions do not prove real touchscreen or visible hide.
 Default: no selftest,10s idle hide; control widgets hidden when OSD hidden; progress redraw4Hz.
+First board selftest: parser PASS, actual frame received, pause stable0.366s; volume displayed29 versus request30 because float truncation, exit1/menu restored. No leak: pool live0.
+Planned mplayer_ui.c: round float volume for integer slider, retain full double acknowledgement and require within0.1percent of requested30; no fake acknowledgement or relaxed playback-frame check.
