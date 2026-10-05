@@ -12,7 +12,7 @@ CFLAGS := -Os -Wall -Wextra -ffunction-sections -fdata-sections -MMD -MP -D_FILE
 CFLAGS += -DLV_CONF_INCLUDE_SIMPLE -I$(MENU) -I$(ROOT)/LVGL/touch -I$(LV)
 CFLAGS += -I$(HOST)/arm-buildroot-linux-gnueabi/sysroot/usr/include/freetype2
 LIBS := -lpng -ljpeg -lfreetype -lm -lpthread
-all: libons-native.a libons-script.a native-tests native-event-tests ons-native-probe ons-script-probe
+all: libons-native.a libons-script.a native-tests native-event-tests native-sprite-tests ons-native-probe ons-script-probe
 .PHONY: verify-script-source
 verify-script-source:
 	sha256sum -c source-baseline.sha256
@@ -39,7 +39,7 @@ build/%.o: %.c native.h
 build/platform.o: $(MENU)/platform.c $(MENU)/platform.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $<
-libons-native.a: build/native.o build/archive.o build/gbk.o build/events.o
+libons-native.a: build/native.o build/archive.o build/gbk.o build/events.o build/sprite.o
 	$(AR) rcs $@ $^
 native-tests: build/tests.o build/native.o build/archive.o build/gbk.o
 	$(CC) -Wl,--gc-sections -o $@ $^ $(LIBS)
@@ -47,6 +47,10 @@ build/events.o: events.h
 build/event_tests.o: events.h
 native-event-tests: build/event_tests.o build/events.o
 	$(CC) -Wl,--gc-sections -o $@ $^ -lpthread
+build/sprite.o: sprite.h
+build/sprite_tests.o: sprite.h
+native-sprite-tests: build/sprite_tests.o build/sprite.o build/native.o build/gbk.o
+	$(CC) -Wl,--gc-sections -o $@ $^ $(LIBS)
 ons-native-probe: build/probe.o build/native.o build/archive.o build/gbk.o build/platform.o $(OBJECTS)
 	$(CC) -Wl,--gc-sections -o $@ $^ $(LIBS)
 -include $(wildcard build/*.d) $(OBJECTS:.o=.d)

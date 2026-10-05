@@ -6,3 +6,4 @@ native-tests
 *.a
 ons-script-probe
 native-event-tests
+native-sprite-tests
