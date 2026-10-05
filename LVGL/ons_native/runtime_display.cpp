@@ -48,6 +48,9 @@ uint32_t ons_rt_GetTicks(void) { return (uint32_t)(milliseconds() - origin); }
 int ons_rt_PushEvent(ons_rt_Event *event)
 {
     if (!event || event->type >= 32) return -1;
+    if (std::getenv("ONS_NATIVE_INPUT_DEBUG") &&
+        (event->type == ons_rt_MOUSEBUTTONDOWN || event->type == ons_rt_MOUSEBUTTONUP || event->type == ons_rt_QUIT))
+        std::fprintf(stderr, "Native input type=%u x=%d y=%d\n", event->type, event->button.x, event->button.y);
     pthread_mutex_lock(&lock);
     if (ending || queued == 128) { pthread_mutex_unlock(&lock); failure("Native event queue full or closed"); return -1; }
     if (event->type == ons_rt_MOUSEMOTION && queued && pending[queued - 1].type == ons_rt_MOUSEMOTION)
