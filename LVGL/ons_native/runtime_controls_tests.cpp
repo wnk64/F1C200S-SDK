@@ -18,7 +18,7 @@ int main()
         lv_obj_t *button = lv_obj_get_child(bar, i); lv_obj_get_coords(button, &bounds);
         assert(bounds.y1 >= 720 && bounds.y2 <= 799 && bounds.x1 >= 0 && bounds.x2 <= 479);
         assert(!lv_obj_get_style_shadow_width(button, LV_PART_MAIN));
-        assert(lv_obj_get_style_transform_angle(button, LV_PART_MAIN) == 900);
+        assert(lv_obj_get_child_cnt(button) == 0);
         assert(lv_event_send(button, LV_EVENT_CLICKED, NULL) == LV_RES_OK);
         int count = ons_rt_PeepEvents(events, 128, ons_rt_GETEVENT, ons_rt_ALLEVENTS);
         if (i < 5) {

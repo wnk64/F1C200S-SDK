@@ -1,6 +1,7 @@
 #include "engine_runtime.h"
 extern "C" {
 #include "platform.h"
+#include "src/draw/sw/lv_draw_sw.h"
 }
 #include <pthread.h>
 #include <cstdlib>
@@ -29,6 +30,7 @@ static unsigned queued;
 static ons_surface *screen;
 static lv_obj_t *canvas;
 static lv_obj_t *controls;
+static lv_color_t control_pixels[6][64 * 64];
 static uint64_t tick, origin;
 static int mouse_x, mouse_y, mouse_down, finger_down, captured;
 static int cursor_visible;
@@ -173,6 +175,44 @@ static void control_clicked(lv_event_t *event)
     } else failure("Native control key queue full or closed");
     pthread_mutex_unlock(&lock);
 }
+static void paint_control(unsigned index, const char *symbol, const char *name)
+{
+    lv_color_t pixels[64 * 64];
+    for (unsigned i = 0; i < 64 * 64; ++i) pixels[i] = lv_color_black();
+    lv_draw_sw_ctx_t context; lv_draw_sw_init_ctx(NULL, &context.base_draw);
+    lv_area_t area = {0, 0, 63, 63};
+    context.base_draw.buf = pixels; context.base_draw.buf_area = &area; context.base_draw.clip_area = &area;
+    lv_draw_rect_dsc_t rectangle; lv_draw_rect_dsc_init(&rectangle);
+    rectangle.bg_color = lv_color_hex(0x24343d); rectangle.bg_opa = LV_OPA_COVER; rectangle.radius = 4;
+    lv_draw_rect(&context.base_draw, &rectangle, &area);
+    lv_draw_label_dsc_t label; lv_draw_label_dsc_init(&label);
+    label.color = lv_color_white(); label.align = LV_TEXT_ALIGN_CENTER;
+    label.font = &lv_font_montserrat_24;
+    lv_area_t icon = {0, 7, 63, 34}; lv_draw_label(&context.base_draw, &label, &icon, symbol, NULL);
+    label.font = &lv_font_montserrat_16;
+    lv_area_t caption = {0, 40, 63, 62}; lv_draw_label(&context.base_draw, &label, &caption, name, NULL);
+    for (unsigned y = 0; y < 64; ++y)
+        for (unsigned x = 0; x < 64; ++x) control_pixels[index][x * 64 + 63 - y] = pixels[y * 64 + x];
+    lv_draw_sw_deinit_ctx(NULL, &context.base_draw);
+}
+static void draw_control(lv_event_t *event)
+{
+    unsigned index = (unsigned)(uintptr_t)lv_event_get_user_data(event);
+    lv_obj_t *button = lv_event_get_target(event); lv_area_t bounds, clip;
+    lv_obj_get_coords(button, &bounds);
+    lv_draw_ctx_t *context = lv_event_get_draw_ctx(event);
+    if (!_lv_area_intersect(&clip, &bounds, context->clip_area)) return;
+    int stride = lv_area_get_width(context->buf_area);
+    lv_color_t base = lv_color_hex(0x24343d), pressed = lv_color_hex(0x405a64);
+    bool down = lv_obj_has_state(button, LV_STATE_PRESSED);
+    for (int y = clip.y1; y <= clip.y2; ++y) {
+        lv_color_t *output = (lv_color_t *)context->buf + (y - context->buf_area->y1) * stride;
+        for (int x = clip.x1; x <= clip.x2; ++x) {
+            lv_color_t pixel = control_pixels[index][(y - bounds.y1) * 64 + x - bounds.x1];
+            output[x - context->buf_area->x1] = down && pixel.full == base.full ? pressed : pixel;
+        }
+    }
+}
 static void create_controls()
 {
     const int margin = (800 - screen->w) / 2;
@@ -188,21 +228,13 @@ static void create_controls()
     for (unsigned i = 0; i < 6; ++i) {
         lv_obj_t *button = lv_btn_create(controls); lv_obj_remove_style_all(button);
         lv_obj_set_pos(button, 8 + i * 80, (margin - 64) / 2); lv_obj_set_size(button, 64, 64);
-        // LVGL 8.2 rotates object layers about their center, including children.
-        lv_obj_set_style_transform_angle(button, 900, 0);
+        paint_control(i, symbols[i], names[i]);
         lv_obj_clear_flag(button, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_set_style_radius(button, 4, 0);
         lv_obj_set_style_bg_opa(button, LV_OPA_COVER, 0);
         lv_obj_set_style_bg_color(button, lv_color_hex(0x24343d), 0);
         lv_obj_set_style_bg_color(button, lv_color_hex(0x405a64), LV_STATE_PRESSED);
-        lv_obj_t *icon = lv_label_create(button); lv_label_set_text(icon, symbols[i]);
-        lv_obj_set_style_text_font(icon, &lv_font_montserrat_24, 0);
-        lv_obj_set_style_text_color(icon, lv_color_white(), 0);
-        lv_obj_align(icon, LV_ALIGN_TOP_MID, 0, 7);
-        lv_obj_t *label = lv_label_create(button); lv_label_set_text(label, names[i]);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_16, 0);
-        lv_obj_set_style_text_color(label, lv_color_white(), 0);
-        lv_obj_align(label, LV_ALIGN_BOTTOM_MID, 0, -7);
+        lv_obj_add_event_cb(button, draw_control, LV_EVENT_DRAW_MAIN, (void *)(uintptr_t)i);
         lv_obj_add_event_cb(button, keys[i] ? control_clicked : exit_clicked, LV_EVENT_CLICKED, (void *)(intptr_t)keys[i]);
     }
 }
