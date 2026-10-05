@@ -24,7 +24,7 @@ static lv_point_t press_point, injected_point;
 static uint64_t pressed_at, ui_activity;
 static uint16_t *pixels;
 static lv_img_dsc_t descriptor;
-static void stop(int signal){(void)signal;quit=1;}
+static void stop(int signal){quit=signal;}
 static lv_obj_t *label(lv_obj_t *parent,const char *value,int x,int y,int width)
 {
     lv_obj_t *o=lv_label_create(parent);lv_obj_set_pos(o,x,y);lv_obj_set_width(o,width);
@@ -150,6 +150,7 @@ static void test_touch(int x1,int y1,int x2,int y2)
 static void timer_ui_test(lv_timer_t *timer)
 {
     test_touch(240,400,240,400);
+    fprintf(stderr,"READER timer tap shown=%d activity=%llu\n",shown,(unsigned long long)ui_activity);
     lv_timer_del(timer);
 }
 static int gesture_selftest(void)
@@ -270,6 +271,7 @@ int main(int argc,char **argv)
         if(selftest&&is_document&&stage==2&&now-started>1500){if(document_reflowable())lv_event_send(mode,LV_EVENT_CLICKED,NULL);if(!pixels||page<0||page>=document_pages()){stage=-1;}else puts("READER document next/previous/reflow PASS");quit=1;}
         if(test_ms&&now-started>=test_ms)quit=1;
         usleep(delay*1000);}
+    if(timer_test)fprintf(stderr,"READER timer exit quit=%d stage=%d seen=%d done=%d age=%llu\n",quit,stage,timer_seen,timer_done,(unsigned long long)(platform_ms()-started));
     if(picture)lv_obj_del(picture);
     free(pixels);text_close();document_close();platform_close();menu_font_stream_close();return stage<0||(timer_test&&!timer_done)?1:0;
 }
