@@ -1,7 +1,8 @@
 /KERNEL/
 /ROOTFS/
 /UBOOT/
-/SOFTWARE/
+/SOFTWARE/*
+!/SOFTWARE/mplayer-cedar/
 /records/
 /DRIVER/aic8800-ugreen-v14/
 /DRIVER/rtl8723-support/
