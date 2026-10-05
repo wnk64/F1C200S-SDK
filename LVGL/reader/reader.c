@@ -217,8 +217,10 @@ int main(int argc,char **argv)
         if(selftest&&!visibility_checked&&now-started>250){
             uint16_t *before=pixels;
             test_touch(240,400,240,400);
+            lv_refr_now(NULL);
             if(!shown||lv_obj_has_flag(ui_layer,LV_OBJ_FLAG_HIDDEN)){stage=-1;quit=1;}
             test_touch(240,400,240,400);
+            lv_refr_now(NULL);
             if(shown||!lv_obj_has_flag(ui_layer,LV_OBJ_FLAG_HIDDEN)||pixels!=before){stage=-1;quit=1;}
             visibility_checked=1;fprintf(stderr,"READER center tap show/hide without redecode %s\n",quit?"FAIL":"PASS");
         }
