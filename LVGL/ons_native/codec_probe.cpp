@@ -1,6 +1,7 @@
 extern "C" {
 #include "native.h"
 }
+#define ONS_VORBIS_RAW_OPEN
 #include "vorbis_backend.h"
 #include <algorithm>
 #include <cstdio>

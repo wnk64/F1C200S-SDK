@@ -4,6 +4,21 @@
 #ifdef ONS_USE_TREMOR
 #include "ivorbisfile.h"
 #include <math.h>
+// This legacy Tremor requires an explicit PCM origin for short seekable files.
+static inline int ons_vorbis_open_callbacks(void *input, OggVorbis_File *file,
+                                            char *initial, long bytes,
+                                            ov_callbacks callbacks)
+{
+    int result = ov_open_callbacks(input, file, initial, bytes, callbacks);
+    if (!result && ov_seekable(file)) {
+        result = ov_pcm_seek(file, 0);
+        if (result) ov_clear(file);
+    }
+    return result;
+}
+#ifndef ONS_VORBIS_RAW_OPEN
+#define ov_open_callbacks ons_vorbis_open_callbacks
+#endif
 // Tremor emits native-endian signed 16-bit PCM; the board is little-endian.
 static inline long ons_vorbis_read(OggVorbis_File *file, char *output, int bytes,
                                   int endian, int word, int signed_pcm, int *section)
