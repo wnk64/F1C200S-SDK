@@ -33,6 +33,10 @@ Build: make -C LVGL/ons_native -j2 all ons-lvgl, existing GCC 6.4 Buildroot tool
 Protected: kernel, drivers, Miracast/player, network/audio services, user game/save data unchanged.
 Evidence: prior full-engine user feedback works; profile title-only RSS19616KiB/PSS18235KiB, 90s audio3938304frames/1underrun. Not stable; cold-boot gate pending.
 Decision: pending; archive and remote source verification required before decoder changes.
+Baseline preservation: commit8bc3ab7; subtree43787d706436caafb061468539f3be6d875e5a0b verified on GitHub wnk64/f1c200s-extras, ons-native-lvgl-candidate-20261005.
+Archive: /home/wnk/F1C200S_host_archive/ons/ons-native-source-8bc3ab7.tar, SHA25680eac229492d98f904e3f8d2361da5a9c506ee6ed335288087670c1067f64007.
+Planned decoder files: Makefile.tremor, vorbis_backend.h, prepare_engine.py, runtime_mixer.cpp, .gitignore; independent integer targets, no original engine edits.
+Build: make -f Makefile.tremor -j2 ons-lvgl-tremor native-runtime-mixer-tests-tremor succeeded; deploy/tests pending.
 
 ## 2026-10-02 pending / managed pool allocation and menu recovery verified
 Source98f6254, same helper/launcher f3333ad4/fe515f1c and supervisorc4a414cf.

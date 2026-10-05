@@ -61,6 +61,7 @@ for name, text in sources.items():
     text = pattern.sub(lambda match: names[match.group(0)], text)
     text = re.sub(r"\b(?:SDLK_[A-Za-z0-9_]+|SDLKey|SDLCALL|(?:SDL|IMG|TTF|Mix|MIX)_[A-Za-z0-9_]+)\b", runtime_name, text)
     if name == "ONScripter_sound.cpp":
+        text = text.replace("#include <vorbis/vorbisfile.h>", '#include "vorbis_backend.h"')
         start = text.index('        FILE *gbk_music_fp = ::fopen(ONS_GBK_MUSIC_TMP_FILE, "wb");')
         end = text.index("        ons_mix_VolumeMusic( music_volume );", start)
         text = text[:start] + "        music_info = ons_mix_LoadMUS_RW(ons_rt_RWFromMem(buffer, length));\n" + text[end:]

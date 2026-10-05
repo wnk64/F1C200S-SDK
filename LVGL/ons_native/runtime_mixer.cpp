@@ -1,6 +1,6 @@
 #include "engine_runtime.h"
 #include <alsa/asoundlib.h>
-#include <vorbis/vorbisfile.h>
+#include "vorbis_backend.h"
 #include <pthread.h>
 #include <atomic>
 #include <vector>

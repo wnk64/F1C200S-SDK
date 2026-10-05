@@ -1,0 +1,22 @@
+include Makefile
+
+TREMOR := vendor/tremor
+TREMOR_FILES := mdct block window synthesis info floor1 floor0 vorbisfile res012 mapping0 registry codebook sharedbook framing bitwise
+TREMOR_OBJECTS := $(addprefix build/tremor/,$(addsuffix .o,$(TREMOR_FILES)))
+TREMOR_FLAGS := -O2 -Wall -ffunction-sections -fdata-sections -MMD -MP -DONS_USE_TREMOR -I. -I$(TREMOR)
+
+build/tremor/%.o: $(TREMOR)/%.c
+	@mkdir -p $(@D)
+	$(CC) $(TREMOR_FLAGS) -c -o $@ $<
+build/tremor/runtime_mixer.o: runtime_mixer.cpp engine_runtime.h vorbis_backend.h
+	@mkdir -p $(@D)
+	$(CXX) $(TREMOR_FLAGS) -c -o $@ $<
+build/tremor/ONScripter_sound.o: build/engine/generated.stamp engine_runtime.h vorbis_backend.h
+	@mkdir -p $(@D)
+	$(CXX) $(TREMOR_FLAGS) -funsigned-char -fno-strict-aliasing -DCHARSET_GBK -DLINUX -DPDA_AUTOSIZE -D_FILE_OFFSET_BITS=64 -Ibuild/engine -I$(ENGINE) -I$(EXT)/include -c -o $@ build/engine/ONScripter_sound.cpp
+ons-lvgl-tremor: build/native_main.o $(filter-out build/engine/ONScripter_sound.o,$(EXECUTION_OBJECTS)) build/tremor/ONScripter_sound.o build/runtime_image.o build/runtime_display.o build/tremor/runtime_mixer.o $(TREMOR_OBJECTS) build/platform.o $(OBJECTS) libons-commands.a libons-native.a
+	$(CXX) -Wl,--gc-sections -o $@ $^ $(EXT)/lib/libbz2.a $(LIBS) -lasound
+native-runtime-mixer-tests-tremor: build/runtime_mixer_tests.o build/tremor/runtime_mixer.o $(TREMOR_OBJECTS) build/runtime_image.o libons-native.a
+	$(CXX) -Wl,--gc-sections -o $@ $^ $(LIBS) -lasound
+
+-include $(TREMOR_OBJECTS:.o=.d) build/tremor/runtime_mixer.d build/tremor/ONScripter_sound.d
