@@ -28,6 +28,7 @@ static ons_rt_Event pending[128];
 static unsigned queued;
 static ons_surface *screen;
 static lv_obj_t *canvas;
+static lv_obj_t *controls;
 static uint64_t tick, origin;
 static int mouse_x, mouse_y, mouse_down, finger_down, captured;
 static int cursor_visible;
@@ -121,7 +122,7 @@ void ons_rt_Quit(void)
     if (!initialized) return;
     pthread_mutex_lock(&lock); ending = true; pthread_cond_broadcast(&changed); pthread_mutex_unlock(&lock);
     if (timer_started) { pthread_join(timer_thread, NULL); timer_started = false; }
-    if (display_opened) { platform_close(); display_opened = false; canvas = NULL; }
+    if (display_opened) { platform_close(); display_opened = false; canvas = controls = NULL; }
     ons_surface_free(screen); screen = NULL;
     initialized = false;
 }
@@ -158,6 +159,51 @@ static void draw(lv_event_t *event)
     }
 }
 static void exit_clicked(lv_event_t *) { ons_rt_Event event = {}; event.type = ons_rt_QUIT; ons_rt_PushEvent(&event); }
+static void control_clicked(lv_event_t *event)
+{
+    int key = (int)(intptr_t)lv_event_get_user_data(event);
+    ons_rt_Event press = {}, release = {};
+    press.type = ons_rt_KEYDOWN; press.key.state = 1; press.key.keysym.sym = key;
+    release.type = ons_rt_KEYUP; release.key.keysym.sym = key;
+    // Reserve both events atomically so queue pressure cannot leave a key held.
+    pthread_mutex_lock(&lock);
+    if (!ending && queued <= 126) {
+        pending[queued++] = press; pending[queued++] = release;
+        pthread_cond_broadcast(&changed);
+    } else failure("Native control key queue full or closed");
+    pthread_mutex_unlock(&lock);
+}
+static void create_controls()
+{
+    const int margin = (800 - screen->w) / 2;
+    if (margin < 64) return;
+    controls = lv_obj_create(lv_scr_act()); lv_obj_remove_style_all(controls);
+    lv_obj_set_pos(controls, 0, 800 - margin); lv_obj_set_size(controls, 480, margin);
+    lv_obj_clear_flag(controls, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_bg_opa(controls, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(controls, lv_color_black(), 0);
+    const char *symbols[] = {LV_SYMBOL_LIST, LV_SYMBOL_PREV, LV_SYMBOL_PLAY, LV_SYMBOL_NEXT, LV_SYMBOL_EDIT, LV_SYMBOL_CLOSE};
+    const char *names[] = {"Menu", "History", "Auto", "Skip", "Speed", "Exit"};
+    const int keys[] = {ONSK_ESCAPE, ONSK_LEFT, ONSK_a, ONSK_s, ONSK_0, 0};
+    for (unsigned i = 0; i < 6; ++i) {
+        lv_obj_t *button = lv_btn_create(controls); lv_obj_remove_style_all(button);
+        lv_obj_set_pos(button, 8 + i * 80, (margin - 64) / 2); lv_obj_set_size(button, 64, 64);
+        lv_obj_clear_flag(button, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_style_radius(button, 4, 0);
+        lv_obj_set_style_bg_opa(button, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color(button, lv_color_hex(0x24343d), 0);
+        lv_obj_set_style_bg_color(button, lv_color_hex(0x405a64), LV_STATE_PRESSED);
+        lv_obj_t *icon = lv_label_create(button); lv_label_set_text(icon, symbols[i]);
+        lv_obj_set_style_text_font(icon, &lv_font_montserrat_24, 0);
+        lv_obj_set_style_text_color(icon, lv_color_white(), 0);
+        lv_obj_align(icon, LV_ALIGN_TOP_MID, 0, 7);
+        lv_obj_t *label = lv_label_create(button); lv_label_set_text(label, names[i]);
+        lv_obj_set_style_text_font(label, &lv_font_montserrat_16, 0);
+        lv_obj_set_style_text_color(label, lv_color_white(), 0);
+        lv_obj_align(label, LV_ALIGN_BOTTOM_MID, 0, -7);
+        lv_obj_add_event_cb(button, keys[i] ? control_clicked : exit_clicked, LV_EVENT_CLICKED, (void *)(intptr_t)keys[i]);
+    }
+}
 ons_surface *ons_rt_SetVideoMode(int w, int h, int depth, uint32_t)
 {
     if (!initialized || depth != 32 || w < 1 || w > 800 || h < 1 || h > 480) { failure("Native viewport must fit 800x480 in ARGB8888"); return NULL; }
@@ -167,11 +213,7 @@ ons_surface *ons_rt_SetVideoMode(int w, int h, int depth, uint32_t)
     display_opened = true; tick = milliseconds();
     canvas = lv_obj_create(lv_scr_act()); lv_obj_remove_style_all(canvas); lv_obj_set_size(canvas, 480, 800);
     lv_obj_clear_flag(canvas, LV_OBJ_FLAG_CLICKABLE); lv_obj_add_event_cb(canvas, draw, LV_EVENT_DRAW_MAIN, NULL);
-    lv_obj_t *button = lv_btn_create(lv_scr_act()); lv_obj_set_pos(button, 388, 720); lv_obj_set_size(button, 80, 80);
-    lv_obj_set_style_bg_opa(button, LV_OPA_COVER, 0); lv_obj_set_style_bg_color(button, lv_color_hex(0x24343d), 0);
-    lv_obj_t *label = lv_label_create(button); lv_label_set_text(label, LV_SYMBOL_CLOSE);
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_32, 0); lv_obj_set_style_text_color(label, lv_color_white(), 0); lv_obj_center(label);
-    lv_obj_add_event_cb(button, exit_clicked, LV_EVENT_CLICKED, NULL);
+    create_controls();
     lv_obj_invalidate(canvas); lv_refr_now(NULL); return screen;
 }
 ons_rect **ons_rt_ListModes(ons_pixel_format *, uint32_t)
@@ -202,7 +244,7 @@ static void pump()
     }
     int x, y, down; platform_touch(&x, &y, &down);
     int sx = y - (800 - screen->w) / 2, sy = 479 - x - (480 - screen->h) / 2;
-    bool inside = sx >= 0 && sx < screen->w && sy >= 0 && sy < screen->h && !(x >= 388 && y >= 720);
+    bool inside = sx >= 0 && sx < screen->w && sy >= 0 && sy < screen->h;
     bool edge = down != finger_down; finger_down = down;
     if (!captured && !(edge && down && inside)) return;
     if (!inside) { sx = screen->w; sy = screen->h; }

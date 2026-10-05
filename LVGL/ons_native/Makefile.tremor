@@ -30,3 +30,7 @@ codec-probe-tremor: build/tremor/codec_probe.o $(TREMOR_OBJECTS) libons-native.a
 	$(CXX) -Wl,--gc-sections -o $@ $^ $(LIBS)
 codec-probe-float: build/codec_probe.o libons-native.a
 	$(CXX) -Wl,--gc-sections -o $@ $^ $(EXT)/lib/libvorbisfile.a $(EXT)/lib/libvorbis.a $(EXT)/lib/libogg.a $(LIBS)
+build/runtime_controls_tests.o: runtime_controls_tests.cpp engine_runtime.h
+	$(CXX) $(CFLAGS) -c -o $@ $<
+native-runtime-controls-tests: build/runtime_controls_tests.o build/runtime_display.o build/platform.o $(OBJECTS) libons-native.a
+	$(CXX) -Wl,--gc-sections -o $@ $^ $(LIBS)

@@ -20,3 +20,4 @@ ons-lvgl-tremor
 native-runtime-mixer-tests-tremor
 codec-probe-tremor
 codec-probe-float
+native-runtime-controls-tests
