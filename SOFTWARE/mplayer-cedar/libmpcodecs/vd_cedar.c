@@ -12,6 +12,7 @@
 #include "libmpcodecs/img_format.h"
 #include <memoryAdapter.h>
 #include <vdecoder.h>
+#include "f1c200s/cedar_cma_pool.h"
 
 static const vd_info_t info = {
     "Allwinner Cedar H.264 decoder",
@@ -25,6 +26,9 @@ typedef struct {
     VideoDecoder *decoder;
     struct ScMemOpsS *memops;
     int configured;
+    int memory_opened;
+    int rotate_90;
+    int debug;
     int avcc_nal_length_size;
     unsigned char *codec_data;
     int codec_data_len;
@@ -37,6 +41,7 @@ typedef struct {
 /* One MPlayer instance owns the Cedar display queue. */
 static VideoDecoder *cedar_display_decoder;
 static int cedar_plugins_loaded;
+extern void vo_cedar_release_picture(void);
 
 void vd_cedar_return_picture(void *picture)
 {
@@ -106,10 +111,17 @@ static int avcc_codec_data(vd_cedar_ctx *ctx, const unsigned char *avcc, int len
 
 static int control(sh_video_t *sh, int cmd, void *arg, ...)
 {
-    (void)sh;
+    vd_cedar_ctx *ctx = sh->context;
     (void)arg;
     if (cmd == VDCTRL_QUERY_FORMAT)
         return *((int *)arg) == IMGFMT_YV12;
+    if (cmd == VDCTRL_RESYNC_STREAM && ctx && ctx->configured) {
+        vo_cedar_release_picture();
+        ResetVideoDecoder(ctx->decoder);
+        ctx->fallback_pts = 0;
+        ctx->have_pts_base = 0;
+        return CONTROL_TRUE;
+    }
     return CONTROL_UNKNOWN;
 }
 
@@ -130,8 +142,30 @@ static int init(sh_video_t *sh)
     sh->context = ctx;
 
     ctx->memops = MemAdapterGetOpsS();
-    if (!ctx->memops || CdcMemOpen(ctx->memops) != 0)
+    if (!ctx->memops)
         goto fail;
+    {
+        const char *pool = getenv("CEDAR_CMA_POOL_MB");
+        if (pool && *pool) {
+            char *end;
+            long mb = strtol(pool, &end, 10);
+            if (*end || mb < 1 || mb > 16 ||
+                cedar_cma_pool_enable(ctx->memops, (size_t)mb * 1024 * 1024))
+                goto fail;
+        }
+    }
+    if (CdcMemOpen(ctx->memops) < 0)
+        goto fail;
+    ctx->memory_opened = 1;
+    {
+        const char *rotate = getenv("CEDAR_ROTATE"), *debug = getenv("CEDAR_DEBUG");
+        if (rotate && *rotate && strcmp(rotate, "0") && strcmp(rotate, "90")) {
+            mp_msg(MSGT_DECVIDEO, MSGL_ERR, "[cedar] CEDAR_ROTATE requires 0 or 90\n");
+            goto fail;
+        }
+        ctx->rotate_90 = rotate && !strcmp(rotate, "90");
+        ctx->debug = debug && !strcmp(debug, "1");
+    }
 
     if (!cedar_plugins_loaded) {
         AddVDPlugin();
@@ -168,15 +202,18 @@ static int init(sh_video_t *sh)
     config.eOutputPixelFormat = PIXEL_FORMAT_YUV_MB32_420;
     /* 720p must fit in the board's fixed 16 MiB CMA pool. */
     config.nDeInterlaceHoldingFrameBufferNum = 0;
-    config.nDisplayHoldingFrameBufferNum = 1;
+    config.nDisplayHoldingFrameBufferNum = 0;
     config.nRotateHoldingFrameBufferNum = 0;
     config.nDecodeSmoothFrameBufferNum = 0;
     config.memops = ctx->memops;
     config.nVbvBufferSize = 1024 * 1024;
+    config.bRotationEn = ctx->rotate_90;
+    config.nRotateDegree = ctx->rotate_90 ? 1 : 0;
 
     if (InitializeVideoDecoder(ctx->decoder, &info, &config) != 0)
         goto fail;
-    if (!mpcodecs_config_vo(sh, sh->disp_w, sh->disp_h, IMGFMT_YV12))
+    if (!mpcodecs_config_vo(sh, ctx->rotate_90 ? info.nHeight : info.nWidth,
+                            ctx->rotate_90 ? info.nWidth : info.nHeight, IMGFMT_YV12))
         goto fail;
 
     ctx->configured = 1;
@@ -186,7 +223,7 @@ static int init(sh_video_t *sh)
 fail:
     if (ctx->decoder)
         DestroyVideoDecoder(ctx->decoder);
-    if (ctx->memops)
+    if (ctx->memory_opened)
         CdcMemClose(ctx->memops);
     free(ctx->codec_data);
     free(ctx);
@@ -199,11 +236,12 @@ static void uninit(sh_video_t *sh)
     vd_cedar_ctx *ctx = sh->context;
     if (!ctx)
         return;
+    vo_cedar_release_picture();
     if (cedar_display_decoder == ctx->decoder)
         cedar_display_decoder = NULL;
     if (ctx->decoder)
         DestroyVideoDecoder(ctx->decoder);
-    if (ctx->memops)
+    if (ctx->memory_opened)
         CdcMemClose(ctx->memops);
     free(ctx->codec_data);
     free(ctx);
@@ -288,7 +326,7 @@ static int submit_packet(vd_cedar_ctx *ctx, sh_video_t *sh, void *data, int len)
     if (!ctx->have_pts_base) {
         ctx->pts_base = input_pts;
         ctx->have_pts_base = 1;
-        mp_msg(MSGT_DECVIDEO, MSGL_INFO,
+        if (ctx->debug) mp_msg(MSGT_DECVIDEO, MSGL_INFO,
                "[cedar] normalizing PTS base %lld us\\n",
                (long long)ctx->pts_base);
     }
@@ -300,7 +338,7 @@ static int submit_packet(vd_cedar_ctx *ctx, sh_video_t *sh, void *data, int len)
     packet.bIsLastPart = 1;
     {
         int submit_result = SubmitVideoStreamData(ctx->decoder, &packet, 0);
-        if (ctx->trace_decode_calls <= 40 || (ctx->trace_decode_calls % 300) == 0)
+        if (ctx->debug && (ctx->trace_decode_calls <= 40 || (ctx->trace_decode_calls % 300) == 0))
             mp_msg(MSGT_DECVIDEO, MSGL_INFO, "[cedar] packet #%u len=%d pts=%lld submit=%d\\n", ctx->trace_decode_calls, stream_len, (long long)packet.nPts, submit_result);
         return submit_result;
     }
@@ -340,7 +378,7 @@ static mp_image_t *decode(sh_video_t *sh, void *data, int len, int flags)
             usleep(1000);
         }
     }
-    if (ctx->trace_decode_calls <= 40 || (ctx->trace_decode_calls % 300) == 0)
+    if (ctx->debug && (ctx->trace_decode_calls <= 40 || (ctx->trace_decode_calls % 300) == 0))
         mp_msg(MSGT_DECVIDEO, MSGL_INFO,
                "[cedar] decode #%u data=%d attempts=%d result=%d valid=%d\\n",
                ctx->trace_decode_calls, data ? len : 0, attempt + 1, result,

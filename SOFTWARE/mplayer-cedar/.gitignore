@@ -28,5 +28,6 @@ ffmpeg/libavfilter/filter_list.c
 ffmpeg/libavdevice/indev_list.c
 ffmpeg/libavdevice/outdev_list.c
 __pycache__/
+build-outputs/
 .stamp_*
 .files-list.txt

@@ -46,12 +46,23 @@ static const vo_info_t info = {
 
 const LIBVO_EXTERN(cedar_drm)
 
-enum display_mode { DISPLAY_FIT, DISPLAY_STRETCH, DISPLAY_CROP };
+enum display_mode { DISPLAY_FIT, DISPLAY_STRETCH, DISPLAY_CROP, DISPLAY_NATIVE };
 static int drm_fd = -1;
 static int screen_w, screen_h, source_w, source_h;
 static int view_x, view_y, view_w, view_h;
 static enum display_mode display_mode = DISPLAY_FIT;
 static void *displayed_picture;
+static void *retired_picture;
+
+void vo_cedar_release_picture(void)
+{
+    if (retired_picture)
+        vd_cedar_return_picture(retired_picture);
+    retired_picture = NULL;
+    if (displayed_picture)
+        vd_cedar_return_picture(displayed_picture);
+    displayed_picture = NULL;
+}
 
 static uint32_t pack_size(int w, int h)
 {
@@ -108,6 +119,8 @@ static int preinit(const char *arg)
         display_mode = DISPLAY_STRETCH;
     else if (!strcmp(arg, "crop"))
         display_mode = DISPLAY_CROP;
+    else if (!strcmp(arg, "native"))
+        display_mode = DISPLAY_NATIVE;
     else
         return ENOSYS;
     drm_fd = open("/dev/dri/card0", O_RDWR);
@@ -157,6 +170,11 @@ static int config(uint32_t width, uint32_t height, uint32_t d_width,
     }
     if (display_mode == DISPLAY_CROP)
         return submit_crop_view() ? 1 : 0;
+    if (display_mode == DISPLAY_NATIVE) {
+        view_w = source_w; view_h = source_h;
+        view_x = (screen_w - source_w) / 2;
+        view_y = (screen_h - source_h) / 2;
+    }
     return submit_view() ? 1 : 0;
 }
 
@@ -172,6 +190,18 @@ static int control(uint32_t request, void *data)
     mpi = data;
     if (!mpi || !mpi->priv)
         return VO_FALSE;
+    if (retired_picture) {
+        drmVBlank blank;
+        memset(&blank, 0, sizeof(blank));
+        blank.request.type = DRM_VBLANK_RELATIVE;
+        blank.request.sequence = 1;
+        if (drmWaitVBlank(drm_fd, &blank) < 0) {
+            vd_cedar_return_picture(mpi->priv);
+            return VO_FALSE;
+        }
+        vd_cedar_return_picture(retired_picture);
+        retired_picture = NULL;
+    }
     memset(commands, 0, sizeof(commands));
     commands[0].layer_id = 0;
     commands[0].type = DRM_SRGN_MOUNT_FB_YUV;
@@ -182,9 +212,21 @@ static int control(uint32_t request, void *data)
     commit.data = (uint32_t)(uintptr_t)commands;
     if (drmIoctl(drm_fd, DRM_IOCTL_SRGN_ATOMIC_COMMIT, &commit) < 0)
         return VO_FALSE;
-    if (displayed_picture)
-        vd_cedar_return_picture(displayed_picture);
+    retired_picture = displayed_picture;
     displayed_picture = mpi->priv;
+    {
+        drmVBlank blank;
+        memset(&blank, 0, sizeof(blank));
+        blank.request.type = DRM_VBLANK_RELATIVE;
+        blank.request.sequence = 1;
+        if (drmWaitVBlank(drm_fd, &blank) < 0) {
+            mp_msg(MSGT_VO, MSGL_ERR, "[cedar_drm] vblank wait failed\n");
+            return VO_TRUE;
+        }
+    }
+    if (retired_picture)
+        vd_cedar_return_picture(retired_picture);
+    retired_picture = NULL;
     return VO_TRUE;
 }
 
@@ -194,9 +236,7 @@ static void check_events(void) { }
 
 static void uninit(void)
 {
-    if (displayed_picture)
-        vd_cedar_return_picture(displayed_picture);
-    displayed_picture = NULL;
+    vo_cedar_release_picture();
     if (drm_fd >= 0)
         close(drm_fd);
     drm_fd = -1;

@@ -617,6 +617,7 @@ SRCS_MPLAYER = command.c                \
                $(SRCS_MPLAYER-yes)
 
 SRCS_MPLAYER += libmpcodecs/vd_cedar.c libvo/vo_cedar_drm.c
+SRCS_MPLAYER += f1c200s/cedar_cma_pool.c
 
 #MEncoder
 SRCS_MENCODER-$(FAAC)             += libmpcodecs/ae_faac.c
