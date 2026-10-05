@@ -10,6 +10,8 @@ int main(int argc, char **argv)
     ons_rect from = {0, 0, 3, 1}, to = {1, 0, 0, 0};
     assert(!ons_rt_BlitSurface(surface, &from, surface, &to));
     assert(surface->pixels[0] == 0 && surface->pixels[1] == 0 && surface->pixels[2] == 0xffff0000 && surface->pixels[3] == 0xffff0000);
+    from = (ons_rect){0, 0, 4, 1}; to = (ons_rect){0, 1, 0, 0};
+    assert(!ons_rt_BlitSurface(surface, &from, surface, &to) && surface->pixels[6] == 0xffff0000);
     ons_rect outside = {INT_MAX, INT_MIN, INT_MAX, INT_MAX}; assert(!ons_rt_FillRect(surface, &outside, 0xffffffff));
     ons_surface *small = ons_surface_create(0, 4, 2, 16, 0xf800, 0x7e0, 31, 0); assert(small);
     ons_surface *converted = ons_rt_ConvertSurface(surface, small->format, 0); assert(converted);

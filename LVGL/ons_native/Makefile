@@ -40,7 +40,7 @@ execution-objects: $(EXECUTION_OBJECTS)
 build/native_main.o: native_main.cpp build/engine/generated.stamp engine_runtime.h
 	$(CXX) -O2 -Wall -funsigned-char -MMD -MP -DCHARSET_GBK -DLINUX -I. -Ibuild/engine -c -o $@ $<
 # Link intentionally fails until all native runtime contracts have implementations.
-ons-lvgl: build/native_main.o $(EXECUTION_OBJECTS) libons-commands.a libons-native.a
+ons-lvgl: build/native_main.o $(EXECUTION_OBJECTS) build/runtime_image.o libons-commands.a libons-native.a
 	$(CXX) -Wl,--gc-sections -o $@ $^ $(EXT)/lib/libvorbisfile.a $(EXT)/lib/libvorbis.a $(EXT)/lib/libogg.a $(EXT)/lib/libbz2.a $(LIBS) -lasound
 build/runtime_image.o: runtime_image.cpp engine_runtime.h
 	$(CXX) -O2 -Wall -ffunction-sections -fdata-sections -MMD -MP -c -o $@ $<

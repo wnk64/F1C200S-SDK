@@ -53,6 +53,22 @@ int ons_rt_BlitSurface(ons_surface *source, ons_rect *from, ons_surface *destina
         std::min<int64_t>(destination->h - dy, (int64_t)destination->clip_rect.y + destination->clip_rect.h - dy)));
     if (to) { to->w = end_x > first_x ? end_x - first_x : 0; to->h = end_y > first_y ? end_y - first_y : 0; }
     if (end_x <= first_x || end_y <= first_y) return 0;
+    bool identical = source->format->BitsPerPixel == destination->format->BitsPerPixel &&
+        source->format->Rmask == destination->format->Rmask && source->format->Gmask == destination->format->Gmask &&
+        source->format->Bmask == destination->format->Bmask && source->format->Amask == destination->format->Amask;
+    if (identical && !(source->flags & ONS_SRCALPHA)) {
+        size_t bytes = (end_x - first_x) * source->format->BytesPerPixel;
+        bool reverse = source == destination && dy > src.y;
+        for (int64_t row = 0; row < end_y - first_y; ++row) {
+            int64_t y = reverse ? end_y - 1 - row : first_y + row;
+            const uint8_t *input = (const uint8_t *)source->pixels + (src.y + y) * source->pitch +
+                (src.x + first_x) * source->format->BytesPerPixel;
+            uint8_t *output = (uint8_t *)destination->pixels + (dy + y) * destination->pitch +
+                (dx + first_x) * destination->format->BytesPerPixel;
+            std::memmove(output, input, bytes);
+        }
+        return 0;
+    }
     std::vector<uint32_t> overlap;
     if (source == destination) {
         try { overlap.resize((end_x - first_x) * (end_y - first_y)); }
@@ -60,9 +76,6 @@ int ons_rt_BlitSurface(ons_surface *source, ons_rect *from, ons_surface *destina
         for (int64_t y = first_y; y < end_y; ++y) for (int64_t x = first_x; x < end_x; ++x)
             overlap[(y - first_y) * (end_x - first_x) + x - first_x] = read_pixel(source, src.x + x, src.y + y);
     }
-    bool identical = source->format->BitsPerPixel == destination->format->BitsPerPixel &&
-        source->format->Rmask == destination->format->Rmask && source->format->Gmask == destination->format->Gmask &&
-        source->format->Bmask == destination->format->Bmask && source->format->Amask == destination->format->Amask;
     for (int64_t y = first_y; y < end_y; ++y) for (int64_t x = first_x; x < end_x; ++x) {
         uint32_t pixel = overlap.empty() ? read_pixel(source, src.x + x, src.y + y) :
             overlap[(y - first_y) * (end_x - first_x) + x - first_x];
@@ -86,6 +99,33 @@ ons_surface *ons_rt_ConvertSurface(ons_surface *source, ons_pixel_format *format
         write_pixel(destination, x, y, packed(destination, argb(source, read_pixel(source, x, y))));
     destination->format->alpha = source->format->alpha; return destination;
 }
+static void little32(uint8_t *output, uint32_t number)
+{
+    for (unsigned i = 0; i < 4; ++i) output[i] = number >> (i * 8);
+}
+int ons_rt_SaveBMP(ons_surface *surface, const char *path)
+{
+    if (!surface || !surface->pixels || !path) return -1;
+    std::FILE *file = std::fopen(path, "wb"); if (!file) return -1;
+    uint8_t header[54] = {}; unsigned stride = (surface->w * 3 + 3) & ~3;
+    header[0] = 'B'; header[1] = 'M'; header[10] = 54; header[14] = 40;
+    header[26] = 1; header[28] = 24;
+    little32(header + 2, 54 + stride * surface->h);
+    little32(header + 18, surface->w); little32(header + 22, surface->h);
+    little32(header + 34, stride * surface->h);
+    int result = std::fwrite(header, 1, sizeof(header), file) == sizeof(header) ? 0 : -1;
+    std::vector<uint8_t> row;
+    try { row.resize(stride); } catch (...) { std::fclose(file); return -1; }
+    for (int y = surface->h - 1; y >= 0 && !result; --y) {
+        for (int x = 0; x < surface->w; ++x) {
+            uint32_t pixel = argb(surface, read_pixel(surface, x, y));
+            row[x * 3] = pixel; row[x * 3 + 1] = pixel >> 8; row[x * 3 + 2] = pixel >> 16;
+        }
+        if (std::fwrite(&row[0], 1, row.size(), file) != row.size()) result = -1;
+    }
+    if (std::fclose(file)) result = -1;
+    return result;
+}
 uint32_t ons_rt_MapRGB(const ons_pixel_format *format, uint8_t r, uint8_t g, uint8_t b) { return ons_map_rgba(format, r, g, b, 255); }
 uint32_t ons_rt_MapRGBA(const ons_pixel_format *format, uint8_t r, uint8_t g, uint8_t b, uint8_t a) { return ons_map_rgba(format, r, g, b, a); }
 ons_rt_RWops *ons_rt_RWFromMem(void *memory, int size)
@@ -106,7 +146,8 @@ ons_surface *ons_img_Load_RW(ons_rt_RWops *stream, int free_stream)
     if (!stream) return NULL;
     ons_surface *surface = ons_image_decode(stream->memory + stream->position, stream->length - stream->position);
     if (surface) stream->position = stream->length;
-    if (free_stream) ons_rt_RWclose(stream); return surface;
+    if (free_stream) ons_rt_RWclose(stream);
+    return surface;
 }
 ons_surface *ons_img_LoadJPG_RW(ons_rt_RWops *stream)
 {
