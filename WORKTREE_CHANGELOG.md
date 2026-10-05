@@ -37,6 +37,11 @@ Baseline preservation: commit8bc3ab7; subtree43787d706436caafb061468539f3be6d875
 Archive: /home/wnk/F1C200S_host_archive/ons/ons-native-source-8bc3ab7.tar, SHA25680eac229492d98f904e3f8d2361da5a9c506ee6ed335288087670c1067f64007.
 Planned decoder files: Makefile.tremor, vorbis_backend.h, prepare_engine.py, runtime_mixer.cpp, .gitignore; independent integer targets, no original engine edits.
 Build: make -f Makefile.tremor -j2 ons-lvgl-tremor native-runtime-mixer-tests-tremor succeeded; deploy/tests pending.
+Commits: 9204cc5 integer target, a79cfa1 time-seek unit adapter and diagnostic.
+Deploy: separate ons_tremor_20261005 directory; retained float SHA256 dd18b6e499ecc36b0a010ccbdc37cc3c7143b38af26c9a78eedcf8362b15c9c9. No menu entry changed.
+Integer binary SHA2565a3cbbb597e6528b0217e63e5d0d87adf87fed49f5a363f9ece0fd3d7fc8f7a0; no SDL dependency.
+Test: diagnostic SHA25622802b2b50a0875888143d88cdfee6beab7d34018e0b2f92b9fd0083b1a06381 verified, real OGG chunk28928bytes versus28224expected; assert failed. Integer full engine not run.
+Decision: rejected for full-game deployment, frame-count mismatch unresolved; old float runtime retained, menu running, cold boots pending.
 
 ## 2026-10-02 pending / managed pool allocation and menu recovery verified
 Source98f6254, same helper/launcher f3333ad4/fe515f1c and supervisorc4a414cf.
