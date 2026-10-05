@@ -1,5 +1,6 @@
 ## 2026-10-05 / planned / user-supplied TK032F8004 timing
 Baseline root1f3bd30/kernelb3d8ed3, source artifacts/release5.7.1 rechecked. User ZIP6029517d, exact example source70943fd3. Numeric timing from STM32 sample33MHz/524x809, retain board bus/polarity/init; complete evidence/build/rollback/dependencies in DRIVER/panel-and-board/vendor-timing-20261005.md. External DTS only; no kernel/application change, coldboots0 pending.
+Sourcef511105/buildPASS/candidate8ca3cd42 boardboot hashmatch. Boot87274123, kernel5.7.1#250/menuSSH normal; DRM78Hz-rounded/33MHz/524x809 active. User visual red-band/flicker pending; coldboots0, no stable acceptance. Existing LG rollback unchanged, no temporary scripts/unsolicited backups. Full details in vendor-timing-20261005.md.
 
 ## 2026-10-05 / planned / kernel table timing comparison
 Baseline rootf5782ee/kernelb3d8ed3. Running zImagebffc71e8 and DTB7018246d match source artifacts; release5.7.1 and complete kernel metadata checked. New external DTS selects COM43H4M85ULC seven timing fields from current panel-simple.c, not custom reduced-clock extrapolation. Details, full hashes/build/protected dependencies/rollback in DRIVER/panel-and-board/ortustech-timing-20261005.md. Keep kernel, bus polarity, panel init, wiring, applications untouched. Physical red-band and coldboot0 pending.
