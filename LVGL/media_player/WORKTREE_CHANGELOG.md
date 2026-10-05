@@ -5,6 +5,8 @@ Baseline: e5e99e8, existing video frontend8b978fd7368f0cbf8766c8c17494ad0d5849e0
 Files: mplayer_ui.c audio-only mode; lyrics.c/.h bounded UTF8 LRC loader and tests; Makefile.
 MP3: mpg123/default ALSA, visible full framebuffer UI without video OSD or CMA reservation; audio position from MPlayer ANS_TIME_POSITION. Metadata title/artist; drag pause, seek release, volume, exit. Lyrics from same basename.lrc; no fabricated lyric if absent.
 Protected: video frame-driven position and private OSD, backend, kernel, Bluetooth/network configuration, startup menu. Test parser/LRC, MP3 controls with existing user file, video regression. Three cold boots pending.
+Code commit907a7df; build8bf41cc04eabfc8d893fd398e96bcf18d847713825feae9aec9e0adad06d12ad. Board parser/LRC selftests PASS; audio UI seek86.000 target86.000, pause/volume PASS; video regression PASS/fallback0/live0. Screenshot confirms metadata/Chinese no-lyric state/controls. Paused get_time_pos emits ALSA DELAY(-77) because paused device state; planned skip position polling while paused, retain last played position. Strip MPlayer metadata transport quotes.
+User requested real matching MP3/LRC download: Code Monkey by Jonathan Coulton, public Internet Archive audio and LRCLIB18493616 timed lyrics. Verify download hashes, playback duration, visible lyric advancement and seek reset; do not fabricate lyrics. Preserve test.mp3 and old binaries.
 
 ## 2026-10-05 / planned / OSD plane enumeration
 Baseline: d86d841, frontend7d4a01b16d608a75fc6df34c5fb8a1be58ad8a16693de8b549e28c591a2d02cc.

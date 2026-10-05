@@ -47,6 +47,15 @@ static int value(const char *line, const char *prefix, double *number)
     if (end == line + size || *end || !isfinite(parsed) || parsed < 0 || parsed > 86400) return -1;
     *number = parsed; return 1;
 }
+static void metadata(lv_obj_t *object, const char *text)
+{
+    size_t length = strlen(text);
+    if (length >= 2 && text[0] == '\'' && text[length - 1] == '\'') {
+        char clean[512]; size_t size = length - 2;
+        if (size >= sizeof(clean)) size = sizeof(clean) - 1;
+        memcpy(clean, text + 1, size); clean[size] = 0; lv_label_set_text(object, clean);
+    } else lv_label_set_text(object, text);
+}
 static void response(const char *line)
 {
     double number;
@@ -57,8 +66,8 @@ static void response(const char *line)
         ready = 1;
         if (!dragging) position = number;
     }
-    else if (audio_only && !strncmp(line, "ANS_META_TITLE=", 15)) lv_label_set_text(song_title, line + 15);
-    else if (audio_only && !strncmp(line, "ANS_META_ARTIST=", 16)) lv_label_set_text(song_artist, line + 16);
+    else if (audio_only && !strncmp(line, "ANS_META_TITLE=", 15)) metadata(song_title, line + 15);
+    else if (audio_only && !strncmp(line, "ANS_META_ARTIST=", 16)) metadata(song_artist, line + 16);
     else if (value(line, "ANS_volume=", &number) == 1 && number <= 100) {
         reported_volume_exact = number;
         reported_volume = (int)lround(number);
@@ -310,7 +319,7 @@ int main(int argc, char **argv)
         }
         if (now - query >= 500) {
             send_command("pausing_keep_force get_time_length\npausing_keep_force get_property volume\n"); query = now;
-            if (audio_only) send_command("pausing_keep_force get_time_pos\n");
+            if (audio_only && !paused) send_command("pausing_keep_force get_time_pos\n");
         }
         if (!audio_only && shown && !dragging && now - activity >= 10000) visibility(0);
         if (now - update >= 250) {
