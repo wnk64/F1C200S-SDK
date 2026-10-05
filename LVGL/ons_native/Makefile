@@ -61,6 +61,6 @@ native-audio-tests: build/audio_tests.o build/audio.o build/archive.o build/even
 	$(CC) -Wl,--gc-sections -o $@ $^ $(EXT)/lib/libvorbisfile.a $(EXT)/lib/libvorbis.a $(EXT)/lib/libogg.a -lasound -lm -lpthread
 ons-audio-probe: build/audio_probe.o build/audio.o build/archive.o build/events.o
 	$(CC) -Wl,--gc-sections -o $@ $^ $(EXT)/lib/libvorbisfile.a $(EXT)/lib/libvorbis.a $(EXT)/lib/libogg.a -lasound -lm -lpthread
-ons-native-probe: build/probe.o build/native.o build/archive.o build/gbk.o build/sprite.o build/platform.o $(OBJECTS)
-	$(CC) -Wl,--gc-sections -o $@ $^ $(LIBS)
+ons-native-probe: build/probe.o build/native.o build/archive.o build/gbk.o build/sprite.o build/audio.o build/events.o build/platform.o $(OBJECTS)
+	$(CC) -Wl,--gc-sections -o $@ $^ $(LIBS) $(EXT)/lib/libvorbisfile.a $(EXT)/lib/libvorbis.a $(EXT)/lib/libogg.a -lasound
 -include $(wildcard build/*.d) $(OBJECTS:.o=.d)

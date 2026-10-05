@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "native.h"
 #include "sprite.h"
+#include "audio.h"
 #include "platform.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,10 +12,18 @@ static ons_surface *canvas;
 static lv_obj_t *image;
 static const char *archive, *font;
 static unsigned current;
+static ons_audio audio;
+static int audio_opened, audio_paused;
 static volatile sig_atomic_t stopped;
 static const char *resources[] = {"cg/sayajpgfirstedition10244.png", "cg/000.jpg", "bitmap/02.png"};
 static void stop_signal(int signal) { (void)signal; stopped = 1; }
 static void close_clicked(lv_event_t *event) { (void)event; stopped = 1; }
+static void pause_clicked(lv_event_t *event)
+{
+    (void)event; audio_paused = !audio_paused;
+    ons_audio_pause(&audio, audio_paused);
+    fprintf(stderr, "Native BGM pause=%d\n", audio_paused);
+}
 static void draw(lv_event_t *event)
 {
     lv_draw_ctx_t *ctx = lv_event_get_draw_ctx(event);
@@ -89,7 +98,17 @@ int main(int argc, char **argv)
     lv_obj_add_event_cb(image, image_clicked, LV_EVENT_CLICKED, NULL);
     button(12, LV_SYMBOL_RIGHT, next_clicked); button(388, LV_SYMBOL_CLOSE, close_clicked);
     int rc = load_image() ? 1 : 0;
+    const char *audio_archive = getenv("ONS_NATIVE_AUDIO_ARCHIVE");
+    if (!rc && audio_archive) {
+        if (ons_audio_open(&audio)) rc = 1;
+        else {
+            audio_opened = 1; ons_audio_volume(&audio, 60);
+            if (ons_audio_start(&audio, audio_archive, "sound/SayaVoiFirstEdition10001.ogg", "default", 1)) rc = 1;
+            else button(194, LV_SYMBOL_PAUSE, pause_clicked);
+        }
+    }
     uint64_t tick = platform_ms(), begin = tick, automatic = begin;
+    uint64_t audio_report = begin;
     const char *limit = getenv("ONS_NATIVE_TEST_MS");
     while (!stopped && !rc) {
         uint64_t now = platform_ms(); lv_tick_inc(now - tick); tick = now; lv_timer_handler();
@@ -97,7 +116,18 @@ int main(int argc, char **argv)
         if (getenv("ONS_NATIVE_AUTO") && now - automatic >= 5000) {
             automatic = now; current = (current + 1) % 3; if (load_image()) rc = 1;
         }
+        if (audio_opened && now - audio_report >= 1000) {
+            ons_audio_stats stats; ons_audio_snapshot(&audio, &stats); audio_report = now;
+            if (!stats.running && stats.result) { fprintf(stderr, "Native BGM failed\n"); rc = 1; }
+        }
         struct timespec pause = {0, 10000000}; nanosleep(&pause, NULL);
+    }
+    if (audio_opened) {
+        ons_audio_stop(&audio); ons_audio_stats stats; ons_audio_snapshot(&audio, &stats);
+        fprintf(stderr, "Native AV frames=%llu underruns=%u holes=%u result=%d\n",
+            (unsigned long long)stats.frames, stats.underruns, stats.holes, stats.result);
+        if (stats.result || !stats.frames) rc = 1;
+        ons_audio_close(&audio);
     }
     platform_close(); ons_surface_free(canvas); return rc;
 }
