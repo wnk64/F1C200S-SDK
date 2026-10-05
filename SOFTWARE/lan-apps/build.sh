@@ -7,6 +7,7 @@ CC="$HOST/bin/arm-buildroot-linux-gnueabi-gcc"
 SYSROOT=$($CC --print-sysroot)
 cd "$SELF"
 mkdir -p build stage
+find vendor -type f \( -name '*.am' -o -name '*.ac' -o -name '*.m4' -o -name '*.sh' -o -name '*.c' -o -name '*.h' \) -exec sed -i 's/\r$//' {} +
 cd vendor/pupnp
 autoreconf -fi
 ./configure --host=arm-buildroot-linux-gnueabi --prefix="$SELF/stage" CC="$CC" CFLAGS='-Os' --disable-samples --disable-shared --enable-static --disable-ipv6
