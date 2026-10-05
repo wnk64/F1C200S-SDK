@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <sys/socket.h>
 
 #include <drm/drm.h>
 #include <xf86drm.h>
@@ -18,7 +20,7 @@
 #define NO_DRAW_SLICE
 #include "video_out_internal.h"
 
-extern void vd_cedar_return_picture(void *picture);
+#include "f1c200s/cedar_display.h"
 
 #define DRM_SRGN_ATOMIC_COMMIT 0x00
 #define DRM_SRGN_RESET_FB_CACHE 0x01
@@ -53,6 +55,18 @@ static int view_x, view_y, view_w, view_h;
 static enum display_mode display_mode = DISPLAY_FIT;
 static void *displayed_picture;
 static void *retired_picture;
+static int event_fd = -1;
+
+static void notify_frame(void *picture)
+{
+    if (event_fd < 0)
+        return;
+    int64_t pts = vd_cedar_picture_position(picture);
+    if (pts >= 0 && pts / 1000 <= UINT32_MAX) {
+        uint64_t message = 7 | ((uint64_t)(pts / 1000) << 32);
+        (void)send(event_fd, &message, sizeof(message), MSG_DONTWAIT | MSG_NOSIGNAL);
+    }
+}
 
 void vo_cedar_release_picture(void)
 {
@@ -113,6 +127,14 @@ static int query_format(uint32_t format)
 
 static int preinit(const char *arg)
 {
+    const char *events = getenv("MPLAYER_OSD_FD");
+    event_fd = -1;
+    if (events && !strcmp(events, "3")) {
+        int type;
+        socklen_t size = sizeof(type);
+        if (!getsockopt(3, SOL_SOCKET, SO_TYPE, &type, &size) && type == SOCK_DGRAM)
+            event_fd = 3;
+    }
     if (!arg || !strcmp(arg, "fit"))
         display_mode = DISPLAY_FIT;
     else if (!strcmp(arg, "stretch"))
@@ -227,6 +249,7 @@ static int control(uint32_t request, void *data)
     if (retired_picture)
         vd_cedar_return_picture(retired_picture);
     retired_picture = NULL;
+    notify_frame(displayed_picture);
     return VO_TRUE;
 }
 
@@ -240,4 +263,5 @@ static void uninit(void)
     if (drm_fd >= 0)
         close(drm_fd);
     drm_fd = -1;
+    event_fd = -1;
 }

@@ -13,6 +13,7 @@
 #include <memoryAdapter.h>
 #include <vdecoder.h>
 #include "f1c200s/cedar_cma_pool.h"
+#include "f1c200s/cedar_display.h"
 
 static const vd_info_t info = {
     "Allwinner Cedar H.264 decoder",
@@ -40,8 +41,16 @@ typedef struct {
 
 /* One MPlayer instance owns the Cedar display queue. */
 static VideoDecoder *cedar_display_decoder;
+static vd_cedar_ctx *cedar_display_context;
 static int cedar_plugins_loaded;
-extern void vo_cedar_release_picture(void);
+
+int64_t vd_cedar_picture_position(void *picture)
+{
+    VideoPicture *frame = picture;
+    if (!cedar_display_context || !frame || frame->nPts < 0)
+        return -1;
+    return frame->nPts + cedar_display_context->pts_base;
+}
 
 void vd_cedar_return_picture(void *picture)
 {
@@ -220,6 +229,7 @@ static int init(sh_video_t *sh)
 
     ctx->configured = 1;
     cedar_display_decoder = ctx->decoder;
+    cedar_display_context = ctx;
     return 1;
 
 fail:
@@ -241,6 +251,8 @@ static void uninit(sh_video_t *sh)
     vo_cedar_release_picture();
     if (cedar_display_decoder == ctx->decoder)
         cedar_display_decoder = NULL;
+    if (cedar_display_context == ctx)
+        cedar_display_context = NULL;
     if (ctx->decoder)
         DestroyVideoDecoder(ctx->decoder);
     if (ctx->memory_opened)
