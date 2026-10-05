@@ -1,5 +1,6 @@
 #include "platform.h"
 #include "content.h"
+#include "document.h"
 #include <dirent.h>
 #include <limits.h>
 #include <signal.h>
@@ -11,7 +12,7 @@
 extern const lv_font_t reader_font_28;
 void menu_font_stream_close(void);
 static volatile sig_atomic_t quit;
-static int is_text, native, page, image_index, image_count;
+static int is_text, is_document, native, page, image_index, image_count;
 static off_t offsets[4096], next_offset;
 static char path[PATH_MAX], directory[PATH_MAX], names[256][256], page_text[12288];
 static lv_obj_t *body, *title, *status, *previous, *next, *mode_label, *picture;
@@ -68,14 +69,17 @@ static void render(void)
         fprintf(stderr,"READER text page=%d bytes=%ld..%ld encoding=%s\n",page+1,(long)offsets[page],(long)next_offset,text_encoding());
     }else{
         if(picture){lv_obj_del(picture);picture=NULL;}free(pixels);pixels=NULL;
-        unsigned w,h;pixels=image_open(path,native,&w,&h);
+        unsigned w,h;
+        pixels=is_document?document_render(page,&w,&h):image_open(path,native,&w,&h);
         if(pixels){
             lv_label_set_text(body,"");memset(&descriptor,0,sizeof(descriptor));descriptor.header.cf=LV_IMG_CF_TRUE_COLOR;
             descriptor.header.w=w;descriptor.header.h=h;descriptor.data_size=w*h*2;descriptor.data=(const uint8_t *)pixels;
             picture=lv_img_create(lv_scr_act());lv_img_set_src(picture,&descriptor);lv_obj_set_pos(picture,(480-w)/2,104+(600-h)/2);
-            snprintf(info,sizeof(info),"%d/%d  %s",image_index+1,image_count,image_info());
-        }else{lv_label_set_text(body,image_error());snprintf(info,sizeof(info),"%d / %d",image_index+1,image_count);}
-        lv_label_set_text(mode_label,native?"1:1":"Fit");set_enabled(previous,image_index>0);set_enabled(next,image_index+1<image_count);
+            if(is_document)snprintf(info,sizeof(info),"%d / %d",page+1,document_pages());
+            else snprintf(info,sizeof(info),"%d/%d  %s",image_index+1,image_count,image_info());
+        }else{lv_label_set_text(body,is_document?document_error():image_error());snprintf(info,sizeof(info),"%d / %d",is_document?page+1:image_index+1,is_document?document_pages():image_count);}
+        lv_label_set_text(mode_label,is_document?document_mode():native?"1:1":"Fit");
+        set_enabled(previous,is_document?page>0:image_index>0);set_enabled(next,is_document?page+1<document_pages():image_index+1<image_count);
     }
     lv_label_set_text(status,info);
 }
@@ -84,27 +88,43 @@ static void change(lv_event_t *event)
 {
     int direction=(int)(intptr_t)lv_event_get_user_data(event);
     if(is_text){if(direction<0){if(!page)return;--page;}else{if(page==4095||next_offset>=text_size()||next_offset<=offsets[page])return;offsets[++page]=next_offset;}}
+    else if(is_document){int target=page+direction;if(target<0||target>=document_pages())return;page=target;}
     else{int target=image_index+direction;if(target<0||target>=image_count)return;image_index=target;native=0;
         int n=snprintf(path,sizeof(path),"%s%s%s",directory,!strcmp(directory,"/")?"":"/",names[target]);if(n<0||n>=(int)sizeof(path))return;}
     render();
 }
 static void mode_clicked(lv_event_t *event)
 {
-    (void)event;if(is_text){text_cycle_encoding();page=0;offsets[0]=text_start();}else native=!native;render();
+    (void)event;
+    if(is_text){text_cycle_encoding();page=0;offsets[0]=text_start();}
+    else if(is_document){int target=document_resize_text(page);if(target<0){lv_label_set_text(body,document_error());return;}page=target;}
+    else native=!native;
+    render();
 }
 int main(int argc,char **argv)
 {
     if(argc==2&&!strcmp(argv[1],"--selftest-text")){int rc=text_selftest();puts(rc?"Text encoding FAIL":"Text encoding PASS");return rc;}
     if(argc==3&&!strcmp(argv[1],"--check-image")){unsigned w,h;uint16_t *data=image_open(argv[2],0,&w,&h);if(!data){fprintf(stderr,"%s\n",image_error());return 1;}free(data);return 0;}
+    if(argc==3&&!strcmp(argv[1],"--check-document")){
+        if(document_open(argv[2])){fprintf(stderr,"%s\n",document_error());return 1;}
+        int count=document_pages();int result=0;
+        for(int i=0;i<(count>1?2:1);++i){unsigned w,h;int number=i?count-1:0;uint16_t *data=document_render(number,&w,&h);
+            if(!data){fprintf(stderr,"%s\n",document_error());result=1;break;}
+            unsigned checksum=2166136261u;for(unsigned p=0;p<w*h;++p)checksum=(checksum^data[p])*16777619u;
+            printf("DOCUMENT page=%d/%d size=%ux%u checksum=%08x\n",number+1,count,w,h,checksum);free(data);}
+        document_close();return result;
+    }
     if(argc!=2||!realpath(argv[1],path)){fprintf(stderr,"usage: reader file\n");return 1;}
     const char *dot=strrchr(path,'.');is_text=dot&&!strcasecmp(dot,".txt");
-    if(is_text){if(text_open(path))return 1;offsets[0]=text_start();}else images_scan();
-    if(platform_open()){platform_close();text_close();return 2;}
+    is_document=dot&&(!strcasecmp(dot,".pdf")||!strcasecmp(dot,".epub"));
+    if(is_text){if(text_open(path))return 1;offsets[0]=text_start();}else if(is_document)document_open(path);else images_scan();
+    if(platform_open()){platform_close();text_close();document_close();return 2;}
     signal(SIGTERM,stop);signal(SIGINT,stop);
     lv_obj_t *root=lv_scr_act();lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_style_bg_color(root,lv_color_hex(0xf1f4f6),0);lv_obj_set_style_bg_opa(root,LV_OPA_COVER,0);
     lv_obj_t *back=button(16,16,LV_SYMBOL_LEFT);lv_obj_add_event_cb(back,exit_clicked,LV_EVENT_CLICKED,NULL);
     title=label(root,"",108,34,268);lv_label_set_long_mode(title,LV_LABEL_LONG_DOT);lv_obj_set_height(title,40);
     lv_obj_t *mode=button(392,16,"");mode_label=lv_obj_get_child(mode,0);lv_obj_set_style_text_font(mode_label,&lv_font_montserrat_16,0);lv_obj_add_event_cb(mode,mode_clicked,LV_EVENT_CLICKED,NULL);
+    if(is_document&&!document_reflowable())set_enabled(mode,0);
     body=label(root,"",20,104,440);lv_obj_set_height(body,600);lv_label_set_long_mode(body,LV_LABEL_LONG_WRAP);
     previous=button(16,712,LV_SYMBOL_LEFT);next=button(392,712,LV_SYMBOL_RIGHT);
     lv_obj_add_event_cb(previous,change,LV_EVENT_CLICKED,(void *)(intptr_t)-1);lv_obj_add_event_cb(next,change,LV_EVENT_CLICKED,(void *)(intptr_t)1);
@@ -116,11 +136,14 @@ int main(int argc,char **argv)
         if(selftest&&is_text&&stage==0&&now-started>500){lv_event_send(next,LV_EVENT_CLICKED,NULL);stage=1;
             if(page!=1||offsets[1]!=initial){fprintf(stderr,"READER next-page FAIL\n");quit=1;stage=-1;}}
         if(selftest&&is_text&&stage==1&&now-started>1000){lv_event_send(previous,LV_EVENT_CLICKED,NULL);stage=2;if(page||next_offset!=initial){fprintf(stderr,"READER previous-page FAIL\n");stage=-1;}else puts("READER page roundtrip PASS");quit=1;}
-        if(selftest&&!is_text&&stage==0&&now-started>500){lv_event_send(mode,LV_EVENT_CLICKED,NULL);stage=1;if(!pixels||!native){stage=-1;quit=1;}}
-        if(selftest&&!is_text&&stage==1&&now-started>1000){lv_event_send(next,LV_EVENT_CLICKED,NULL);stage=2;if(!pixels||native||image_index!=initial_image+1){stage=-1;quit=1;}}
-        if(selftest&&!is_text&&stage==2&&now-started>1500){lv_event_send(previous,LV_EVENT_CLICKED,NULL);if(!pixels||image_index!=initial_image){stage=-1;}else puts("READER image fit/native/next/previous PASS");quit=1;}
+        if(selftest&&!is_text&&!is_document&&stage==0&&now-started>500){lv_event_send(mode,LV_EVENT_CLICKED,NULL);stage=1;if(!pixels||!native){stage=-1;quit=1;}}
+        if(selftest&&!is_text&&!is_document&&stage==1&&now-started>1000){lv_event_send(next,LV_EVENT_CLICKED,NULL);stage=2;if(!pixels||native||image_index!=initial_image+1){stage=-1;quit=1;}}
+        if(selftest&&!is_text&&!is_document&&stage==2&&now-started>1500){lv_event_send(previous,LV_EVENT_CLICKED,NULL);if(!pixels||image_index!=initial_image){stage=-1;}else puts("READER image fit/native/next/previous PASS");quit=1;}
+        if(selftest&&is_document&&stage==0&&now-started>500){lv_event_send(next,LV_EVENT_CLICKED,NULL);stage=1;if(page!=1||!pixels){stage=-1;quit=1;}}
+        if(selftest&&is_document&&stage==1&&now-started>1000){lv_event_send(previous,LV_EVENT_CLICKED,NULL);stage=2;if(page||!pixels){stage=-1;quit=1;}}
+        if(selftest&&is_document&&stage==2&&now-started>1500){if(document_reflowable())lv_event_send(mode,LV_EVENT_CLICKED,NULL);if(!pixels||page<0||page>=document_pages()){stage=-1;}else puts("READER document next/previous/reflow PASS");quit=1;}
         if(test_ms&&now-started>=test_ms)quit=1;
         usleep(delay*1000);}
     if(picture)lv_obj_del(picture);
-    free(pixels);text_close();platform_close();menu_font_stream_close();return stage<0?1:0;
+    free(pixels);text_close();document_close();platform_close();menu_font_stream_close();return stage<0?1:0;
 }

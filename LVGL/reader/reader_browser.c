@@ -29,7 +29,7 @@ static int join(char *out, size_t size, const char *directory, const char *name)
 static int media_name(const char *name)
 {
     const char *extension = strrchr(name, '.');
-    const char *types[] = {".txt", ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tga", ".ppm", ".pgm", ".pnm", ".psd"};
+    const char *types[] = {".txt", ".pdf", ".epub", ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tga", ".ppm", ".pgm", ".pnm", ".psd"};
     for (unsigned i = 0; extension && i < sizeof(types)/sizeof(*types); ++i)
         if (!strcasecmp(extension, types[i])) return 1;
     return 0;
