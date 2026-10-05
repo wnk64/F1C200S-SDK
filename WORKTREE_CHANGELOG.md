@@ -54,6 +54,17 @@ Tests: correct short OGG frames and mixer PASS; 60s real full engine/user works/
 Screenshot: SHA2562c941382aedd2135b598229bfc58a8ea3a93a96468609093ab9286df5590dff1 verifies actual rotated control text/icons outside game viewport; style-only candidate rejected. Temporary board raw captures cleaned.
 Decision: candidate running for real touch confirmation; exit restores menu. No kernel/driver/network/player/game script edits, no persistent menu entry; saves remain original engine behavior. Save/load/long-run/cold-boot gates pending.
 
+## 2026-10-05 / pending / ONS ROM selection and boot menu
+
+Hypothesis: standalone directory browser exits before engine, preserving low RAM and original menu supervisor lifecycle.
+Files: LVGL/ons_native/rom_browser.c, Makefile.browser, ons-app.sh, MENU_PLAN_20261005.md, .gitignore; SCRCPT/cast-and-menu-source/apps.conf adds one ONS entry.
+Base: 02236c3; old source and apps config retained in Git, existing engine artifacts unchanged.
+Commits: 61905a8 browser, 0bbb510 menu entry; make -f Makefile.browser -j2 ons-rom-browser succeeded, launcher sh -n passed.
+Deploy: ons_menu_20261005 browser SHA2569b228ad7c221230e63b2cad3ca03b2a9a92031483e2e39400d850fd9ce9b56f5; launcher4f85ad36845419b021d2eb57d943e7016beda4f899bd88259e55d719fcb32fc5; menu configf5bd02bbeeee6fb44e124c45592f423a65707402430c8288775c5814fc6abc7c. All remote hashes verified.
+Tests: actual directory list/game check/invalid paths passed; menu validator0 and restart; framebuffer browser screenshotff5313bd30301fefc933367f2e5c097721244245559b96bb4599bc4ed7742056 verified. Real game launch/back workflow pending user confirmation.
+Rollback: apps.conf from Git02236c3; no ad hoc board backup directories. Service/supervisor/kernel/drivers/other apps unchanged. Runtime selection temp file cleaned by launcher trap on exit; raw capture removed.
+Decision: entry deployed, browser active for touch test; three cold boots and end-to-end launch/exit not yet accepted. mplayer read-only inventory found ordinary SDL1.3.0 binary without Cedar codec, historical Cedar launcher separate; no mplayer/player mutation.
+
 ## 2026-10-02 pending / managed pool allocation and menu recovery verified
 Source98f6254, same helper/launcher f3333ad4/fe515f1c and supervisorc4a414cf.
 Validround3 Cma9120->16084KiB, pool9MiB, actual phone video. Normaldisconnect
