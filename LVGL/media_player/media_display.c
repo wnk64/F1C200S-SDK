@@ -64,6 +64,12 @@ void platform_close(void)
 int media_osd_open(void)
 {
     drm_fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC); if (drm_fd < 0) return -1;
+    /* Visibility ioctl addresses hardware layer1, so include primary layer0. */
+    if (drmSetClientCap(drm_fd, DRM_CLIENT_CAP_ATOMIC, 1) ||
+        drmSetClientCap(drm_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1)) {
+        perror("MPlayer OSD plane capabilities");
+        media_osd_close(); return -1;
+    }
     drmModeRes *resources = drmModeGetResources(drm_fd);
     drmModePlaneRes *planes = drmModeGetPlaneResources(drm_fd);
     if (!resources || !resources->count_crtcs || !planes || planes->count_planes < 2) {
@@ -76,6 +82,24 @@ int media_osd_open(void)
     drmModePlane *primary = drmModeGetPlane(drm_fd, primary_plane);
     if (!primary) { media_osd_close(); return -1; }
     primary_fb = primary->fb_id; drmModeFreePlane(primary);
+    drmModeObjectProperties *properties = drmModeObjectGetProperties(drm_fd, primary_plane, DRM_MODE_OBJECT_PLANE);
+    int is_primary = 0;
+    if (properties) {
+        for (uint32_t i = 0; i < properties->count_props; ++i) {
+            drmModePropertyRes *property = drmModeGetProperty(drm_fd, properties->props[i]);
+            if (property) {
+                if (!strcmp(property->name, "type") && properties->prop_values[i] == DRM_PLANE_TYPE_PRIMARY)
+                    is_primary = 1;
+                drmModeFreeProperty(property);
+            }
+        }
+        drmModeFreeObjectProperties(properties);
+    }
+    if (!is_primary) {
+        fprintf(stderr, "MPlayer OSD: first plane is not primary; refusing mismatched layer mapping\n");
+        primary_fb = 0; media_osd_close(); return -1;
+    }
+    fprintf(stderr, "MPLAYER UI planes: primary0=%u OSD1=%u\n", primary_plane, osd_plane);
     struct drm_mode_create_dumb create = {.width = 86, .height = 800, .bpp = 16};
     if (drmIoctl(drm_fd, DRM_IOCTL_MODE_CREATE_DUMB, &create)) goto fail;
     osd_handle = create.handle; osd_pitch = create.pitch; osd_size = create.size;

@@ -1,5 +1,12 @@
 # Worktree Change Log
 
+## 2026-10-05 / planned / OSD plane enumeration
+Baseline: d86d841, frontend7d4a01b16d608a75fc6df34c5fb8a1be58ad8a16693de8b549e28c591a2d02cc.
+Hypothesis: without UNIVERSAL_PLANES, primary layer0 is omitted; planes[1] mounts layer2 while private visibility commands move layer1. Hidden widgets clear the still-visible layer2 to black.
+Files: media_display.c only; enable atomic/universal plane enumeration before selecting primary0/OSD1, log selected IDs and validate primary type.
+Protected: Cedar decoder/backend, native rotated geometry, audio, network, kernel, menu and wiliwili sources unchanged.
+Rollback: existing mplayer-ui-volume candidate; source d86d841. Build: make -C LVGL/media_player -j2. Visual hide and three cold boots pending.
+
 Worktree: /home/wnk/Desktop/F1c200S_SOFT
 Component: LVGL/media_player frontend and optional Cedar MPlayer frame notification
 Base: MPlayer618d09a/noSDL candidate96a9cab0df56079ac251f639d59ace224ff94541224ed637cfa019df6ab7ebbf
