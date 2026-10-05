@@ -1,5 +1,10 @@
 # Worktree Change Log
 
+## 2026-10-05 / planned / PDF and EPUB
+Baseline31c66ef, readere1003bb95776d45873755324926d5bd5a081c8a9788c12e946f2d8c54188f1bc; user requests native PDF/EPUB. Acquire complete MuPDF1.24.9 official source archive (AGPL) with bundled dependencies, track under LVGL/reader/vendor, no SDL. Inspect build features before cross compile; use current system freetype/jpeg/zlib and bundled required codecs, no rootfs/kernel rebuild.
+Hypothesis: single document open, page render to bounded480x600 RGB pixmap then RGB565, small MuPDF store and allocation budget; EPUB layout to screen page. Previous/next, page count, EPUB text reflow. Keep text/image paths and menu sequential ownership. Encrypted/DRM and oversized-memory documents must fail safely, not OOM system.
+Files: vendor full source/build config, document adapter, reader.c/browser extension/Makefile/app docs. SD candidate artifact retained separately from old reader where practical; rollout only after PDF/EPUB samples and existing TXT/image regressions. No service/network/driver changes. Three cold boots pending.
+
 ## 2026-10-05 / planned / each-image automatic aspect fit
 Baselineb76fb1e/reader335dd3f9dfe302812741f2fabd82bf4ca7d8e079d59b609a889361a5b53fd15f. Existing default scales oversized images proportionally to480x600 content viewport, no stretching and no small-image enlargement. A manual1:1 selection currently carries to next image; fix resets new-image view toFit and tests transition directly from1:1. PDF/CBZ/CBR remain unsupported; extracted image-folder comics work within existing2Mpx/12MiB limits.
 Files reader.c only plus records. Protected text pagination/decoder/font/menu/media/kernel/network unchanged. Rollbackreader sourceb76fb1e; no ad-hoc backup. Build make -C LVGL/reader -j2, board gallery selftest and menu return; three cold boots pending.
