@@ -9,6 +9,7 @@ extern "C" {
 #include <ctime>
 #include <algorithm>
 #include <atomic>
+#include <csignal>
 
 struct ons_rt_timer {
     bool active, running;
@@ -32,6 +33,10 @@ static int mouse_x, mouse_y, mouse_down, finger_down, captured;
 static int cursor_visible;
 static char caption[256];
 static thread_local char error[128];
+static volatile sig_atomic_t quit_signal;
+static uint64_t test_duration;
+static bool test_requested;
+static void request_quit(int) { quit_signal = 1; }
 static void failure(const char *message) { std::snprintf(error, sizeof(error), "%s", message); }
 const char *ons_rt_GetError(void) { return error; }
 static uint64_t milliseconds()
@@ -122,6 +127,9 @@ int ons_rt_Init(uint32_t flags)
     if (flags & (ons_rt_INIT_CDROM | ons_rt_INIT_JOYSTICK)) { failure("CD/joystick hardware unavailable"); return -1; }
     if (initialized) return 0;
     origin = milliseconds(); ending = false; queued = 0; std::memset(timers, 0, sizeof(timers));
+    const char *limit = std::getenv("ONS_NATIVE_TEST_MS"); test_duration = limit ? std::strtoul(limit, NULL, 10) : 0;
+    quit_signal = 0; test_requested = false;
+    std::signal(SIGTERM, request_quit); std::signal(SIGINT, request_quit);
     if (pthread_create(&timer_thread, NULL, timer_loop, NULL)) { failure("Native timer thread creation failed"); return -1; }
     timer_started = initialized = true; std::atexit(ons_rt_Quit); return 0;
 }
@@ -185,6 +193,10 @@ static void pump()
 {
     if (!display_opened) return;
     uint64_t now = milliseconds(); lv_tick_inc(now - tick); tick = now; lv_timer_handler();
+    if (quit_signal || (!test_requested && test_duration && now - origin >= test_duration)) {
+        ons_rt_Event event = {}; event.type = ons_rt_QUIT;
+        if (!ons_rt_PushEvent(&event)) { quit_signal = 0; test_requested = true; }
+    }
     int x, y, down; platform_touch(&x, &y, &down);
     int sx = y - (800 - screen->w) / 2, sy = 479 - x - (480 - screen->h) / 2;
     bool inside = sx >= 0 && sx < screen->w && sy >= 0 && sy < screen->h && !(x >= 388 && y >= 720);

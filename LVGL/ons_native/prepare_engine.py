@@ -55,6 +55,7 @@ for name, text in sources.items():
         text = text[:start] + text[end:]
         text = text[:text.index("unsigned char AnimationInfo::getAlpha(")]
     text = text.replace("#include <SDL.h>", '#include "engine_types.h"')
+    text = text.replace("SDL surface:", "Native surface:")
     for header in ["SDL_image.h", "SDL_ttf.h", "SDL_mixer.h"]:
         text = text.replace("#include <" + header + ">", '#include "engine_runtime.h"')
     text = pattern.sub(lambda match: names[match.group(0)], text)
