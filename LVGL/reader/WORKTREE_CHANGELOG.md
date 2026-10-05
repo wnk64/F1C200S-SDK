@@ -1,5 +1,8 @@
 # Worktree Change Log
 
+## 2026-10-05 / planned / toolbar idle timer underflow
+Baseline1c5a722, reader4e3c980e327bae35cbc7f357d65af3554bffd1b5a7db047d766ec776f4213ebf. lv_timer_handler updates ui_activity after loop timestamp; unsigned stale-now subtraction immediately expires newly shown UI. Scope reader.c timer guard/fresh timestamp and optional timer-handler regression only. Protected decoder/gesture thresholds/fullscreen/menu/kernel/network/audio unchanged. Existing reader_documents candidate remains rollback. Build make -C LVGL/reader -j2; tests stale timestamp, timeout boundary, real LVGL timer callback show/persist/auto-hide and gesture/text regression. Three cold boots and real touch pending.
+
 ## 2026-10-05 / planned / fullscreen content and gesture navigation
 Baseline da65994, reader82fe43535275cbdfd6c637d7057b24d8ffd9a1535b1a5cf7bdedf39a1ddacf38. User requires left/right swipe paging, center single tap toolbar, images fullscreen when UI hidden.
 Files reader.c/content.h/image.c/text.c/document.c only plus docs/menu candidate selection. Full480x800 content with toolbar overlay default hidden, no reserved104px header/88px footer; images preserve aspect and use whole screen, PDF render/EPUB layout480x800, TXT21lines with margins. UI toggle invalidates overlay only, does not rerender/redecode or change page; swipe classification and event dispatch tests.

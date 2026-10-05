@@ -109,6 +109,10 @@ static void visibility(int visible)
     if(visible)lv_obj_clear_flag(ui_layer,LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(ui_layer,LV_OBJ_FLAG_HIDDEN);
 }
+static int ui_expired(uint64_t now,uint64_t activity)
+{
+    return now>=activity&&now-activity>=10000;
+}
 enum gesture_action { GESTURE_NONE, GESTURE_NEXT, GESTURE_PREVIOUS, GESTURE_TOGGLE };
 static enum gesture_action classify(lv_point_t from,lv_point_t to,uint64_t elapsed)
 {
@@ -141,8 +145,16 @@ static void test_touch(int x1,int y1,int x2,int y2)
     lv_event_send(gesture_layer,LV_EVENT_PRESSED,NULL);
     injected_point=(lv_point_t){x2,y2};lv_event_send(gesture_layer,LV_EVENT_RELEASED,NULL);injected=0;
 }
+static void timer_ui_test(lv_timer_t *timer)
+{
+    test_touch(240,400,240,400);
+    lv_timer_del(timer);
+}
 static int gesture_selftest(void)
 {
+    assert(!ui_expired(1000,1001));
+    assert(!ui_expired(10999,1000));
+    assert(ui_expired(11000,1000));
     assert(classify((lv_point_t){380,400},(lv_point_t){80,410},300)==GESTURE_NEXT);
     assert(classify((lv_point_t){80,400},(lv_point_t){380,390},300)==GESTURE_PREVIOUS);
     assert(classify((lv_point_t){240,400},(lv_point_t){245,405},200)==GESTURE_TOGGLE);
@@ -213,8 +225,25 @@ int main(int argc,char **argv)
     const char *visibility_test=getenv("READER_TEST_VISIBILITY_ONLY");
     int initial_image=image_index;
     int visibility_checked=0;
+    const char *timer_test_env=getenv("READER_TEST_TIMER_UI");
+    int timer_test=timer_test_env&&!strcmp(timer_test_env,"1"),timer_seen=0;
+    uint64_t timer_activity=0;
+    if(timer_test)lv_timer_create(timer_ui_test,250,NULL);
     while(!quit){uint64_t now=platform_ms();lv_tick_inc(now-tick);tick=now;unsigned delay=lv_timer_handler();if(delay<1)delay=1;if(delay>16)delay=16;
-        if(shown&&!pressed&&now-ui_activity>=10000)visibility(0);
+        /* Input callbacks may refresh ui_activity inside lv_timer_handler. */
+        now=platform_ms();
+        if(shown&&!pressed&&ui_expired(now,ui_activity))visibility(0);
+        if(timer_test){
+            if(!timer_seen&&now-started>=500){
+                if(!shown){fprintf(stderr,"READER timer callback persistence FAIL\n");stage=-1;quit=1;}
+                timer_seen=1;timer_activity=ui_activity;
+            }
+            if(timer_seen&&now-timer_activity<10000&&!shown){stage=-1;quit=1;}
+            if(timer_seen&&now-timer_activity>=10000){
+                if(shown){stage=-1;}
+                fprintf(stderr,"READER timer callback persistence/10s expiry %s\n",stage<0?"FAIL":"PASS");quit=1;
+            }
+        }
         if(selftest&&!visibility_checked&&now-started>250){
             uint16_t *before=pixels;
             test_touch(240,400,240,400);
