@@ -228,10 +228,10 @@ int main(int argc,char **argv)
     int initial_image=image_index;
     int visibility_checked=0;
     const char *timer_test_env=getenv("READER_TEST_TIMER_UI");
-    int timer_test=timer_test_env&&!strcmp(timer_test_env,"1"),timer_seen=0;
+    int timer_test=timer_test_env&&!strcmp(timer_test_env,"1"),timer_seen=0,timer_done=0;
     uint64_t timer_activity=0;
     timer_test_active=timer_test;
-    if(timer_test)lv_timer_create(timer_ui_test,250,NULL);
+    if(timer_test){lv_indev_enable(NULL,false);lv_timer_create(timer_ui_test,250,NULL);}
     while(!quit){uint64_t now=platform_ms();lv_tick_inc(now-tick);tick=now;unsigned delay=lv_timer_handler();if(delay<1)delay=1;if(delay>16)delay=16;
         /* Input callbacks may refresh ui_activity inside lv_timer_handler. */
         now=platform_ms();
@@ -245,6 +245,7 @@ int main(int argc,char **argv)
             if(timer_seen&&now-timer_activity>=10000){
                 if(shown){stage=-1;}
                 fprintf(stderr,"READER timer callback persistence/10s expiry %s\n",stage<0?"FAIL":"PASS");quit=1;
+                timer_done=1;
             }
         }
         if(selftest&&!visibility_checked&&now-started>250){
@@ -270,5 +271,5 @@ int main(int argc,char **argv)
         if(test_ms&&now-started>=test_ms)quit=1;
         usleep(delay*1000);}
     if(picture)lv_obj_del(picture);
-    free(pixels);text_close();document_close();platform_close();menu_font_stream_close();return stage<0?1:0;
+    free(pixels);text_close();document_close();platform_close();menu_font_stream_close();return stage<0||(timer_test&&!timer_done)?1:0;
 }
