@@ -41,13 +41,28 @@ static int controls(ons_audio *audio, int *paused, int *volume)
     int stop = audio->stop; *paused = audio->paused; *volume = audio->volume;
     pthread_mutex_unlock(&audio->lock); return stop;
 }
-static int pcm_frames(ons_audio *audio, snd_pcm_t *pcm, int16_t *samples, unsigned frames, unsigned channels)
+static int ready(ons_audio *audio, snd_pcm_t *pcm, int *hardware_paused, int *volume)
+{
+    for (;;) {
+        int paused;
+        if (controls(audio, &paused, volume)) return 1;
+        if (!paused) {
+            if (*hardware_paused == 1 && snd_pcm_pause(pcm, 0) < 0 && snd_pcm_prepare(pcm) < 0) return -1;
+            *hardware_paused = 0; return 0;
+        }
+        if (!*hardware_paused) *hardware_paused = snd_pcm_pause(pcm, 1) == 0 ? 1 : -1;
+        sleep_ms(10);
+    }
+}
+static int pcm_frames(ons_audio *audio, snd_pcm_t *pcm, int16_t *samples, unsigned frames, unsigned channels, int *hardware_paused)
 {
     unsigned written = 0; uint64_t last_progress = ons_monotonic_ms();
     while (written < frames) {
-        int paused, volume;
-        if (controls(audio, &paused, &volume)) return 1;
-        if (paused) { sleep_ms(10); last_progress = ons_monotonic_ms(); continue; }
+        int volume;
+        uint64_t before_control = ons_monotonic_ms();
+        int control = ready(audio, pcm, hardware_paused, &volume);
+        if (control) return control;
+        last_progress += ons_monotonic_ms() - before_control;
         snd_pcm_sframes_t result = snd_pcm_writei(pcm, samples + written * channels, frames - written);
         if (result > 0) {
             written += result; last_progress = ons_monotonic_ms();
@@ -66,7 +81,7 @@ static void *worker(void *argument)
 {
     ons_audio *audio = argument;
     struct stream stream = {0}; OggVorbis_File vorbis; snd_pcm_t *pcm = NULL;
-    int vorbis_open = 0, result = -1, section = 0;
+    int vorbis_open = 0, result = -1, section = 0, hardware_paused = 0;
     uint64_t begin = ons_monotonic_ms();
     int16_t *samples = malloc(32768);
     if (!samples || ons_nsa_stream(audio->archive, audio->resource, &stream.file, &stream.offset, &stream.length)) goto done;
@@ -82,8 +97,8 @@ static void *worker(void *argument)
     unsigned consecutive_holes = 0;
     for (;;) {
         int paused, volume;
-        if (controls(audio, &paused, &volume)) { result = 0; break; }
-        if (paused) { sleep_ms(10); continue; }
+        int control = ready(audio, pcm, &hardware_paused, &volume);
+        if (control) { result = control == 1 ? 0 : -1; break; }
         long bytes = ov_read(&vorbis, (char *)samples, 32768, 0, 2, 1, &section);
         if (bytes == OV_HOLE) {
             pthread_mutex_lock(&audio->lock); ++audio->stats.holes; pthread_mutex_unlock(&audio->lock);
@@ -107,7 +122,7 @@ static void *worker(void *argument)
         info = ov_info(&vorbis, section);
         if (!info || info->channels != (int)channels || info->rate != (long)rate || bytes % (channels * 2)) break;
         for (long i = 0; i < bytes / 2; ++i) samples[i] = (int16_t)((int)samples[i] * volume / 100);
-        int rc = pcm_frames(audio, pcm, samples, bytes / (channels * 2), channels);
+        int rc = pcm_frames(audio, pcm, samples, bytes / (channels * 2), channels, &hardware_paused);
         if (rc) { result = rc == 1 ? 0 : -1; break; }
     }
 done:

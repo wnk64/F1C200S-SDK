@@ -13,7 +13,7 @@ CFLAGS := -Os -Wall -Wextra -ffunction-sections -fdata-sections -MMD -MP -D_FILE
 CFLAGS += -DLV_CONF_INCLUDE_SIMPLE -I$(MENU) -I$(ROOT)/LVGL/touch -I$(LV)
 CFLAGS += -I$(HOST)/arm-buildroot-linux-gnueabi/sysroot/usr/include/freetype2
 LIBS := -lpng -ljpeg -lfreetype -lm -lpthread
-all: libons-native.a libons-script.a native-tests native-event-tests native-sprite-tests ons-native-probe ons-script-probe ons-audio-probe
+all: libons-native.a libons-script.a native-tests native-event-tests native-sprite-tests native-audio-tests ons-native-probe ons-script-probe ons-audio-probe
 .PHONY: verify-script-source
 verify-script-source:
 	sha256sum -c source-baseline.sha256
@@ -56,6 +56,9 @@ build/audio.o: audio.c audio.h events.h native.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -I$(EXT)/include -c -o $@ $<
 build/audio_probe.o: audio.h events.h
+build/audio_tests.o: audio.h events.h
+native-audio-tests: build/audio_tests.o build/audio.o build/archive.o build/events.o
+	$(CC) -Wl,--gc-sections -o $@ $^ $(EXT)/lib/libvorbisfile.a $(EXT)/lib/libvorbis.a $(EXT)/lib/libogg.a -lasound -lm -lpthread
 ons-audio-probe: build/audio_probe.o build/audio.o build/archive.o build/events.o
 	$(CC) -Wl,--gc-sections -o $@ $^ $(EXT)/lib/libvorbisfile.a $(EXT)/lib/libvorbis.a $(EXT)/lib/libogg.a -lasound -lm -lpthread
 ons-native-probe: build/probe.o build/native.o build/archive.o build/gbk.o build/sprite.o build/platform.o $(OBJECTS)
