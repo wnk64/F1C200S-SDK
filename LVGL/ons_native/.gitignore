@@ -5,3 +5,4 @@ native-tests
 *.png
 *.a
 ons-script-probe
+native-event-tests
