@@ -2,6 +2,14 @@
 #include <string.h>
 #include <stdint.h>
 
+int ons_sprite_adopt(ons_sprite *sprite, ons_surface **source, int cells)
+{
+    if (!sprite || !source || !*source || !(*source)->pixels || cells < 1 ||
+        cells > (*source)->w || (*source)->w % cells || (*source)->h < 1) return -1;
+    sprite->image = *source; sprite->cells = cells; sprite->cell = 0;
+    *source = NULL; return 0;
+}
+
 int ons_sprite_open(ons_sprite *sprite, const ons_surface *source, int cells,
                     enum ons_transparency mode, int has_alpha, uint32_t key, const ons_surface *mask)
 {

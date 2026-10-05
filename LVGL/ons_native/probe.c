@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "native.h"
+#include "sprite.h"
 #include "platform.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,16 +35,23 @@ static int load_image(void)
     if (ons_nsa_read(archive, resources[current], &data, &length)) return -1;
     ons_surface *decoded = ons_image_decode(data, length); free(data);
     if (!decoded) return -1;
+    int source_w = decoded->w, source_h = decoded->h;
+    ons_sprite sprite = {0};
+    if (ons_sprite_adopt(&sprite, &decoded, 1)) { ons_surface_free(decoded); return -1; }
     /* Preview fitting is separate from engine geometry; script integration is pending. */
     for (int y = 0; y < canvas->h; ++y)
         for (int x = 0; x < canvas->w; ++x) {
             uint32_t checker = ((x / 24 + y / 24) & 1) ? 0xff303840 : 0xff202830;
-            uint32_t p = decoded->pixels[(y * decoded->h / canvas->h) * decoded->w + x * decoded->w / canvas->w];
-            canvas->pixels[y * canvas->w + x] = ons_over(p, checker);
+            canvas->pixels[y * canvas->w + x] = checker;
         }
-    fprintf(stderr, "Native decode %s %dx%d elapsed=%llu ms\n", resources[current], decoded->w, decoded->h,
+    ons_rect dirty, placement = {0, 0, canvas->w, canvas->h};
+    if (ons_sprite_draw(canvas, &sprite, placement, placement, 255, ONS_BLEND_OVER, &dirty) < 0) {
+        ons_sprite_close(&sprite); return -1;
+    }
+    fprintf(stderr, "Native sprite %s %dx%d dirty=%d,%d,%d,%d elapsed=%llu ms\n", resources[current], source_w, source_h,
+        dirty.x, dirty.y, dirty.w, dirty.h,
         (unsigned long long)(platform_ms() - begin));
-    ons_surface_free(decoded);
+    ons_sprite_close(&sprite);
     if (ons_text_gbk(canvas, font, 24, 12, 32, "\xd6\xd0\xce\xc4", 0xffffffff) != 2) return -1;
     lv_obj_invalidate(image); lv_refr_now(NULL); return 0;
 }

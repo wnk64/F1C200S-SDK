@@ -9,6 +9,8 @@ typedef struct { ons_surface *image; int cells, cell; } ons_sprite;
 int ons_sprite_open(ons_sprite *sprite, const ons_surface *source, int cells,
                     enum ons_transparency mode, int has_alpha, uint32_t key, const ons_surface *mask);
 void ons_sprite_close(ons_sprite *sprite);
+/* On success transfer ownership without a pixel copy and set *source to NULL. */
+int ons_sprite_adopt(ons_sprite *sprite, ons_surface **source, int cells);
 int ons_sprite_cell(ons_sprite *sprite, int cell);
 uint8_t ons_sprite_hit(const ons_sprite *sprite, ons_rect placement, int x, int y, uint8_t opacity);
 /* Nearest-neighbor fit of one cell; returns 1 for a dirty region, 0 for no draw, -1 invalid args. */

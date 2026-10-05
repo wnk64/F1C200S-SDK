@@ -57,7 +57,11 @@ int main(void)
     ons_sprite_close(&sprite);
     assert(!ons_sprite_open(&sprite, source, 1, ONS_COPY, 1, 0, NULL));
     assert((sprite.image->pixels[0] >> 24) == 255);
-    ons_sprite_close(&sprite); ons_surface_free(source); ons_surface_free(destination);
+    ons_sprite_close(&sprite);
+    ons_surface *original = source;
+    assert(ons_sprite_adopt(&sprite, &source, 3) == -1 && source == original);
+    assert(!ons_sprite_adopt(&sprite, &source, 2) && !source && sprite.image == original);
+    ons_sprite_close(&sprite); ons_surface_free(destination);
     puts("Native sprite cells/keys/mask/alpha/hit/scale/clip/dirty/blend tests PASS (no SDL)");
     return 0;
 }

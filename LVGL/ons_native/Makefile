@@ -51,6 +51,6 @@ build/sprite.o: sprite.h
 build/sprite_tests.o: sprite.h
 native-sprite-tests: build/sprite_tests.o build/sprite.o build/native.o build/gbk.o
 	$(CC) -Wl,--gc-sections -o $@ $^ $(LIBS)
-ons-native-probe: build/probe.o build/native.o build/archive.o build/gbk.o build/platform.o $(OBJECTS)
+ons-native-probe: build/probe.o build/native.o build/archive.o build/gbk.o build/sprite.o build/platform.o $(OBJECTS)
 	$(CC) -Wl,--gc-sections -o $@ $^ $(LIBS)
 -include $(wildcard build/*.d) $(OBJECTS:.o=.d)
