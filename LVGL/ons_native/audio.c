@@ -111,12 +111,16 @@ static void *worker(void *argument)
             if (audio->loop && !ov_pcm_seek(&vorbis, 0)) continue;
             result = 0;
             uint64_t deadline = ons_monotonic_ms() + 2000;
-            int drained;
-            while ((drained = snd_pcm_drain(pcm)) == -EAGAIN && ons_monotonic_ms() < deadline) {
-                if (controls(audio, &paused, &volume)) break;
+            int drained = snd_pcm_drain(pcm);
+            while (drained == -EAGAIN) {
+                if (controls(audio, &paused, &volume)) { drained = 0; break; }
+                snd_pcm_state_t state = snd_pcm_state(pcm);
+                if (state == SND_PCM_STATE_SETUP) { drained = 0; break; }
+                if (state == SND_PCM_STATE_XRUN) { drained = -EPIPE; break; }
+                if (ons_monotonic_ms() >= deadline) { drained = -ETIMEDOUT; break; }
                 snd_pcm_wait(pcm, 20);
             }
-            if (drained < 0 && drained != -EAGAIN) result = -1;
+            if (drained < 0) result = -1;
             break;
         }
         info = ov_info(&vorbis, section);
