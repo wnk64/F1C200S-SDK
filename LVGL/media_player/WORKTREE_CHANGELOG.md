@@ -1,5 +1,14 @@
 # Worktree Change Log
 
+## 2026-10-07 / planned / WAV files absent from media browser
+Baseline0e76791; board browser8ba618a5/frontend9eda7361/backend3cff48d2 exact source retained.
+Observed: Recordings --list outputs no files although3regular WAV recordings present. Audio directory lists2MP3 files. Browser allowlist only MP3/MP4, UI audio-only detector only MP3.
+Files: media_browser.c add WAV allowlist, mplayer_ui.c WAV audio-only detection, media-app.sh select colocated frontend and SD playback log; apps.conf media path only.
+Hypothesis: support existing WAV PCM through audio-only backend, without allocating video OSD/CMA or waiting for video frame.
+Deploy: new /root/roms/candidates/media_wav_20261007 with existing CJK asset, retain old menu/UI/backend. No new worktree or backup.
+Rollback: restore media entry from0e76791; original media menu/UI binary paths unchanged.
+Protected: MP3/MP4 UI, geometry backend, kernel/DTB/audio routing/network/Miracast. Tests: list/check WAV/MP3/MP4, existing-file playback control tests, three coldboots pending.
+
 ## 2026-10-05 / planned / menu geometry backend selection
 Switch media-app.sh BACKEND only to /root/roms/candidates/mplayer_geometry_20261005/mplayer-native-geometry SHA2563cff48d26822847db9fdf466d6d3f9168b4073086d291187fc56c480a04808c2. Backend source85440d9/6ceb14f validates decoded MB32 stride/window; multi-size decode tests fallback0/live0,800UI and MP3 controls regressions PASS,620 full UI EOF0. No kernel or UI changes. Existing menu-launched playback7192 untouched; new path applies on next script launch. Rollback previous backendff93 retained, media-app.sh commit767f6ba/55189f1. Actual visible non800 geometry pending user confirmation, not stable baseline.
 

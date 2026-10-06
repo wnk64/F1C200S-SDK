@@ -293,7 +293,7 @@ int main(int argc, char **argv)
     const char *debug_env = getenv("MPLAYER_UI_DEBUG");
     debug = debug_env && !strcmp(debug_env, "1");
     const char *extension = strrchr(argv[1], '.');
-    audio_only = extension && !strcasecmp(extension, ".mp3");
+    audio_only = extension && (!strcasecmp(extension, ".mp3") || !strcasecmp(extension, ".wav"));
     if (audio_only) lyric_count = lyrics_load(argv[1]);
     signal(SIGTERM, stop); signal(SIGINT, stop); signal(SIGPIPE, SIG_IGN);
     if (platform_open()) { platform_close(); return 2; }

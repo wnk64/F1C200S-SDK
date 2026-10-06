@@ -29,7 +29,8 @@ static int join(char *out, size_t size, const char *directory, const char *name)
 static int media_name(const char *name)
 {
     const char *extension = strrchr(name, '.');
-    return extension && (!strcasecmp(extension, ".mp3") || !strcasecmp(extension, ".mp4"));
+    return extension && (!strcasecmp(extension, ".mp3") || !strcasecmp(extension, ".mp4") ||
+                         !strcasecmp(extension, ".wav"));
 }
 static int media_file(const char *path)
 {

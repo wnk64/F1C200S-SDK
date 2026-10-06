@@ -1,5 +1,12 @@
 # Worktree Change Log
 
+## 2026-10-07 / planned / missing font and recorder buttons
+Baseline0e76791; deployed recorder f0419d30, launcherbf5311c1. Readlink-based CJK font loader requires cjk28.bin beside executable, but recorder deployment omitted it.
+Files: recorder.c explicit bounded button labels/state; recorder-app.sh font preflight.
+Deploy required: existing cjk28.bin asset copied onto SD (vfat cannot symlink), verify hash; no shared font loader changes.
+Rollback: existing recorder source cfc8adc and launcher1ca7e90; independent SD candidate, original application paths retained.
+Protected: kernel, modules, default audio routing, Wi-Fi/cast; test screenshot and capture/stop/playback states.
+
 Worktree: /home/wnk/Desktop/F1c200S_SOFT
 Component: independent microphone recording application
 Base: 1f2b7d9, tracked LVGL/menu platform and LVGL8 source

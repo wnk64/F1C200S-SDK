@@ -1,4 +1,6 @@
 #!/bin/sh
 set -eu
-cd /root/roms/candidates/mic_recorder_20261007
+SELF=$(CDPATH= cd "$(dirname "$0")" && pwd)
+cd "$SELF"
+test -r ./cjk28.bin || { echo 'Recorder CJK font asset missing' >&2; exit 1; }
 exec ./mic-recorder

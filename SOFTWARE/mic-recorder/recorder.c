@@ -36,6 +36,7 @@ static pid_t playback;
 static uint64_t last_data;
 static volatile sig_atomic_t quit;
 static lv_obj_t *status_label, *time_label, *file_label, *level_label;
+static lv_obj_t *record_label, *replay_label;
 static void stop_signal(int sig) { (void)sig; quit = 1; }
 static void error_text(const char *operation, int err)
 {
@@ -213,7 +214,7 @@ static lv_obj_t *label(const char *text, int y)
     lv_obj_t *o = lv_label_create(lv_scr_act()); lv_obj_set_pos(o, 24, y); lv_obj_set_width(o, 432);
     lv_obj_set_style_text_font(o, &menu_font_stream, 0); lv_label_set_text(o, text); return o;
 }
-static void button(const char *text, int y, long action)
+static lv_obj_t *button(const char *text, int y, long action)
 {
     lv_obj_t *o = lv_btn_create(lv_scr_act()); lv_obj_remove_style_all(o);
     lv_obj_set_pos(o, 24, y); lv_obj_set_size(o, 432, 88);
@@ -222,14 +223,21 @@ static void button(const char *text, int y, long action)
     lv_obj_set_style_border_width(o, 2, 0); lv_obj_set_style_border_color(o, lv_color_hex(0x58666b), 0);
     lv_obj_set_style_radius(o, 4, 0);
     lv_obj_t *l = lv_label_create(o); lv_obj_set_style_text_font(l, &menu_font_stream, 0);
+    lv_obj_set_style_text_color(l, lv_color_hex(0x172329), 0);
+    lv_obj_set_width(l, 388); lv_label_set_long_mode(l, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(l, text); lv_obj_center(l); lv_obj_add_event_cb(o, clicked, LV_EVENT_CLICKED, (void *)action);
+    return l;
 }
 int main(int argc, char **argv)
 {
     signal(SIGINT, stop_signal); signal(SIGTERM, stop_signal);
     int headless = argc == 4 && !strcmp(argv[1], "--record");
+    int ui_test = argc == 3 && !strcmp(argv[1], "--ui-test");
+    unsigned test_ms = ui_test ? strtoul(argv[2], NULL, 10) : 0;
     unsigned seconds = headless ? strtoul(argv[2], NULL, 10) : 0;
-    if (argc != 1 && (!headless || !seconds || seconds > 3600)) return 1;
+    if (argc != 1 && !headless && !ui_test) return 1;
+    if ((headless && (!seconds || seconds > 3600)) || (ui_test && (test_ms < 1000 || test_ms > 60000))) return 1;
     if (headless) {
         if (begin_record(argv[3])) return 1;
         while (!quit && pcm && bytes < seconds * RATE * 2) { capture(); usleep(10000); }
@@ -242,8 +250,8 @@ int main(int argc, char **argv)
     label("麦克风录音", 32); status_label = label(message, 110);
     time_label = label("00:00", 178); level_label = label("MIC 0%", 244);
     file_label = label("SD / Recordings", 312); lv_label_set_long_mode(file_label, LV_LABEL_LONG_WRAP);
-    button("录音 / 停止保存", 448, 0); button("回放 / 停止", 550, 1); button("返回", 652, 2);
-    uint64_t tick = platform_ms(), refreshed = 0;
+    record_label = button("开始录音", 448, 0); replay_label = button("回放", 550, 1); button("返回", 652, 2);
+    uint64_t tick = platform_ms(), refreshed = 0, started = tick;
     while (!quit) {
         capture();
         if (playback > 0) {
@@ -253,12 +261,16 @@ int main(int argc, char **argv)
         uint64_t now = platform_ms(); lv_tick_inc(now - tick); tick = now;
         if (now - refreshed >= 200) {
             refreshed = now; char text[80]; unsigned sec = bytes / (RATE * 2);
+            lv_label_set_text(record_label, pcm ? "停止保存" : "开始录音");
+            lv_label_set_text(replay_label, playback ? "停止回放" : "回放");
             lv_label_set_text(status_label, message); snprintf(text, sizeof(text), "%02u:%02u", sec / 60, sec % 60);
             lv_label_set_text(time_label, text); snprintf(text, sizeof(text), "MIC %d%%", peak * 100 / 32768);
             lv_label_set_text(level_label, text);
             lv_label_set_text(file_label, *path ? strrchr(path, '/') ? strrchr(path, '/') + 1 : path : "SD / Recordings");
         }
-        lv_timer_handler(); usleep(10000);
+        lv_timer_handler();
+        if (ui_test && now - started >= test_ms) quit = 1;
+        usleep(10000);
     }
     finish_record(); stop_playback(); platform_close(); menu_font_stream_close(); return 0;
 }

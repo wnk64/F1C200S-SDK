@@ -2,7 +2,7 @@
 set -u
 SELF=$(CDPATH= cd "$(dirname "$0")" && pwd)
 BROWSER="$SELF/media-browser"
-UI=/root/aic_miracast/candidates/mplayer_ui_20261005/mplayer-ui-lyrics-test
+UI="$SELF/mplayer-ui"
 BACKEND=/root/roms/candidates/mplayer_geometry_20261005/mplayer-native-geometry
 selection=$(mktemp /tmp/f1-media-selection.XXXXXX) || exit 1
 child=
@@ -14,6 +14,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 0' INT TERM
 test -x "$BROWSER" && test -x "$UI" && test -x "$BACKEND" || exit 1
+test -r "$SELF/cjk28.bin" || { echo 'Media CJK font asset missing' >&2; exit 1; }
 browse=${MEDIA_APP_START_DIR:-/root/roms}
 while :; do
     rc=0
