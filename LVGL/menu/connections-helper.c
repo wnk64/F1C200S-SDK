@@ -4,6 +4,8 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <arpa/inet.h>
+#include <ifaddrs.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -115,6 +117,41 @@ static int find_network(const char *ssid)
     }
     return -1;
 }
+static int wait_network(int id,int seconds)
+{
+    char reply[4096],expected[64];snprintf(expected,sizeof(expected),"\nid=%d\n",id);
+    long long until=milliseconds()+seconds*1000;
+    while(!stop&&milliseconds()<until){
+        if(!request("STATUS",reply,sizeof(reply))&&strstr(reply,"wpa_state=COMPLETED\n")&&strstr(reply,expected))return 1;
+        sleep(1);
+    }
+    return 0;
+}
+static int reject_count(void)
+{
+    FILE *f=fopen("/run/rtl-bs-sta/wpa.log","r");if(!f)return 0;char line[1024];int count=0;
+    while(fgets(line,sizeof(line),f))if(strstr(line,"ASSOC-REJECT"))count++;
+    fclose(f);return count;
+}
+static int recover_wifi(int before)
+{
+    puts("STATUS\twifi-recovering");fflush(stdout);
+    if(wpa_fd>=0)close(wpa_fd);
+    wpa_fd=-1;unlink(local_socket);
+    char count[32];snprintf(count,sizeof(count),"%d",before);
+    pid_t child=fork();if(!child){dup2(STDERR_FILENO,STDOUT_FILENO);execl("/etc/init.d/S17rtl8723bs-sta","S17rtl8723bs-sta","recover",count,(char *)NULL);_exit(127);}
+    int status,done=0;long long until=milliseconds()+20000;
+    while(child>0&&!stop&&milliseconds()<until){if(waitpid(child,&status,WNOHANG)==child){done=1;break;}struct timespec pause={0,100000000};nanosleep(&pause,NULL);}
+    if(child>0&&!done){kill(child,SIGTERM);waitpid(child,NULL,0);}
+    if(wpa_open())return -1;
+    return done&&WIFEXITED(status)&&!WEXITSTATUS(status)?0:-1;
+}
+static int has_address(void)
+{
+    struct ifaddrs *all;if(getifaddrs(&all))return 0;int found=0;
+    for(struct ifaddrs *a=all;a;a=a->ifa_next)if(a->ifa_addr&&a->ifa_addr->sa_family==AF_INET&&!strcmp(a->ifa_name,"rtlwlan0")&&((struct sockaddr_in *)a->ifa_addr)->sin_addr.s_addr)found=1;
+    freeifaddrs(all);return found;
+}
 static int wifi_action(const char *action, const char *key)
 {
     char ssid[33], command[400], reply[4096];
@@ -124,7 +161,10 @@ static int wifi_action(const char *action, const char *key)
     if (!request("STATUS", reply, sizeof(reply))) {
         char *old = strstr(reply, "\nid="); if (old) previous_id = atoi(old + 4);
     }
-    if (!strcmp(action, "wifi-disconnect")) return ok("DISCONNECT") ? error("disconnect-failed") : 0;
+    if (!strcmp(action, "wifi-disconnect")) {
+        int fd=open("/run/rtl-bs-sta/manual-disconnect",O_WRONLY|O_CREAT,0600);if(fd<0)return error("disconnect-failed");close(fd);
+        return ok("DISCONNECT") ? error("disconnect-failed") : 0;
+    }
     if (!strcmp(action, "wifi-forget")) {
         if (id < 0) return 0;
         snprintf(command, sizeof(command), "REMOVE_NETWORK %d", id);
@@ -149,14 +189,14 @@ static int wifi_action(const char *action, const char *key)
         if (ok(command)) goto configure_failed;
     }
     snprintf(command, sizeof(command), "SELECT_NETWORK %d", id);
+    int before=reject_count();
+    unlink("/run/rtl-bs-sta/manual-disconnect");
     if (ok(command)) goto configure_failed;
-    int connected = 0;
-    for (int i = 0; i < 30 && !stop; i++) {
-        if (!request("STATUS", reply, sizeof(reply)) && strstr(reply, "wpa_state=COMPLETED\n")) {
-            char expected[64]; snprintf(expected, sizeof(expected), "\nid=%d\n", id);
-            if (strstr(reply, expected)) { connected = 1; break; }
-        }
-        sleep(1);
+    int connected=wait_network(id,25);
+    if(!connected&&!added&&!stop&&reject_count()-before>=2&&!recover_wifi(before)){
+        previous_id=-1;
+        id=find_network(ssid);
+        if(id>=0){snprintf(command,sizeof(command),"SELECT_NETWORK %d",id);if(!ok(command))connected=wait_network(id,25);}
     }
     if (!connected) {
         if (added) { snprintf(command, sizeof(command), "REMOVE_NETWORK %d", id); (void)ok(command); }
@@ -175,7 +215,9 @@ static int wifi_action(const char *action, const char *key)
         }
         int result;
         if (child < 0 || waitpid(child, &result, 0) != child ||
-            !WIFEXITED(result) || WEXITSTATUS(result)) return error("configure-failed");
+            !WIFEXITED(result) || WEXITSTATUS(result)) return error("ip-configure-failed");
+        for(int i=0;i<15&&!stop;i++){if(has_address())return 0;sleep(1);}
+        return error("ip-timeout");
         return 0;
     }
     FILE *pidfile = fopen("/run/rtl-bs-sta/dhcp.pid", "r");

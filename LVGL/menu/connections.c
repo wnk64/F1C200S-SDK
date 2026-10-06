@@ -18,6 +18,7 @@ static struct device devices[CAPACITY];
 static int total, bt, list_page, selected, scene, input_pair, key_mode;
 static pid_t worker;
 static int output_fd = -1, input_fd = -1, listing, had_error, got_done;
+static char failure_reason[64];
 static char incoming[18000];
 static size_t used;
 static char helper_path[320];
@@ -223,7 +224,7 @@ static int start_job(const char *operation, const char *key, const char *secret)
     if (pipe(input)) { close(output[0]); close(output[1]); return -1; }
     listing = strstr(operation, "-scan") || strstr(operation, "-list");
     if (listing) total = 0;
-    used = 0; had_error = got_done = 0;
+    used = 0; had_error = got_done = 0;failure_reason[0]=0;
     worker = fork();
     if (worker < 0) { close(output[0]); close(output[1]); close(input[0]); close(input[1]); worker = 0; status("启动失败"); return -1; }
     if (!worker) {
@@ -255,7 +256,8 @@ static void result_line(char *line)
         snprintf(d->key, sizeof(d->key), "%s", fields[0]);
         d->connected = atoi(fields[2]); d->known = atoi(fields[3]); d->secure = atoi(fields[4]); d->signal = atoi(fields[5]); total++;
     } else if (!strcmp(type, "DONE")) got_done = 1;
-    else if (!strcmp(type, "ERROR")) had_error = 1;
+    else if (!strcmp(type, "ERROR")) {had_error=1;char *why=strtok_r(NULL,"\t",&save);if(why)snprintf(failure_reason,sizeof(failure_reason),"%s",why);}
+    else if (!strcmp(type,"STATUS")) status("正在恢复 Wi-Fi，请稍候");
     else if (!strcmp(type, "CONFIRM") || !strcmp(type, "PIN") || !strcmp(type, "DISPLAY")) {
         char *code = strtok_r(NULL, "\t", &save); pair_prompt(type, code ? code : "");
     }
@@ -280,7 +282,13 @@ void connections_poll(void)
     worker = 0;
     int failed = had_error || !got_done || !WIFEXITED(code) || WEXITSTATUS(code);
     if (listing) { list_page = 0; draw_list(); if (failed) status("扫描失败，请重试"); }
-    else if (failed) { details(); status("操作失败，请重试"); }
+    else if (failed) {
+        details();
+        if(!strcmp(failure_reason,"connect-timeout"))status("关联失败，请检查热点或密码");
+        else if(!strcmp(failure_reason,"ip-timeout")||!strcmp(failure_reason,"ip-configure-failed"))status("已连接，但未获取网络地址");
+        else if(!strcmp(failure_reason,"wifi-unavailable"))status("Wi-Fi 服务不可用");
+        else status("操作失败，请重试");
+    }
     else { draw_list(); start_job(bt ? "bt-list" : "wifi-list", NULL, NULL); }
 }
 void connections_show(int bluetooth)

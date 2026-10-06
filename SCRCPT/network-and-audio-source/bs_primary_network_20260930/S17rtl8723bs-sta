@@ -7,8 +7,16 @@ RUN=/run/rtl-bs-sta
 CONF=/etc/rtl8723bs-sta.conf
 
 network_worker() {
+    waited=0
+    initial=$(grep -c ASSOC-REJECT "$RUN/wpa.log" 2>/dev/null || true)
+    initial=${initial:-0}
     while ! "$CLI" -p "$RUN" -i rtlwlan0 status 2>/dev/null | grep -q '^wpa_state=COMPLETED'; do
+        [ ! -e "$RUN/manual-disconnect" ] || return 0
         [ -r "$RUN/wpa.pid" ] && kill -0 "$(cat "$RUN/wpa.pid")" 2>/dev/null || return 1
+        waited=$((waited + 1))
+        if [ "$waited" -eq 45 ] && [ $(( $(grep -c ASSOC-REJECT "$RUN/wpa.log") - initial )) -ge 2 ]; then
+            exec /etc/init.d/S17rtl8723bs-sta recover "$initial"
+        fi
         sleep 1
     done
     rc=2
@@ -25,6 +33,7 @@ network_worker() {
 start() {
     [ -s "$CONF" ] || { echo '[bs-sta] private Wi-Fi config missing' >&2; return 1; }
     mkdir -p "$RUN" || return 1
+    rm -f "$RUN/manual-disconnect"
     sh "$BASE/load-wifi.sh" "$BASE/r8723bs.ko" || return 1
     ifconfig rtlwlan0 up || return 1
     if ! "$CLI" -p "$RUN" -i rtlwlan0 ping 2>/dev/null | grep -q PONG; then
@@ -40,14 +49,48 @@ start() {
 
 stop() {
     for file in worker.pid dhcp.pid; do
-        [ ! -r "$RUN/$file" ] || kill "$(cat "$RUN/$file")" 2>/dev/null
+        [ -r "$RUN/$file" ] || continue
+        pid=$(cat "$RUN/$file")
+        case "$pid" in ''|*[!0-9]*) continue ;; esac
+        [ "$pid" -gt 1 ] && [ "$pid" != "$$" ] || continue
+        args=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)
+        case "$args" in *S17rtl8723bs-sta*|*udhcpc*rtlwlan0*) kill "$pid" 2>/dev/null || true ;; esac
     done
+    rm -f "$RUN/worker.pid" "$RUN/dhcp.pid"
     "$CLI" -p "$RUN" -i rtlwlan0 terminate >/dev/null 2>&1 || true
+    n=0
+    while "$CLI" -p "$RUN" -i rtlwlan0 ping 2>/dev/null | grep -q PONG; do
+        n=$((n + 1)); [ "$n" -lt 5 ] || return 1; sleep 1
+    done
+}
+
+recover() {
+    [ ! -e "$RUN/manual-disconnect" ] || return 1
+    "$CLI" -p "$RUN" -i rtlwlan0 status | grep -q '^wpa_state=COMPLETED' && return 1
+    tail -15 "$RUN/wpa.log" | grep -q -e WRONG_KEY -e AUTH_FAILED && return 1
+    [ "$(tail -15 "$RUN/wpa.log" | grep -c ASSOC-REJECT)" -ge 2 ] || return 1
+    initial=${1:-0};case "$initial" in ''|*[!0-9]*) return 1 ;; esac
+    [ $(( $(grep -c ASSOC-REJECT "$RUN/wpa.log") - initial )) -ge 2 ] || return 1
+    bssid=$(sed -n 's/.*Trying to associate with \([0-9a-f:]*\).*/\1/p' "$RUN/wpa.log" | tail -1)
+    [ -n "$bssid" ] && "$CLI" -p "$RUN" -i rtlwlan0 scan_results | grep -q "^$bssid" || return 1
+    mkdir "$RUN/recover.lock" 2>/dev/null || return 1
+    trap 'rmdir "$RUN/recover.lock"' EXIT
+    now=$(cut -d . -f1 /proc/uptime); last=0
+    [ ! -r "$RUN/recover.last" ] || read -r last < "$RUN/recover.last"
+    case "$last" in ''|*[!0-9]*) last=0 ;; esac
+    [ "$last" -eq 0 ] || [ $((now - last)) -ge 300 ] || return 1
+    printf '%s\n' "$now" > "$RUN/recover.last"
+    echo '[bs-sta] bounded association-stall recovery' >&2
+    stop || return 1
+    ifconfig rtlwlan0 down || return 1
+    /sbin/rmmod r8723bs || { start; return 1; }
+    start
 }
 
 case "${1:-start}" in
     start) start ;;
     stop) stop ;;
     restart) stop; start ;;
+    recover) recover "${2:-0}" ;;
     *) echo "Usage: $0 {start|stop|restart}" >&2; exit 1 ;;
 esac
