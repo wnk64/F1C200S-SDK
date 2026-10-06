@@ -39,6 +39,15 @@ Details: environment_layout_20261002/README.md and /home/wnk/Desktop/F1c200S_SOF
 
 # Worktree Change Log
 
+## 2026-10-07 / pending acceptance / on-demand MIC recording
+New source: SOFTWARE/mic-recorder; menu entry: SCRCPT/cast-and-menu-source/apps.conf.
+Base1f2b7d9, commits82795d4/1ca7e90/cfc8adc; existing unrelated dirty DTB preserved.
+Existing Codec capture was present but ADC MIC route off; new app enables only capture controls and restores exact saved values.
+Build: make -C SOFTWARE/mic-recorder, original Buildroot GCC6.4, no warnings; no kernel/DTB/module/network/audio-route changes.
+Deploy/hash/tests/rollback: SOFTWARE/mic-recorder/WORKTREE_CHANGELOG.md and changes.cn.md.
+8s and20s nonblocking capture passed without xrun, WAV valid; SIGTERM finalizes and mixer SHA unchanged, coreRSS2032KiB.
+Active cast was not interrupted. GUI/audio listening and complete protected regressions/three coldboots unverified; candidate only.
+
 ## 2026-10-05 / planned / ONS application source baseline
 
 Base: 97bbebd; source-reproducible application, board candidate SHA256 dd18b6e499ecc36b0a010ccbdc37cc3c7143b38af26c9a78eedcf8362b15c9c9 retained.
