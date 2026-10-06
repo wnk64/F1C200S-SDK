@@ -7,6 +7,13 @@ Deploy required: existing cjk28.bin asset copied onto SD (vfat cannot symlink), 
 Rollback: existing recorder source cfc8adc and launcher1ca7e90; independent SD candidate, original application paths retained.
 Protected: kernel, modules, default audio routing, Wi-Fi/cast; test screenshot and capture/stop/playback states.
 
+Result: source c361399, make -C SOFTWARE/mic-recorder PASS with original GCC6.4/no warnings.
+Deployment: /root/roms/candidates/mic_recorder_ui_20261007; recorder4632a9bf6cd6204a75c5e9f03927c26a56f73037afa57394f41783806d075fe4, launcher31372514f3aa07d35a5521ff55f33113c92322fbb3c1c5074ec5620b582f148c, CJK asseta2cea8412a83661341e951e7549f1b9fef506c93c34b7e6fdece7892df86ace0, hashes matched.
+GUI --ui-test20000 rc0; framebuffer screenshot recorder-ui-fixed.png shows clear Chinese labels, outlined88px buttons, no overlap. Interactive user recording7.027s/224856bytes during test, xruns0; saved user WAV retained.
+Menu switched only recorder/media entries, apps SHAd01774920b6a4cd79bc9f239548102b63f7b707e385b964239f916138a919067, supervisor14624 restored.
+Capture closed and MIC switch off afterward; no one-off helper scripts, no diagnostic recordings generated/deleted this round.
+Decision: deployed candidate; audible quality, full protected regressions and three coldboots pending.
+
 Worktree: /home/wnk/Desktop/F1c200S_SOFT
 Component: independent microphone recording application
 Base: 1f2b7d9, tracked LVGL/menu platform and LVGL8 source

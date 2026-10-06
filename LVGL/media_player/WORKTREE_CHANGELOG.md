@@ -9,6 +9,16 @@ Deploy: new /root/roms/candidates/media_wav_20261007 with existing CJK asset, re
 Rollback: restore media entry from0e76791; original media menu/UI binary paths unchanged.
 Protected: MP3/MP4 UI, geometry backend, kernel/DTB/audio routing/network/Miracast. Tests: list/check WAV/MP3/MP4, existing-file playback control tests, three coldboots pending.
 
+Result: source c361399, make -C LVGL/media_player -j2 PASS; existing _GNU_SOURCE redefinition warning only.
+New SD candidate media_wav_20261007, hashes matched: UI30c587169db41ff381d7c76e38426f77795658b35c0db5f0511c05b74e312a3d; browserecf8aa4381a37c46b8b4d81bfff3aadb671b4e6a7470200c0c0c101c72fff5c0; launcheree9ca8eb821c20db29c55f3ebb50b58a4f2ad223a71899b17fb8de5cd32962ca; CJK asseta2cea8412a83661341e951e7549f1b9fef506c93c34b7e6fdece7892df86ace0.
+Browser --list now includes3previous WAV recordings; --check0. Timed browser GUI rc0, recordings-browser-fixed.png shows file rows/paging/Chinese title correctly.
+WAV selftest0: pause stable0.200, volume29.999996, seek9.600 target10.000, audio-ready PASS; no video OSD/CMA allocation.
+MP3 CodeMonkey selftest0: pause/volume/seek/lyric/hide PASS, lyric index31 at94.900. Parser and LRC selftests0.
+800x480 MP4 selftest0: visible480x800 source0,0 native rotation, pause/volume/seek/frame/hide PASS; pool peak10358784 capacity12582912 fallback0/live0. Backend3cff48d2 unchanged.
+Menu apps SHAd0177492 verified, original binaries retained; user recordings not removed, no helper scripts created. No kernel, DTB, wireless, default audio route or Bluetooth service changes.
+Decision: deployed candidate, actual user listening/touch and3coldboots pending; does not claim support for formats beyond MP3/MP4/WAV.
+Launcher end-to-end: MEDIA_APP_START_DIR=Recordings / MEDIA_BROWSER_TEST_SELECT=existing20sWAV / MPLAYER_UI_SELFTEST=1 / MEDIA_APP_TEST_ONCE=1 -> rc0; browser selection, check, audio UI, pause/volume/seek and menu restoration passed. Playback log written on SD; original full rootfs was not expanded or cleaned.
+
 ## 2026-10-05 / planned / menu geometry backend selection
 Switch media-app.sh BACKEND only to /root/roms/candidates/mplayer_geometry_20261005/mplayer-native-geometry SHA2563cff48d26822847db9fdf466d6d3f9168b4073086d291187fc56c480a04808c2. Backend source85440d9/6ceb14f validates decoded MB32 stride/window; multi-size decode tests fallback0/live0,800UI and MP3 controls regressions PASS,620 full UI EOF0. No kernel or UI changes. Existing menu-launched playback7192 untouched; new path applies on next script launch. Rollback previous backendff93 retained, media-app.sh commit767f6ba/55189f1. Actual visible non800 geometry pending user confirmation, not stable baseline.
 

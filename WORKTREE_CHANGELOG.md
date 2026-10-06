@@ -39,6 +39,14 @@ Details: environment_layout_20261002/README.md and /home/wnk/Desktop/F1c200S_SOF
 
 # Worktree Change Log
 
+## 2026-10-07 / pending acceptance / recorder labels and WAV browser
+Base0e76791/sourcec361399. Recorder CJK asset omitted from prior deploy; corrected in independent SD candidate with fixed bounded/stateful labels and screenshot verification.
+Local browser previously filtered WAV; added WAV to browser and audio-only frontend. Existing MP3/MP4/backend unchanged behavior tested.
+Files/tests/deploy SHA/rollback: SOFTWARE/mic-recorder/WORKTREE_CHANGELOG.md and LVGL/media_player/WORKTREE_CHANGELOG.md; Chinese record SOFTWARE/mic-recorder/changes.cn.md.
+WAV/MP3/800x480 MP4 pause-volume-seek/hide tests0; MP3 lyric test0, video pool fallback0/live0. User recording data retained.
+Menu changes two app paths only; old application binaries retained. No kernel/DTB/module/network/BT/audio-route change.
+No coldboots or full protected end-to-end regressions performed; not stable acceptance.
+
 ## 2026-10-07 / pending acceptance / on-demand MIC recording
 New source: SOFTWARE/mic-recorder; menu entry: SCRCPT/cast-and-menu-source/apps.conf.
 Base1f2b7d9, commits82795d4/1ca7e90/cfc8adc; existing unrelated dirty DTB preserved.
