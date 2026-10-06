@@ -6,8 +6,8 @@ trap 'rm -f "$test_root"/wpa.log "$test_root"/manual-disconnect "$test_root"/rec
 run_case() (
     eval "$(sed '/^case /,$d' "$SERVICE")"
     RUN=$test_root;CLI=fake_cli;ap=1;state=SCANNING
-    fake_cli(){case "$*" in *status) echo "wpa_state=$state" ;; *scan_results) [ "$ap" -eq 0 ] || echo '50:4f:3b:cc:67:52 2412 -40 WPA2 test' ;; esac;}
-    stop(){touch "$RUN/called";return 1;}
+    fake_cli(){ case "$*" in *status) echo "wpa_state=$state" ;; *scan_results) [ "$ap" -eq 0 ] || echo '50:4f:3b:cc:67:52 2412 -40 WPA2 test' ;; esac; }
+    stop(){ touch "$RUN/called";return 1; }
     rm -f "$RUN/manual-disconnect" "$RUN/recover.last" "$RUN/called"
     printf '%s\n' 'Trying to associate with 50:4f:3b:cc:67:52' 'ASSOC-REJECT status_code=1' 'ASSOC-REJECT status_code=1' > "$RUN/wpa.log"
     initial=0
