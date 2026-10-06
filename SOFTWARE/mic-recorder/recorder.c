@@ -33,6 +33,7 @@ static uint32_t bytes;
 static double energy;
 static char path[512], message[160] = "就绪";
 static pid_t playback;
+static uint64_t last_data;
 static volatile sig_atomic_t quit;
 static lv_obj_t *status_label, *time_label, *file_label, *level_label;
 static void stop_signal(int sig) { (void)sig; quit = 1; }
@@ -152,6 +153,9 @@ static int begin_record(const char *requested)
     if (rc < 0) { pcm = NULL; error_text("录音设备失败", rc); goto abort_record; }
     rc = snd_pcm_set_params(pcm, SND_PCM_FORMAT_S16_LE, SND_PCM_ACCESS_RW_INTERLEAVED, 1, RATE, 0, 160000);
     if (rc < 0) { error_text("录音参数失败", rc); goto abort_record; }
+    rc = snd_pcm_start(pcm);
+    if (rc < 0) { error_text("启动采样失败", rc); goto abort_record; }
+    last_data = platform_ms();
     snprintf(message, sizeof(message), "录音中"); return 0;
 file_error:
     error_text("写入失败", -errno);
@@ -161,6 +165,9 @@ abort_record:
 static void capture(void)
 {
     if (!pcm) return;
+    if (platform_ms() - last_data > 3000) {
+        error_text("录音无数据", -ETIMEDOUT); failed = 1; finish_record(); return;
+    }
     int16_t samples[1024];
     /* Bound work per UI tick so a faulty capture device cannot starve touch. */
     for (int iteration = 0; iteration < 4 && pcm; iteration++) {
@@ -168,13 +175,15 @@ static void capture(void)
         if (n == -EAGAIN || !n) return;
         if (n == -EPIPE) {
             xruns++; int rc = snd_pcm_prepare(pcm);
-            if (rc >= 0 && xruns < 10) return;
+            if (rc >= 0) rc = snd_pcm_start(pcm);
+            if (rc >= 0 && xruns < 10) { last_data = platform_ms(); return; }
             error_text("录音溢出", rc < 0 ? rc : -EPIPE); failed = 1; finish_record(); return;
         }
         if (n < 0) { error_text("录音失败", n); failed = 1; finish_record(); return; }
         uint32_t amount = (uint32_t)n * 2;
         if (write_all(fd, samples, amount)) { error_text("SD 写入失败", -errno); failed = 1; finish_record(); return; }
         bytes += amount;
+        last_data = platform_ms();
         peak = 0;
         for (int i = 0; i < n; i++) {
             int v = abs((int)samples[i]); if (v > peak) peak = v;
