@@ -9,6 +9,14 @@ int main(void)
     assert(dst&&src);memset(dst,0xa5,bytes+32);for(unsigned i=0;i<640*480;i++)src[i]=0xf800;
     assert(retro_blit(dst,bytes,1920,src,640,480,1280,2,4.f/3)==0);
     assert(((uint32_t*)dst)[44*480]==0xff0000);
+    memset(src,0,640*480*2);src[16*640+80]=0xf800;
+    assert(!retro_blit(dst,bytes,1920,src,640,480,1280,2,4.f/3));
+    assert(((uint32_t*)dst)[0]==0xff0000 && ((uint32_t*)dst)[1]==0);
+    for(unsigned i=0;i<240*160;i++)src[i]=0xf800;
+    assert(!retro_blit(dst,bytes,1920,src,240,160,480,2,1.5f));
+    assert(((uint32_t*)dst)[144*480+120]==0xff0000);
+    assert(((uint32_t*)dst)[144*480+119]==0);
+    assert(((uint32_t*)dst)[304*480+120]==0);
     for(size_t i=448*1920;i<bytes+32;i++)assert(dst[i]==0xa5);
     assert(retro_blit(dst,bytes,1920,src,0,480,1280,2,1)==-1);
     assert(retro_blit(dst,bytes,1920,src,640,480,1,2,1)==-1);

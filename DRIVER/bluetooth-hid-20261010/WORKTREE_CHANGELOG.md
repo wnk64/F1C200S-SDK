@@ -1,5 +1,8 @@
 # Worktree Change Log
 
+## 2026-10-10 planned / Native pixels without scaling
+User redirects performance work: native1:1 pixels first. Baseline41290c8; source unchanged except unrelated DTB. Scope sfc_native/blit.h,test_blit.c and retro_native/pixels.h,test_pixels.c. Center original dimensions in480x448 game band, clip oversized source centrally, retain lower touch controls; no aspect-ratio correction or stretching. Remove per-pixel scaling division. Test small centered frame and oversized coordinate clipping plus guard bounds under sanitizers. Rebuild only two game binaries, no browser/menu/network/audio/kernel change. Existing host artifacts/source commits provide rollback; atomically rename deployed .next, apply next game launch. Physical visual/performance and3coldboots pending.
+
 ## 2026-10-10 planned / No visible cursor in emulators
 Baseline a563622; native artifacts recorded below and retained hostside; original menu executable unchanged. Shared platform displays mouse cursor whenever any mouse-capable device exists, including BT keyboard composite mouse. Add opt-in F1_HIDE_MOUSE_CURSOR=1 read once at platform_open; hide through hid_poll while retaining all input handling. Only emulator launchers export option; browser and game inherit it, menu unchanged.
 Scope: LVGL/menu/platform.c, sfc-app.sh, retro-app.sh, emulators-app.sh. Build native and browsers with existing Makefiles, deploy .next then rename on SD without modifying running executables in place. Existing active game changes on next launch. Dependencies: emulator framebuffer/LVGL/input; no kernel/network/audio changes. Cold boots0, physical visual confirmation pending.
