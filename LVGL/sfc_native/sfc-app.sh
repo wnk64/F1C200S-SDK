@@ -25,7 +25,13 @@ while :; do
     "$SELF/sfc-browser" "$rom" --check || exit 1
     browse=$(dirname "$rom")
     printf '%s\n' "$browse" > "$SELF/last-directory"
-    "$SELF/sfc-native" "$rom" >>"$SELF/sfc.log" 2>&1 & child=$!
+    if [ "$(id -u)" -eq 0 ] && command -v nice >/dev/null 2>&1; then
+        priority=${SFC_NICE:--5}
+        case "$priority" in -5|0) ;; *) priority=0 ;; esac
+        nice -n "$priority" "$SELF/sfc-native" "$rom" >>"$SELF/sfc.log" 2>&1 & child=$!
+    else
+        "$SELF/sfc-native" "$rom" >>"$SELF/sfc.log" 2>&1 & child=$!
+    fi
     rc=0;wait "$child" || rc=$?;child=
     [ "$rc" -eq 0 ] || exit "$rc"
 done

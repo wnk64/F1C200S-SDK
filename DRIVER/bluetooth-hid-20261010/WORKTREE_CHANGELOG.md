@@ -1,5 +1,9 @@
 # Worktree Change Log
 
+## 2026-10-11 pending / Normal-scheduler SFC priority comparison
+Baseline9c18b6d O3native69f39371, no binary changes. Current runtime sampled sameROM DRACULAXX22sec with nice0 then nice-5, normal CFS not realtime, no service disabled. Nice0 frames1310/draw655 elapsed21833893us, windowlongframes1/2/5/5, maxwork38676/34703/38504/58061us, offCPUmax23349/21909/21807/41474us. Nice-5 frames1310/draw655 elapsed21830866us, long0/0/2/0,max27536/28453/38106/32113us,offCPUmax11869/14523/21057/15231us. Both audio_dropped0, no subjective Bluetoothaudio claim.
+Hypothesis: bounded ordinary-priority boost reduces scheduling stalls without RT starvation. Reverse-order22sec pair pending. If repeat supports, modify SFC launcher only: default configurableSFC_NICE=-5 with fallback when nice unavailable/unprivileged. Original emulator/app retains source/host rollback, no kernel/network/BT/global scheduler setting; other emulators unchanged. Coldboots0, candidate physical gameplay/audio/input acceptance pending.
+
 ## 2026-10-11 planned / SFC core O3 controlled comparison
 Baselinedd84cc9 SFC2d01e71d exact-color candidate. Board sameROM --headless300 before: frames300 draws300 changes158 nonblack10992 hashf410c7db elapsed5026248us. Headless removes framebuffer/ALSA/pacing but hashes frames, not full gameplay.
 Scope sfc_native/Makefile only core -O3 in separate build/core-o3 directory, preserve -fno-strict-aliasing and all other flags; no fast-math or source/core behavior change. Add opt-in processCPU timing to frontend to separate workCPU from walltime scheduling/wait. Compare hash/framecount and elapsed on board before deployment; retain old core-o2 objects/host artifact. Rebuild using existingBuildrootGCC6.4 ARMv5 softfloat, tests as before. No kernel/network/Bluetooth/audio/scheduler changes. Candidate pending compatibility/performance/3coldboots.
