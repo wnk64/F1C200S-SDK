@@ -154,6 +154,7 @@ static void render(void)
 }
 int main(int argc, char **argv)
 {
+    setenv("F1_HIDE_MOUSE_CURSOR", "1", 1);
     if(argc==2&&!strcmp(argv[1],"--systems")){
         if(platform_open()){platform_close();return 2;}
         signal(SIGTERM,stop);signal(SIGINT,stop);

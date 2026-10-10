@@ -198,6 +198,7 @@ static int memory_file(const char *rom,int save)
 }
 int main(int argc,char **argv)
 {
+    setenv("F1_HIDE_MOUSE_CURSOR", "1", 1);
     int probe=argc==3&&!strcmp(argv[1],"--probe");headless=argc==6&&!strcmp(argv[1],"--headless");
     unsigned limit=headless?strtoul(argv[2],NULL,10):0;int at=headless?3:1;
     if(!probe&&((!headless&&argc!=4)||(headless&&(!limit||limit>36000))))return 1;

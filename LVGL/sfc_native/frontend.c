@@ -156,6 +156,7 @@ static void sram(const char *rom,int save)
 }
 int main(int argc,char **argv)
 {
+    setenv("F1_HIDE_MOUSE_CURSOR", "1", 1);
     int headless=argc==4&&!strcmp(argv[1],"--headless");
     const char *rom=headless?argv[3]:argc==2?argv[1]:NULL;
     unsigned limit=headless?strtoul(argv[2],NULL,10):0;
@@ -175,7 +176,11 @@ int main(int argc,char **argv)
     const char *skip=getenv("SFC_FRAMESKIP");if(skip){int n=atoi(skip);if(n>=0&&n<=5)frameskip=n;}
     unsigned frames=0,draws=0,changes=0,nonblack=0;uint32_t hash=2166136261u,last_hash=0;int64_t started=now_us(),deadline=started;
     uint64_t tick=headless?0:platform_ms();
+    int profile=getenv("F1_EMU_PROFILE")&&atoi(getenv("F1_EMU_PROFILE"));
+    int64_t report_at=started,core_us=0,blit_us=0,audio_us=0,ui_us=0,max_us=0;
+    unsigned report_frames=0,report_draws=0;
     while(!quit&&(!headless||frames<limit)) {
+        int64_t frame_at=profile?now_us():0,section_at=frame_at;
         if(!headless){
             uint64_t t=platform_ms();lv_tick_inc(t-tick);tick=t;lv_timer_handler();
             f1_hid_poll(&game_input,t,480,800);
@@ -186,8 +191,10 @@ int main(int argc,char **argv)
             game_input.pn=0;
             if(paused){deadline=now_us();usleep(10000);continue;}
         }
+        if(profile){int64_t n=now_us();ui_us+=n-section_at;section_at=n;}
         IPPU.RenderThisFrame=headless||frames%(frameskip+1)==0;
         GFX.Screen=(uint8_t *)pixels;S9xMainLoop();frames++;
+        if(profile){int64_t n=now_us();core_us+=n-section_at;section_at=n;}
         if(IPPU.RenderThisFrame){
             int h=IPPU.RenderedScreenHeight,w=IPPU.RenderedScreenWidth;
             if(h<=0||h>478||w<=0||w>512){fprintf(stderr,"invalid core dimensions %dx%d\n",w,h);goto cleanup;}
@@ -198,7 +205,14 @@ int main(int argc,char **argv)
                 last_hash=frame_hash;hash^=frame_hash;hash*=16777619u;}
             draws++;
         }
+        if(profile){int64_t n=now_us();blit_us+=n-section_at;section_at=n;}
         audio_step();
+        if(profile){int64_t n=now_us();audio_us+=n-section_at;if(n-frame_at>max_us)max_us=n-frame_at;
+            if(n-report_at>=5000000){unsigned count=frames-report_frames;
+                fprintf(stderr,"SFC profile fps=%.2f draw_fps=%.2f core_us=%lld blit_us=%lld audio_us=%lld ui_us=%lld max_work_us=%lld\n",
+                    count*1000000.0/(n-report_at),(draws-report_draws)*1000000.0/(n-report_at),
+                    (long long)(core_us/count),(long long)(blit_us/count),(long long)(audio_us/count),(long long)(ui_us/count),(long long)max_us);
+                report_at=n;report_frames=frames;report_draws=draws;core_us=blit_us=audio_us=ui_us=max_us=0;}}
         if(!headless){deadline+=Settings.FrameTime;int64_t wait=deadline-now_us();if(wait>0&&wait<50000)usleep(wait);else if(wait< -100000)deadline=now_us();}
     }
     fprintf(stderr,"SFC frames=%u draws=%u changes=%u nonblack=%u elapsed_us=%lld hash=%08x audio_written=%llu audio_dropped=%llu\n",frames,draws,changes,nonblack,(long long)(now_us()-started),hash,(unsigned long long)audio_written,(unsigned long long)audio_dropped);

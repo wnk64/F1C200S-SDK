@@ -101,8 +101,10 @@ static void hid_poll(void)
         next_hid_poll = now + 8;
         f1_hid_poll(&hid, now, lv_disp_get_hor_res(display), lv_disp_get_ver_res(display));
     }
-    if (hid.mouse_count && mouse_cursor_enabled) lv_obj_clear_flag(mouse_cursor, LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_add_flag(mouse_cursor, LV_OBJ_FLAG_HIDDEN);
+    if (mouse_cursor) {
+        if (hid.mouse_count && mouse_cursor_enabled) lv_obj_clear_flag(mouse_cursor, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(mouse_cursor, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 static void mouse_read(lv_indev_drv_t *driver, lv_indev_data_t *data)
 {
@@ -186,10 +188,13 @@ int platform_open(void)
     lv_indev_drv_register(&pointer);
     const char *hide_cursor = getenv("F1_HIDE_MOUSE_CURSOR");
     mouse_cursor_enabled = !hide_cursor || strcmp(hide_cursor, "1");
+    mouse_cursor = NULL;
+    if (mouse_cursor_enabled) {
     mouse_cursor = lv_label_create(lv_layer_sys()); lv_label_set_text(mouse_cursor, LV_SYMBOL_PLAY);
     lv_obj_set_style_text_font(mouse_cursor, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_color(mouse_cursor, lv_color_hex(0xd32643), 0);
     lv_obj_clear_flag(mouse_cursor, LV_OBJ_FLAG_CLICKABLE); lv_obj_add_flag(mouse_cursor, LV_OBJ_FLAG_HIDDEN);
+    }
     static lv_indev_drv_t mouse; lv_indev_drv_init(&mouse);
     mouse.type = LV_INDEV_TYPE_POINTER; mouse.read_cb = mouse_read;
     lv_indev_set_cursor(lv_indev_drv_register(&mouse), mouse_cursor);

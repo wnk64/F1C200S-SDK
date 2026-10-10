@@ -146,6 +146,7 @@ static void render(void)
 }
 int main(int argc, char **argv)
 {
+    setenv("F1_HIDE_MOUSE_CURSOR", "1", 1);
     const char *directory = argc > 1 ? argv[1] : "/root/roms/sfc";
     if (argc > 2 && !strcmp(argv[2], "--check")) return media_file(directory) ? 0 : 1;
     if (scan(directory)) { fprintf(stderr, "Media directory: %s: %s\n", directory, strerror(errno)); return 1; }
