@@ -19,6 +19,8 @@ ASan/UBSan及泄漏检查通过映射/快速点击/组合键/释放/断联/队�
 
 已确认 connections.c 按 /proc/self/exe 所在目录寻找 connections-helper-ip；迁移到 SD 的 HID 菜单缺少该文件。只补入原菜单同版本辅助程序（SHA256：8129fa341b7c9eca649c5c73abca3fd12f1566afe6bf1beab9ea92fe991127a8），保留原目录文件，不修改 Wi-Fi、蓝牙配对或内核。将从新路径实际执行列表与扫描验证；三次冷启动验收尚未完成。
 
+实施结果：计划记录提交 ccd7cbb；已补齐 SD 目录的 connections-helper-ip，权限 700，SHA256 与原版完全一致并已 sync。新路径的 wifi-list、wifi-scan、bt-list、bt-scan 均正常返回设备列表和 DONE。路由器 ping 两次成功、丢包率 0%，SSH 和菜单进程保持正常。无需重启菜单，下次点击会直接调用补齐后的程序。屏幕实际操作和三次冷启动验收待完成；BLE 键盘问题仍未解决，本次没有替换内核或音频后台脚本，也没有创建临时脚本。
+
 实测结果：通过 BlueZ 设置 Powered=false/true 成功，/proc/crypto 立即新增 cmac(aes)，之后无新的安全通道不可用报错。键盘 Connect 超时，Xbox 重连失败，两者仍需用户唤醒/开启配对模式。没有删除配对，没有修改内核或开机服务，音频后台进程保留；当前适配器已开启。开机路径永久修复和键盘按键上报验证尚未完成，不能宣称已修好。诊断抓包不保留密钥内容，使用完移除。
 
 Xbox 菜单操作已由用户确认有效；连续按键测试未收到键盘事件。键盘为 BLE HOG，Xbox 为传统 HIDP。键盘磁盘记录无 LongTermKey，内核出现 security requested but not available，抓包出现 BT_SECURITY Invalid argument。计划通过 BlueZ 重新开启适配器验证 audio-backend 中 hciconfig up 与 bluetoothd 初始化竞争的假设，不替换内核，不删除已有配对。适配器切换会短暂断开 Xbox，之后恢复。尚未进行冷启动验收。
