@@ -1,0 +1,9 @@
+/build/
+/stage/
+/retro-native
+/retro-browser
+/vendor/**/*.o
+/vendor/**/*.d
+/vendor/**/*.so
+/vendor/**/Cyclone.s
+/vendor/**/cyclone_gen

@@ -25,6 +25,7 @@
 #include "ppf.h"
 
 #include <assert.h>
+#include <stdio.h>
 #include <errno.h>
 #include <zlib.h>
 #ifdef HAVE_CHD
