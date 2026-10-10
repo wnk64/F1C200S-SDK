@@ -31,14 +31,62 @@ static inline int DRM_IOCTL(int fd, unsigned long cmd, void *arg) {
   return ret < 0 ? -errno : ret;
 }
 
-static void drm_warpper_wait_for_vsync(drm_warpper_t *drm_warpper){
+static int drm_warpper_wait_for_vsync(drm_warpper_t *drm_warpper){
     drm_warpper->blank.request.type = DRM_VBLANK_RELATIVE;
     drm_warpper->blank.request.sequence = 1;
     // log_info("wait for vsync");
     if (drmWaitVBlank(drm_warpper->fd, (drmVBlankPtr) &drm_warpper->blank)) {
       log_error("drmWaitVBlank failed");
+      return -1;
     }
-    // log_info("vsync done");
+    return 0;
+}
+
+typedef struct {
+    drm_warpper_queue_item_t *pending, *retired;
+    unsigned long frames, commands, return_busy, commit_errors;
+} bounded_layer_t;
+
+/* Called only after a successful vblank. Never return a still-scanned frame. */
+static int bounded_layer_step(drm_warpper_t *w, int id, bounded_layer_t *s)
+{
+    layer_t *layer = &w->layer[id];
+    if (s->retired) {
+        if (spsc_bq_try_push(&layer->free_queue, s->retired) != 0) {
+            s->return_busy++;
+            return 0;
+        }
+        s->retired = NULL;
+    }
+    if (!s->pending && spsc_bq_try_pop(&layer->display_queue, (void **)&s->pending) != 0)
+        return 0;
+    struct drm_srgn_atomic_commit_data command = s->pending->mount;
+    command.layer_id = id;
+    struct drm_srgn_atomic_commit request = {
+        .size = 1, .data = (uint32_t)(uintptr_t)&command,
+    };
+    if (drmIoctl(w->fd, DRM_IOCTL_SRGN_ATOMIC_COMMIT, &request) < 0) {
+        s->commit_errors++;
+        return -1;
+    }
+    s->commands++;
+    if (command.type == DRM_SRGN_ATOMIC_COMMIT_MOUNT_FB_NORMAL ||
+        command.type == DRM_SRGN_ATOMIC_COMMIT_MOUNT_FB_YUV) {
+        s->retired = layer->curr_item;
+        layer->curr_item = s->pending;
+        s->frames++;
+    } else if (s->pending->on_heap) {
+        free(s->pending);
+    }
+    s->pending = NULL;
+    return command.type == DRM_SRGN_ATOMIC_COMMIT_MOUNT_FB_YUV ? 1 : 0;
+}
+
+static void bounded_layer_cleanup(bounded_layer_t *s)
+{
+    /* Decoder destruction owns picture buffers after the display worker joins. */
+    free(s->pending); free(s->retired);
+    s->pending = s->retired = NULL;
 }
 
 // 内核那边会缓存用户地址到物理地址，以便快速挂。
@@ -81,10 +129,25 @@ static void* drm_warpper_display_thread(void *arg){
     int stats_enabled = stats_env && strcmp(stats_env, "1") == 0;
     frame_gap_t gaps = {0};
     unsigned long commit_errors = 0;
+    const char *bounded_env = getenv("CEDAR_DISPLAY_BOUNDED");
+    int bounded = bounded_env && strcmp(bounded_env, "1") == 0;
+    bounded_layer_t bounded_layers[4] = {{0}};
+    if (bounded) log_info("bounded display: one command/layer/vblank, deferred nonblocking returns");
     if (stats_enabled) gaps.report_us = drm_monotonic_us();
 
     while(atomic_load(&drm_warpper->thread_running)){
-        drm_warpper_wait_for_vsync(drm_warpper);
+        int vsync_result = drm_warpper_wait_for_vsync(drm_warpper);
+        if (bounded) {
+            if (vsync_result < 0) { usleep(2000); continue; }
+            for (int i = 0; i < 4; i++) if (drm_warpper->layer[i].used) {
+                int mounted = bounded_layer_step(drm_warpper, i, &bounded_layers[i]);
+                if (i == DRM_WARPPER_LAYER_VIDEO) {
+                    if (mounted > 0 && stats_enabled) frame_gap_success(&gaps, drm_monotonic_us());
+                    if (mounted < 0) commit_errors++;
+                }
+            }
+            goto report_stats;
+        }
         int video_mount = 0;
         // log_info("vsync");
         commit_req.size = 0;
@@ -132,6 +195,7 @@ static void* drm_warpper_display_thread(void *arg){
                 frame_gap_success(&gaps, drm_monotonic_us());
             }
         }
+report_stats:
         if (stats_enabled) {
             int64_t now = drm_monotonic_us();
             if (now - gaps.report_us >= 5000000) {
@@ -147,10 +211,17 @@ static void* drm_warpper_display_thread(void *arg){
                          (unsigned long long)frame_gap_idle(&gaps, now),
                          commit_errors);
                 frame_gap_reset_window(&gaps, now);
+                if (bounded) {
+                    bounded_layer_t *s = &bounded_layers[DRM_WARPPER_LAYER_VIDEO];
+                    log_info("bounded video totals: frames=%lu commands=%lu return_busy=%lu commit_errors=%lu pending=%d retired=%d",
+                             s->frames, s->commands, s->return_busy, s->commit_errors,
+                             s->pending != NULL, s->retired != NULL);
+                }
             }
         }
     }
 
+    for (int i = 0; i < 4; i++) bounded_layer_cleanup(&bounded_layers[i]);
     log_info("==> DRM_Warpper Display Thread Ended!");
     return NULL;
 }

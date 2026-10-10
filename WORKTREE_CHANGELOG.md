@@ -1,5 +1,15 @@
 # Worktree Change Log
 
+## 2026-10-10 planned / opt-in bounded display scheduling
+Base5685c63, original repository SOFTWARE/cedar-player, source files clean; generated binaries/objects dirty and preserved. Existing player MD5a683cf70a95ba2759b5c9d2b1e0dc016 matches last deployed frame-gap player. Complete tracked source/config/build recipe and existing rollback archives retained.
+Hypothesis: draining multiple framebuffer updates and blocking frame returns before ioctl causes avoidable burst coalescing/stalls.
+Files: player-src/driver/drm_warpper.c, render/mediaplayer.c, tests/test_display_bounded.c, build-display-candidate.sh, Chinese change record.
+Candidate: CEDAR_DISPLAY_BOUNDED=1 only; default legacy branch unchanged. One command per layer per vblank; pending ioctl retry, old frame retired only after next successful vblank, nonblocking frame returns, bounded ownership.
+Counters: CEDAR_PIPELINE_STATS=1 reports raw access-unit submissions and decoded/enqueued/queue-dropped frames separately. Default probes off; no new thread or heap video buffer.
+Protected: existing raw pacing/PTS, geometry, decoder rotation/CMA config, sink/audio, kernel/DTB/modules/Wi-Fi/BT/menu. No board access or deployment.
+Build: separate candidate output directory, no clean/default tracked-object overwrite. Rollback: deployed binaries/scripts remain unchanged; unset new flags.
+Tests planned: host fake-ioctl ownership/backpressure/retry/teardown sanitizer tests and existing lifecycle/frame-gap tests, ARM build. Physical playback/three coldboots pending.
+
 ## 2026-10-01 planned / opt-in successful video commit intervals
 Results: diagnostic source940fdc5, host summary305e685 (3 Python tests pass
 on Windows and VM; zero-frame windows after first commit included).

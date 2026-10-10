@@ -39,6 +39,13 @@ extern int g_video_buf_ready;
 #define MP_RAW_READ_CHUNK (32 * 1024)
 #define MP_RAW_BUFFER_MAX (1024 * 1024)
 
+static int64_t mp_monotonic_us(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (int64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+}
+
 static int mp_is_network_uri(const char *path)
 {
     return path &&
@@ -664,6 +671,9 @@ static void *mp_raw_h264_thread(void *param)
     int64_t pts_step = mp_frame_interval_us(mp);
     struct stat input_stat;
     int input_fifo;
+    int pipeline_stats = mp_env_flag("CEDAR_PIPELINE_STATS");
+    unsigned long submitted_aus = 0;
+    int64_t au_report = pipeline_stats ? mp_monotonic_us() : 0;
 
     log_info("==> mp_raw_h264 Thread Started!");
 
@@ -855,6 +865,15 @@ static void *mp_raw_h264_thread(void *param)
                     goto raw_done;
                 }
                 pts += pts_step;
+                if (pipeline_stats) {
+                    submitted_aus++;
+                    int64_t now = mp_monotonic_us();
+                    if (now - au_report >= 5000000) {
+                        log_info("raw AU window: submitted=%lu span_us=%lld (next-AUD boundary, synthetic PTS)",
+                                 submitted_aus, (long long)(now - au_report));
+                        submitted_aus = 0; au_report = now;
+                    }
+                }
                 break;
             }
 
@@ -921,6 +940,10 @@ static void *mp_decoder_thread(void *param)
     int native_view_logged = 0;
     unsigned long decode_calls = 0;
     unsigned long decode_results[7] = {0};
+    int pipeline_stats = mp_env_flag("CEDAR_PIPELINE_STATS");
+    unsigned long pictures = 0, enqueued = 0, queue_drops = 0;
+    int64_t decode_us = 0, decode_max_us = 0, pace_us = 0;
+    int64_t pipeline_report = pipeline_stats ? mp_monotonic_us() : 0;
 
 
     next_frame_time = mp_get_now_us() + fallback_interval;
@@ -958,7 +981,13 @@ static void *mp_decoder_thread(void *param)
         }
 
         // long long start = mp_get_now_us();
+        int64_t decode_begin = pipeline_stats ? mp_monotonic_us() : 0;
         ret = DecodeVideoStream(decoder, end_of_stream, 0, 0, 0);
+        if (pipeline_stats) {
+            int64_t elapsed = mp_monotonic_us() - decode_begin;
+            decode_us += elapsed;
+            if (elapsed > decode_max_us) decode_max_us = elapsed;
+        }
         decode_calls++;
         if (ret >= 0 && ret < 7)
             decode_results[ret]++;
@@ -967,6 +996,16 @@ static void *mp_decoder_thread(void *param)
                      decode_calls, decode_results[0], decode_results[1],
                      decode_results[2], decode_results[3], decode_results[4],
                      decode_results[5], decode_results[6]);
+        }
+        if (pipeline_stats) {
+            int64_t now = mp_monotonic_us();
+            if (now - pipeline_report >= 5000000) {
+                log_info("decoder window: pictures=%lu enqueued=%lu queue_drops=%lu span_us=%lld decode_us=%lld decode_max_us=%lld pace_us=%lld",
+                         pictures, enqueued, queue_drops, (long long)(now - pipeline_report),
+                         (long long)decode_us, (long long)decode_max_us, (long long)pace_us);
+                pictures = enqueued = queue_drops = 0;
+                decode_us = decode_max_us = pace_us = 0; pipeline_report = now;
+            }
         }
         // long long finish = mp_get_now_us();
         // log_debug("frame time: %lld us", finish - start);
@@ -991,6 +1030,7 @@ static void *mp_decoder_thread(void *param)
                     log_error("RequestPicture err");
                     continue;
                 }
+                if (pipeline_stats) pictures++;
 
                 if (picture->nWidth != (int)g_video_buf.width ||
                     picture->nHeight != (int)g_video_buf.height) {
@@ -1043,7 +1083,9 @@ static void *mp_decoder_thread(void *param)
                     if (target_time > now) {
                         int64_t wait_us = target_time - now;
                         if (wait_us <= MP_MAX_FRAME_INTERVAL_US) {
+                            int64_t pace_begin = pipeline_stats ? mp_monotonic_us() : 0;
                             usleep(wait_us);
+                            if (pipeline_stats) pace_us += mp_monotonic_us() - pace_begin;
                         } else {
                             next_frame_time = now + fallback_interval;
                         }
@@ -1082,6 +1124,7 @@ static void *mp_decoder_thread(void *param)
                 item_to_display->on_heap = false;
                 ret = drm_warpper_try_enqueue_display_item(mp->drm_warpper, DRM_WARPPER_LAYER_VIDEO, item_to_display);
                 if (ret != 0) {
+                    if (pipeline_stats) queue_drops++;
                     static unsigned int dropped_display_frames;
                     dropped_display_frames++;
                     if ((dropped_display_frames & 0x3f) == 1) {
@@ -1089,6 +1132,8 @@ static void *mp_decoder_thread(void *param)
                     }
                     ReturnPicture(decoder, picture);
                     free(item_to_display);
+                } else if (pipeline_stats) {
+                    enqueued++;
                 }
             }
         }
