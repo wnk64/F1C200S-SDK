@@ -1,5 +1,9 @@
 # Worktree Change Log
 
+## 2026-10-10 planned / Restore relocated menu helper
+Baseline: project e2b77b0; GUI1984410ae0c932b8cdb14cd92b8f9128ee3ca744264de69c716a941809e602d1 unchanged. connections.c resolves connections-helper-ip relative to /proc/self/exe; HID SD directory lacks that executable. Stable helper exists under menu_graphics_boot_20261003; SHA8129fa341b7c9eca649c5c73abca3fd12f1566afe6bf1beab9ea92fe991127a8.
+Action: copy existing unchanged helper into /root/roms/candidates/bluetooth_hid_20261010/connections-helper-ip, verify checksum and executable flag, run wifi-list/bt-list/wifi-scan/bt-scan through candidate path. Original remains untouched; remove only added candidate file to undo. No rebuild, kernel/network/bond/source changes. Bluetooth BLE startup issue separate, pending. Cold boots 0; no stable acceptance claim.
+
 ## 2026-10-10 pending / BLE keyboard security diagnosis
 Baseline: source 5801eef; running Linux 5.7.1 #250 unchanged. Xbox menu controls user-confirmed; keyboard presses produced zero input events.
 Evidence: keyboard Paired=true in BlueZ but no LongTermKey section on disk; kernel security requested but not available; bt_io_set BT_SECURITY Invalid argument; LE reconnect timeouts. Do not log secret keys.

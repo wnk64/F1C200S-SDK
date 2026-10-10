@@ -15,6 +15,10 @@ ASan/UBSan及泄漏检查通过映射/快速点击/组合键/释放/断联/队�
 构建路径与SHA、回退见根WORKTREE_CHANGELOG.md。本轮无板端部署，不称蓝牙已适配完成、不称稳定版；需先恢复受控kernel构建记录，再生成HID模块并实测配对/自动重连/键鼠与蓝牙音响并用/三冷回归。
 # 2026-10-10 键盘安全通道诊断（待验证）
 
+## 新菜单网络控制恢复计划
+
+已确认 connections.c 按 /proc/self/exe 所在目录寻找 connections-helper-ip；迁移到 SD 的 HID 菜单缺少该文件。只补入原菜单同版本辅助程序（SHA256：8129fa341b7c9eca649c5c73abca3fd12f1566afe6bf1beab9ea92fe991127a8），保留原目录文件，不修改 Wi-Fi、蓝牙配对或内核。将从新路径实际执行列表与扫描验证；三次冷启动验收尚未完成。
+
 实测结果：通过 BlueZ 设置 Powered=false/true 成功，/proc/crypto 立即新增 cmac(aes)，之后无新的安全通道不可用报错。键盘 Connect 超时，Xbox 重连失败，两者仍需用户唤醒/开启配对模式。没有删除配对，没有修改内核或开机服务，音频后台进程保留；当前适配器已开启。开机路径永久修复和键盘按键上报验证尚未完成，不能宣称已修好。诊断抓包不保留密钥内容，使用完移除。
 
 Xbox 菜单操作已由用户确认有效；连续按键测试未收到键盘事件。键盘为 BLE HOG，Xbox 为传统 HIDP。键盘磁盘记录无 LongTermKey，内核出现 security requested but not available，抓包出现 BT_SECURITY Invalid argument。计划通过 BlueZ 重新开启适配器验证 audio-backend 中 hciconfig up 与 bluetoothd 初始化竞争的假设，不替换内核，不删除已有配对。适配器切换会短暂断开 Xbox，之后恢复。尚未进行冷启动验收。
