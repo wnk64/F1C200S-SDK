@@ -5,6 +5,7 @@ Baseline: source 5801eef; running Linux 5.7.1 #250 unchanged. Xbox menu controls
 Evidence: keyboard Paired=true in BlueZ but no LongTermKey section on disk; kernel security requested but not available; bt_io_set BT_SECURITY Invalid argument; LE reconnect timeouts. Do not log secret keys.
 Hypothesis: audio-backend starts bluetoothd asynchronously then hciconfig up before HCI_MGMT initialization; legacy power-up bypasses SMP registration. Validate using BlueZ Powered=false/true, reconnect Xbox and keyboard. No service/source/kernel replacement yet.
 Protected dependencies: Wi-Fi/SSH, existing Xbox bond and audio processes; adapter toggle briefly disconnects Bluetooth only. Restore Powered=true and reconnect existing devices. Cold boots 0; candidate remains pending.
+Result: BlueZ Powered=false/true succeeded; cmac(aes) appeared in /proc/crypto immediately, previously absent. No new security-unavailable messages after toggle. Both devices currently disconnected; Xbox reconnect Failed, keyboard Connect NoReply. Requested physical wake/pairing mode; no bonds deleted, no kernel/service files changed. Adapter remains Powered=true; bluetoothd/bluealsa unchanged. MemAvailable37580kB/CmaFree17548kB. audio-backend source/runtime SHAba68631d4db5fae2ebdf618d00aa79bf9eac226b2acc3618657ed1cb3a8e5bae matches. Persistent startup correction and keyboard key verification pending.
 
 Worktree: /home/wnk/Desktop/F1c200S_SOFT
 Component: external upstream HIDP/UHID modules
