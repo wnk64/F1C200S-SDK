@@ -39,6 +39,13 @@ Details: environment_layout_20261002/README.md and /home/wnk/Desktop/F1c200S_SOF
 
 # Worktree Change Log
 
+## 2026-10-10 planned / offline HID input candidate
+Base038fcee; modify LVGL/menu/platform.c and add header-only evdev-hid.h with deterministic host tests, HID kernel config fragment and Chinese record. Existing shared platform source tracked, built menu binaries retained; no new worktree/board access.
+Hypothesis: capability-based evdev discovery and separate LVGL mouse/keypad inputs enable HID without disrupting direct-I2C touch fallback.
+Scope: shared-platform menu, settings and browsers; default group navigation/text entry, relative mouse/cursor, bounded event queues and periodic hotplug discovery. Independent ONS/wiliwili/custom video inputs not automatically claimed supported.
+Protected: kernel .config/zImage/modules, BlueZ/audio services, network/cast/default audio policy; only config fragment staged, kernel not built pending documented build-command gate.
+Rollback: Git038fcee platform.c; no deployment. Tests: host synthetic input, GCC6.4 menu/media/recorder builds. Physical pairing, audio coexistence, scanout and3coldboots pending.
+
 ## 2026-10-07 / pending acceptance / recorder labels and WAV browser
 Base0e76791/sourcec361399. Recorder CJK asset omitted from prior deploy; corrected in independent SD candidate with fixed bounded/stateful labels and screenshot verification.
 Local browser previously filtered WAV; added WAV to browser and audio-only frontend. Existing MP3/MP4/backend unchanged behavior tested.
