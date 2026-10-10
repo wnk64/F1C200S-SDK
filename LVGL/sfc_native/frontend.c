@@ -44,7 +44,15 @@ static uint32_t key_mask(unsigned key)
     default:return 0;
     }
 }
-uint32_t S9xReadJoypad(int32_t port) { return port == 0 ? touch_pad | keyboard_pad : 0; }
+uint32_t S9xReadJoypad(int32_t port)
+{
+    if(port)return 0;
+    static const uint32_t masks[]={SNES_B_MASK,SNES_Y_MASK,SNES_SELECT_MASK,SNES_START_MASK,
+        SNES_UP_MASK,SNES_DOWN_MASK,SNES_LEFT_MASK,SNES_RIGHT_MASK,SNES_A_MASK,SNES_X_MASK,SNES_TL_MASK,SNES_TR_MASK};
+    uint32_t pad=touch_pad|keyboard_pad;unsigned buttons=f1_hid_pad(&game_input);
+    for(unsigned i=0;i<sizeof(masks)/sizeof(*masks);i++)if(buttons&(1u<<i))pad|=masks[i];
+    return pad;
+}
 bool S9xReadMousePosition(int32_t n,int32_t *x,int32_t *y,uint32_t *b)
 { (void)n;(void)x;(void)y;(void)b;return false; }
 bool S9xReadSuperScopePosition(int32_t *x,int32_t *y,uint32_t *b)

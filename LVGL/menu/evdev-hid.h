@@ -17,7 +17,7 @@ typedef struct { int x, y, down; } f1_hid_point;
 typedef struct {
     int fd, number, mouse, keyboard, gamepad, left, shift, caps;
     uint16_t buttons, axes;
-    int axis_min[2], axis_max[2], axis_direction[2], hat_direction[2];
+    int axis_min[4], axis_max[4], axis_direction[2], hat_direction[2];
     dev_t dev; ino_t ino;
     unsigned mapped[128];
 } f1_hid_device;
@@ -126,6 +126,11 @@ static void f1_hid_event(f1_hid *s, f1_hid_device *d, const struct input_event *
         if(key)f1_key_push(s,key,e->value!=0);
     }
     if(d->gamepad&&e->type==EV_ABS){
+        int trigger=e->code==ABS_Z?2:e->code==ABS_RZ?3:-1;
+        if(trigger>=0){int64_t range=(int64_t)d->axis_max[trigger]-d->axis_min[trigger];
+            unsigned bit=trigger==2?12:13;
+            if(range>0&&e->value>(int64_t)d->axis_min[trigger]+range/4)d->buttons|=1u<<bit;
+            else d->buttons&=~(1u<<bit);}
         int axis=e->code==ABS_X?0:e->code==ABS_Y?1:-1;
         if(axis>=0){int64_t span=(int64_t)d->axis_max[axis]-d->axis_min[axis];
             int64_t center=(int64_t)d->axis_min[axis]+span/2;
@@ -202,8 +207,9 @@ static void f1_hid_scan(f1_hid *s, uint64_t now)
         f1_hid_device *d = &s->devices[empty]; d->fd = fd; d->number = number;
         d->mouse = mouse; d->keyboard = keyboard; d->dev = st.st_rdev; d->ino = st.st_ino;
         d->gamepad=gamepad;
-        for(int a=0;a<2;a++){struct input_absinfo info;
-            if(gamepad&&ioctl(fd,EVIOCGABS(a==0?ABS_X:ABS_Y),&info)==0){d->axis_min[a]=info.minimum;d->axis_max[a]=info.maximum;}}
+        const unsigned axis_codes[]={ABS_X,ABS_Y,ABS_Z,ABS_RZ};
+        for(int a=0;a<4;a++){struct input_absinfo info;
+            if(gamepad&&ioctl(fd,EVIOCGABS(axis_codes[a]),&info)==0){d->axis_min[a]=info.minimum;d->axis_max[a]=info.maximum;}}
         s->mouse_count += mouse;
     }
 }

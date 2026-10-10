@@ -50,6 +50,9 @@ int main(void)
     event(&s,d,EV_ABS,ABS_X,32768);assert(!(f1_hid_pad(&s)&(1u<<6)));
     event(&s,d,EV_ABS,ABS_HAT0X,-1);assert(f1_hid_pad(&s)&(1u<<6));
     event(&s,d,EV_KEY,BTN_TR,1);assert(f1_hid_pad(&s)&(1u<<11));
+    d->axis_min[2]=0;d->axis_max[2]=1023;
+    event(&s,d,EV_ABS,ABS_Z,900);assert(f1_hid_pad(&s)&(1u<<12));
+    event(&s,d,EV_ABS,ABS_Z,0);assert(!(f1_hid_pad(&s)&(1u<<12)));
     f1_hid_drop(&s,d);assert(!f1_hid_pad(&s));
     puts("evdev HID mapping/rapid click/modifiers/disconnect/queue bounds PASS");
     return 0;

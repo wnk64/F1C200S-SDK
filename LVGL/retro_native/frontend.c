@@ -146,7 +146,7 @@ static void input_poll(void)
 static int16_t input_state(unsigned port,unsigned device,unsigned index,unsigned id)
 {
     (void)index;if(port||device!=RETRO_DEVICE_JOYPAD)return 0;
-    unsigned pad=touch_pad|key_pad;if(id==RETRO_DEVICE_ID_JOYPAD_MASK)return pad;
+    unsigned pad=touch_pad|key_pad|f1_hid_pad(&keys);if(id==RETRO_DEVICE_ID_JOYPAD_MASK)return pad;
     return id<16&&(pad&(1u<<id))?1:0;
 }
 static void pressed(lv_event_t *e)
