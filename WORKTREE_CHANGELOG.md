@@ -46,6 +46,15 @@ Scope: shared-platform menu, settings and browsers; default group navigation/tex
 Protected: kernel .config/zImage/modules, BlueZ/audio services, network/cast/default audio policy; only config fragment staged, kernel not built pending documented build-command gate.
 Rollback: Git038fcee platform.c; no deployment. Tests: host synthetic input, GCC6.4 menu/media/recorder builds. Physical pairing, audio coexistence, scanout and3coldboots pending.
 
+## 2026-10-10 offline tested / shared-platform HID source
+Sourcea2ff9e7. sh LVGL/menu/test-hid.sh ASan/UBSan/leaks PASS: relative delta overflow/clamp, rapid press-release snapshots, shift/caps/repeat/release mapping, Tab/ShiftTab, disconnect releases, bounded queues.
+Build: make -s -C LVGL/menu -j2; make -s -C LVGL/media_player -j2; make -s -C SOFTWARE/mic-recorder -> all0 with original GCC6.4, existing media_display.c _GNU_SOURCE warning only. Recorder Makefile now rebuilds shared platform instead of leaving stale linkage.
+Artifacts SHA256: menu8fb6155b286cab75acbc83c74f058e8fa6f808fe4d0cdc70a56a9818a70e9f8f; mediaUI415d35cf66b07af3ad8bb32d70b4ab838ab1ff0928406b70edf57daa948c9042; browserafb6b36aee7ca06ecc276894bc345c101a6289ea80cca8a25e1e74102f06d61c; recorder18fec2caaed8e2c58ec5a391273a4bfb2e35d22baca325b05eb92c7a4c81e068.
+BlueZ build source includes input/hog; existing pairing agent has DisplayPinCode/DisplayPasskey handling. Not runtime profile verification.
+Kernel#250 source/config/outputs present, BT_HIDP/UHID off. Required Desktop/F1C200S_build_commands.md unavailable; kernel guard blocks guessed build. Added fragment only, no kernel configuration/module/image mutation or build, no board contact/deploy.
+Limitations: relative mice only, US-English basic keymap/no IME, wheel changes focus not arbitrary document scrolling; Esc/right button emits LVGL cancel, not every app's Back/exit. ONS/wiliwili independently implemented inputs not integrated. Video hardware OSD cursor visibility unverified. Rebuilding shared-platform users does not prove application behavior.
+Decision: pending; no GUI runtime input/actual hardware pairing/coexistence/coldboots, no stable acceptance. Test tool retained as reusable tracked source; no temporary helper scripts created.
+
 ## 2026-10-07 / pending acceptance / recorder labels and WAV browser
 Base0e76791/sourcec361399. Recorder CJK asset omitted from prior deploy; corrected in independent SD candidate with fixed bounded/stateful labels and screenshot verification.
 Local browser previously filtered WAV; added WAV to browser and audio-only frontend. Existing MP3/MP4/backend unchanged behavior tested.
