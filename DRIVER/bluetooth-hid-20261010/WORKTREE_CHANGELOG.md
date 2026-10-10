@@ -1,5 +1,9 @@
 # Worktree Change Log
 
+## 2026-10-11 planned / Bounded gameplay adaptive skip
+Gameprobe3c71520 screenshot verification: two captures show CastlevaniaXX firstlevel HUD, player movement, firebackground advancing; no cursor. Timing afterSTART at3/7/17s andRIGHT+B at25/35s: gameplay57.34-57.74fps/draw28.73-28.77, coreavg13658-13812us CPUavg15182-15403us/CPUmax24-25ms; long17/17/17/17 windows. First trialcapturedblack and SSHtransfer contaminated lastwindow; do not use it as visual or performance acceptance.
+Hypothesis: when renderer misses16.7ms budget, skip at most one additionalvideo render beyond configuredframeskip while preserving CPU/APU/audio execution everyframe. Opt-inSFC_ADAPTIVE_SKIP, defaultoff unless runtime test supports. Native1:1 unchanged, no speedhack/audio/kernel change. Baselineframe scheduling retained whenoptionoff; headless alwaysdraw. Game sampling with identicaltimedSTART/movement and screenshots, don't equate changed renderingrate with speedup at sameoutputquality. Fullcompatibility/input/audio/3coldboots pending.
+
 ## 2026-10-11 planned / Actual gameplay test input
 User requires severalSTART inputs afterROMload, actuallevel workload not title-screen benchmark. Baseline65bdbc2 SFCcoreO3/nice-5. Add opt-inF1_EMU_TEST_INPUT only if profilingenabled: SIGUSR1 creates120msSTART pulse, SIGUSR2 creates250msRIGHT+B; signal handlers only set sig_atomic flags, nextgame loop releases automatically. Defaultoff, no global HID injection/bond/kernel/network changes. Capture framebuffer throughSSH to visually verify level before interpreting profile; stopSTART after entering game to avoid pause. Keep physical inputORed, no savestate modifications; gracefulexit/SRAMexisting behavior. Build/offline tests required; source/probe candidate pending realgame measurements/3coldboots.
 

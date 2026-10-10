@@ -179,6 +179,8 @@ int main(int argc,char **argv)
     if(!headless){if(platform_open()){platform_close();goto cleanup;}opened=1;ui();audio_open();}
     f1_hid_init(&game_input);
     const char *skip=getenv("SFC_FRAMESKIP");if(skip){int n=atoi(skip);if(n>=0&&n<=5)frameskip=n;}
+    int adaptive=getenv("SFC_ADAPTIVE_SKIP")&&atoi(getenv("SFC_ADAPTIVE_SKIP"));
+    unsigned skipped_frames=0,extra_skips=0;
     unsigned frames=0,draws=0,changes=0,nonblack=0;uint32_t hash=2166136261u,last_hash=0;int64_t started=now_us(),deadline=started;
     uint64_t tick=headless?0:platform_ms();
     int profile=getenv("F1_EMU_PROFILE")&&atoi(getenv("F1_EMU_PROFILE"));
@@ -209,7 +211,12 @@ int main(int argc,char **argv)
             if(paused){deadline=now_us();usleep(10000);continue;}
         }
         if(profile){int64_t n=now_us(),delta=n-section_at;ui_us+=delta;if(delta>section_max[0])section_max[0]=delta;section_at=n;}
-        IPPU.RenderThisFrame=headless||frames%(frameskip+1)==0;
+        int scheduled=frames%(frameskip+1)==0;
+        if(adaptive&&!headless){
+            scheduled=!frames||skipped_frames>=(unsigned)frameskip;
+            if(scheduled&&frames&&skipped_frames<(unsigned)frameskip+1&&now_us()-deadline>Settings.FrameTime/2){scheduled=0;extra_skips++;}
+        }
+        IPPU.RenderThisFrame=headless||scheduled;
         GFX.Screen=(uint8_t *)pixels;S9xMainLoop();frames++;
         if(profile){int64_t n=now_us(),delta=n-section_at;core_us+=delta;if(delta>section_max[1])section_max[1]=delta;section_at=n;}
         if(IPPU.RenderThisFrame){
@@ -221,7 +228,9 @@ int main(int argc,char **argv)
                 if(draws&&frame_hash!=last_hash)changes++;
                 last_hash=frame_hash;hash^=frame_hash;hash*=16777619u;}
             draws++;
+            skipped_frames=0;
         }
+        else skipped_frames++;
         if(profile){int64_t n=now_us(),delta=n-section_at;blit_us+=delta;if(delta>section_max[2])section_max[2]=delta;section_at=n;}
         audio_step();
         if(profile){int64_t n=now_us(),delta=n-section_at;audio_us+=delta;if(delta>section_max[3])section_max[3]=delta;if(n-frame_at>max_us)max_us=n-frame_at;
@@ -234,6 +243,8 @@ int main(int argc,char **argv)
                     (long long)(core_us/count),(long long)(blit_us/count),(long long)(audio_us/count),(long long)(ui_us/count),(long long)max_us);
                 fprintf(stderr,"SFC maxima ui=%lld core=%lld blit=%lld audio=%lld long_frames=%u\n",(long long)section_max[0],(long long)section_max[1],(long long)section_max[2],(long long)section_max[3],long_frames);
                 fprintf(stderr,"SFC scheduling cpu_avg_us=%lld cpu_max_us=%lld offcpu_max_us=%lld\n",(long long)(cpu_total/count),(long long)cpu_max,(long long)offcpu_max);
+                if(adaptive)fprintf(stderr,"SFC adaptive extra_skips=%u\n",extra_skips);
+                extra_skips=0;
                 cpu_total=cpu_max=offcpu_max=0;
                 report_at=n;report_frames=frames;report_draws=draws;core_us=blit_us=audio_us=ui_us=max_us=0;memset(section_max,0,sizeof(section_max));long_frames=0;}}
         if(!headless){deadline+=Settings.FrameTime;int64_t wait=deadline-now_us();if(wait>0&&wait<50000)usleep(wait);else if(wait< -100000)deadline=now_us();}
