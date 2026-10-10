@@ -1,5 +1,6 @@
 #include "platform.h"
 #include "evdev-hid.h"
+#include "frame_policy.h"
 #include "snes9x.h"
 #include "soundux.h"
 #include "memmap.h"
@@ -211,11 +212,9 @@ int main(int argc,char **argv)
             if(paused){deadline=now_us();usleep(10000);continue;}
         }
         if(profile){int64_t n=now_us(),delta=n-section_at;ui_us+=delta;if(delta>section_max[0])section_max[0]=delta;section_at=n;}
-        int scheduled=frames%(frameskip+1)==0;
-        if(adaptive&&!headless){
-            scheduled=!frames||skipped_frames>=(unsigned)frameskip;
-            if(scheduled&&frames&&skipped_frames<(unsigned)frameskip+1&&now_us()-deadline>Settings.FrameTime/2){scheduled=0;extra_skips++;}
-        }
+        int scheduled=sfc_render_due(frames,skipped_frames,frameskip,
+            adaptive&&!headless?now_us()-deadline:0,Settings.FrameTime,adaptive&&!headless);
+        if(adaptive&&!headless&&frames&&skipped_frames>=(unsigned)frameskip&&!scheduled)extra_skips++;
         IPPU.RenderThisFrame=headless||scheduled;
         GFX.Screen=(uint8_t *)pixels;S9xMainLoop();frames++;
         if(profile){int64_t n=now_us(),delta=n-section_at;core_us+=delta;if(delta>section_max[1])section_max[1]=delta;section_at=n;}
