@@ -10,6 +10,14 @@ Protected: existing raw pacing/PTS, geometry, decoder rotation/CMA config, sink/
 Build: separate candidate output directory, no clean/default tracked-object overwrite. Rollback: deployed binaries/scripts remain unchanged; unset new flags.
 Tests planned: host fake-ioctl ownership/backpressure/retry/teardown sanitizer tests and existing lifecycle/frame-gap tests, ARM build. Physical playback/three coldboots pending.
 
+## 2026-10-10 tested offline / bounded display candidate
+Source commit68a13c4. sh player-src/test-display-candidate.sh: ASan/UBSan leak-enabled100ownership/retry/backpressure/control/cleanup runs PASS,50blocked-worker/idempotent lifecycle runs PASS,frame_gap PASS. These are host mocks, not hardware scanout validation.
+Build: sh player-src/build-display-candidate.sh, original Buildroot GCC6.4, explicit relocated sysroot/CedarX include, no warnings; repeated outputs SHA256188829c65bdff014c6e8e826fb41ac8fd43374ce1ae11776381efe0cb0b65eb6.
+Artifact: player-src/build-display-bounded/player-display-bounded. Original tracked objects/executable untouched; original executable MD5a683cf70a95ba2759b5c9d2b1e0dc016 remains.
+Probe use for future live comparison: CEDAR_DISPLAY_BOUNDED=1 CEDAR_PIPELINE_STATS=1 CEDAR_FRAME_GAP_STATS=1 plus existing pool9/rotate90/raw80048060 settings. Baseline comparison omits DISPLAY_BOUNDED. No launcher/preflight hashes changed or board access attempted.
+Caveats: extra retained rotated frame may cause NO_FRAME_BUFFER; one-per-vblank can increase queue latency during bursts; per-layer ioctls are not cross-layer atomic; real private-ioctl/vblank buffer lifetime must be verified on board. Default remains legacy. Stream PTS loss, AUD-only parsing and gettimeofday pacing unchanged.
+Decision: pending hardware A/B and full dependent regressions/threecoldboots; no performance or stable acceptance claim. No one-off helper scripts created; durable build/test tools retained with source.
+
 ## 2026-10-01 planned / opt-in successful video commit intervals
 Results: diagnostic source940fdc5, host summary305e685 (3 Python tests pass
 on Windows and VM; zero-frame windows after first commit included).
