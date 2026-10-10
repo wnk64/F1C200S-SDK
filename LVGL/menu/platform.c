@@ -197,7 +197,8 @@ int platform_open(void)
     }
     static lv_indev_drv_t mouse; lv_indev_drv_init(&mouse);
     mouse.type = LV_INDEV_TYPE_POINTER; mouse.read_cb = mouse_read;
-    lv_indev_set_cursor(lv_indev_drv_register(&mouse), mouse_cursor);
+    lv_indev_t *mouse_input = lv_indev_drv_register(&mouse);
+    if (mouse_cursor) lv_indev_set_cursor(mouse_input, mouse_cursor);
     static lv_indev_drv_t keyboard; lv_indev_drv_init(&keyboard);
     keyboard.type = LV_INDEV_TYPE_KEYPAD; keyboard.read_cb = keyboard_read;
     lv_indev_set_group(lv_indev_drv_register(&keyboard), key_group);
