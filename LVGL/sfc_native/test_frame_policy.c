@@ -7,7 +7,7 @@ int main(void)
         unsigned skipped=0,draws=0;
         for(unsigned frame=0;frame<1000;frame++){
             assert(sfc_render_due(frame,0,skip,100000,16667,0)==(frame%(skip+1)==0));
-            assert(sfc_render_due(frame,frame%(skip+1),skip,0,16667,1)==(frame%(skip+1)==0));
+            assert(sfc_render_due(frame,frame?(frame-1)%(skip+1):0,skip,0,16667,1)==(frame%(skip+1)==0));
             if(sfc_render_due(frame,skipped,skip,100000,16667,1)){skipped=0;draws++;}
             else skipped++;
             assert(skipped<=skip+1);
