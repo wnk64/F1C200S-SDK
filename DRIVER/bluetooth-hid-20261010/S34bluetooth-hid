@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+SELF=/root/roms/candidates/bluetooth_hid_20261010
+case "${1:-start}" in
+start)
+    [ "$(uname -r)" = 5.7.1 ] || exit 1
+    if [ ! -d /sys/module/uhid ]; then insmod "$SELF/uhid.ko"; fi
+    if [ ! -d /sys/module/hidp ]; then insmod "$SELF/hidp.ko"; fi
+    ;;
+stop) : ;; # Do not forcibly unload input devices during shutdown.
+*) exit 1;;
+esac

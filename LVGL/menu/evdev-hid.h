@@ -30,7 +30,7 @@ typedef struct {
     uint64_t next_scan;
 } f1_hid;
 static void f1_key_push(f1_hid *, unsigned, int);
-static uint16_t f1_hid_pad(const f1_hid *s)
+static inline uint16_t f1_hid_pad(const f1_hid *s)
 {
     uint16_t pad = 0;
     for(int i=0;i<F1_HID_DEVICES;i++)pad |= s->devices[i].buttons | s->devices[i].axes;
