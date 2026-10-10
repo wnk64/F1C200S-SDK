@@ -5,6 +5,8 @@
 #include <stdio.h>
 int main(void)
 {
+    for(unsigned c=0;c<65536;c++)assert(sfc_pixel(c)==
+        (((c>>11)*255/31)<<16|((((c>>5)&63)*255/63)<<8)|((c&31)*255/31)));
     size_t size=480*800*4;uint8_t *dst=malloc(size+32);uint16_t *src=malloc(512*478*2);
     assert(dst&&src);memset(dst,0xa5,size+32);
     for(unsigned i=0;i<512*478;i++)src[i]=0xf800;

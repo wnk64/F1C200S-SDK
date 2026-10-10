@@ -5,6 +5,10 @@
 #include <stdio.h>
 int main(void)
 {
+    for(unsigned c=0;c<65536;c++)for(int format=0;format<=2;format+=2){
+        uint16_t pixel=c;unsigned r=(c>>(format==2?11:10))&31,g=(c>>5)&(format==2?63:31),b=c&31;
+        assert(retro_pixel((const uint8_t*)&pixel,format)==((r*255/31<<16)|(g*255/(format==2?63:31)<<8)|(b*255/31)));
+    }
     size_t bytes=1920*800;uint8_t *dst=malloc(bytes+32);uint16_t *src=malloc(640*480*2);
     assert(dst&&src);memset(dst,0xa5,bytes+32);for(unsigned i=0;i<640*480;i++)src[i]=0xf800;
     assert(retro_blit(dst,bytes,1920,src,640,480,1280,2,4.f/3)==0);

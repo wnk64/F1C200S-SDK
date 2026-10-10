@@ -179,6 +179,7 @@ int main(int argc,char **argv)
     int profile=getenv("F1_EMU_PROFILE")&&atoi(getenv("F1_EMU_PROFILE"));
     int64_t report_at=started,core_us=0,blit_us=0,audio_us=0,ui_us=0,max_us=0;
     unsigned report_frames=0,report_draws=0;
+    int64_t section_max[4]={0};unsigned long_frames=0;
     while(!quit&&(!headless||frames<limit)) {
         int64_t frame_at=profile?now_us():0,section_at=frame_at;
         if(!headless){
@@ -191,10 +192,10 @@ int main(int argc,char **argv)
             game_input.pn=0;
             if(paused){deadline=now_us();usleep(10000);continue;}
         }
-        if(profile){int64_t n=now_us();ui_us+=n-section_at;section_at=n;}
+        if(profile){int64_t n=now_us(),delta=n-section_at;ui_us+=delta;if(delta>section_max[0])section_max[0]=delta;section_at=n;}
         IPPU.RenderThisFrame=headless||frames%(frameskip+1)==0;
         GFX.Screen=(uint8_t *)pixels;S9xMainLoop();frames++;
-        if(profile){int64_t n=now_us();core_us+=n-section_at;section_at=n;}
+        if(profile){int64_t n=now_us(),delta=n-section_at;core_us+=delta;if(delta>section_max[1])section_max[1]=delta;section_at=n;}
         if(IPPU.RenderThisFrame){
             int h=IPPU.RenderedScreenHeight,w=IPPU.RenderedScreenWidth;
             if(h<=0||h>478||w<=0||w>512){fprintf(stderr,"invalid core dimensions %dx%d\n",w,h);goto cleanup;}
@@ -205,14 +206,16 @@ int main(int argc,char **argv)
                 last_hash=frame_hash;hash^=frame_hash;hash*=16777619u;}
             draws++;
         }
-        if(profile){int64_t n=now_us();blit_us+=n-section_at;section_at=n;}
+        if(profile){int64_t n=now_us(),delta=n-section_at;blit_us+=delta;if(delta>section_max[2])section_max[2]=delta;section_at=n;}
         audio_step();
-        if(profile){int64_t n=now_us();audio_us+=n-section_at;if(n-frame_at>max_us)max_us=n-frame_at;
+        if(profile){int64_t n=now_us(),delta=n-section_at;audio_us+=delta;if(delta>section_max[3])section_max[3]=delta;if(n-frame_at>max_us)max_us=n-frame_at;
+            long_frames+=n-frame_at>33334;
             if(n-report_at>=5000000){unsigned count=frames-report_frames;
                 fprintf(stderr,"SFC profile fps=%.2f draw_fps=%.2f core_us=%lld blit_us=%lld audio_us=%lld ui_us=%lld max_work_us=%lld\n",
                     count*1000000.0/(n-report_at),(draws-report_draws)*1000000.0/(n-report_at),
                     (long long)(core_us/count),(long long)(blit_us/count),(long long)(audio_us/count),(long long)(ui_us/count),(long long)max_us);
-                report_at=n;report_frames=frames;report_draws=draws;core_us=blit_us=audio_us=ui_us=max_us=0;}}
+                fprintf(stderr,"SFC maxima ui=%lld core=%lld blit=%lld audio=%lld long_frames=%u\n",(long long)section_max[0],(long long)section_max[1],(long long)section_max[2],(long long)section_max[3],long_frames);
+                report_at=n;report_frames=frames;report_draws=draws;core_us=blit_us=audio_us=ui_us=max_us=0;memset(section_max,0,sizeof(section_max));long_frames=0;}}
         if(!headless){deadline+=Settings.FrameTime;int64_t wait=deadline-now_us();if(wait>0&&wait<50000)usleep(wait);else if(wait< -100000)deadline=now_us();}
     }
     fprintf(stderr,"SFC frames=%u draws=%u changes=%u nonblack=%u elapsed_us=%lld hash=%08x audio_written=%llu audio_dropped=%llu\n",frames,draws,changes,nonblack,(long long)(now_us()-started),hash,(unsigned long long)audio_written,(unsigned long long)audio_dropped);

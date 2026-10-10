@@ -7,8 +7,15 @@ static uint32_t retro_pixel(const uint8_t *p, int format)
 {
     if(format==1){uint32_t c;__builtin_memcpy(&c,p,4);return c&0xffffff;}
     uint16_t c;__builtin_memcpy(&c,p,2);
-    unsigned r=(c>>(format==2?11:10))&31,g=(c>>5)&(format==2?63:31),b=c&31;
-    return (r*255/31<<16)|(g*255/(format==2?63:31)<<8)|(b*255/31);
+    static uint32_t red[32],green5[32],green6[64],blue[32];
+    static int ready;
+    if(!ready){
+        for(unsigned i=0;i<32;i++){red[i]=(i*255/31)<<16;green5[i]=(i*255/31)<<8;blue[i]=i*255/31;}
+        for(unsigned i=0;i<64;i++)green6[i]=(i*255/63)<<8;
+        ready=1;
+    }
+    return red[(c>>(format==2?11:10))&31] |
+        (format==2?green6[(c>>5)&63]:green5[(c>>5)&31]) | blue[c&31];
 }
 static int retro_blit_frame(uint8_t *dst,size_t size,unsigned stride,const void *input,
                       unsigned w,unsigned h,size_t pitch,int format,float aspect,int clear_bars)
