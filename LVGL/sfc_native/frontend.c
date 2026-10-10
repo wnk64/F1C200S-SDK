@@ -32,6 +32,8 @@ static lv_obj_t *pause_label;
 static void stop(int sig) { (void)sig; quit = 1; }
 static int64_t now_us(void)
 { struct timespec t; clock_gettime(CLOCK_MONOTONIC,&t); return (int64_t)t.tv_sec*1000000+t.tv_nsec/1000; }
+static int64_t cpu_us(void)
+{ struct timespec t; clock_gettime(CLOCK_PROCESS_CPUTIME_ID,&t); return (int64_t)t.tv_sec*1000000+t.tv_nsec/1000; }
 static uint32_t key_mask(unsigned key)
 {
     switch (key) {
@@ -180,8 +182,10 @@ int main(int argc,char **argv)
     int64_t report_at=started,core_us=0,blit_us=0,audio_us=0,ui_us=0,max_us=0;
     unsigned report_frames=0,report_draws=0;
     int64_t section_max[4]={0};unsigned long_frames=0;
+    int64_t cpu_total=0,cpu_max=0,offcpu_max=0;
     while(!quit&&(!headless||frames<limit)) {
         int64_t frame_at=profile?now_us():0,section_at=frame_at;
+        int64_t cpu_at=profile?cpu_us():0;
         if(!headless){
             uint64_t t=platform_ms();lv_tick_inc(t-tick);tick=t;lv_timer_handler();
             f1_hid_poll(&game_input,t,480,800);
@@ -210,11 +214,15 @@ int main(int argc,char **argv)
         audio_step();
         if(profile){int64_t n=now_us(),delta=n-section_at;audio_us+=delta;if(delta>section_max[3])section_max[3]=delta;if(n-frame_at>max_us)max_us=n-frame_at;
             long_frames+=n-frame_at>33334;
+            int64_t consumed=cpu_us()-cpu_at,offcpu=n-frame_at-consumed;
+            cpu_total+=consumed;if(consumed>cpu_max)cpu_max=consumed;if(offcpu>offcpu_max)offcpu_max=offcpu;
             if(n-report_at>=5000000){unsigned count=frames-report_frames;
                 fprintf(stderr,"SFC profile fps=%.2f draw_fps=%.2f core_us=%lld blit_us=%lld audio_us=%lld ui_us=%lld max_work_us=%lld\n",
                     count*1000000.0/(n-report_at),(draws-report_draws)*1000000.0/(n-report_at),
                     (long long)(core_us/count),(long long)(blit_us/count),(long long)(audio_us/count),(long long)(ui_us/count),(long long)max_us);
                 fprintf(stderr,"SFC maxima ui=%lld core=%lld blit=%lld audio=%lld long_frames=%u\n",(long long)section_max[0],(long long)section_max[1],(long long)section_max[2],(long long)section_max[3],long_frames);
+                fprintf(stderr,"SFC scheduling cpu_avg_us=%lld cpu_max_us=%lld offcpu_max_us=%lld\n",(long long)(cpu_total/count),(long long)cpu_max,(long long)offcpu_max);
+                cpu_total=cpu_max=offcpu_max=0;
                 report_at=n;report_frames=frames;report_draws=draws;core_us=blit_us=audio_us=ui_us=max_us=0;memset(section_max,0,sizeof(section_max));long_frames=0;}}
         if(!headless){deadline+=Settings.FrameTime;int64_t wait=deadline-now_us();if(wait>0&&wait<50000)usleep(wait);else if(wait< -100000)deadline=now_us();}
     }
