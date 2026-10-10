@@ -1,5 +1,11 @@
 # Worktree Change Log
 
+## 2026-10-10 pending / BLE keyboard security diagnosis
+Baseline: source 5801eef; running Linux 5.7.1 #250 unchanged. Xbox menu controls user-confirmed; keyboard presses produced zero input events.
+Evidence: keyboard Paired=true in BlueZ but no LongTermKey section on disk; kernel security requested but not available; bt_io_set BT_SECURITY Invalid argument; LE reconnect timeouts. Do not log secret keys.
+Hypothesis: audio-backend starts bluetoothd asynchronously then hciconfig up before HCI_MGMT initialization; legacy power-up bypasses SMP registration. Validate using BlueZ Powered=false/true, reconnect Xbox and keyboard. No service/source/kernel replacement yet.
+Protected dependencies: Wi-Fi/SSH, existing Xbox bond and audio processes; adapter toggle briefly disconnects Bluetooth only. Restore Powered=true and reconnect existing devices. Cold boots 0; candidate remains pending.
+
 Worktree: /home/wnk/Desktop/F1c200S_SOFT
 Component: external upstream HIDP/UHID modules
 Base: project7bab3da; kernelb3d8ed3 Linux5.7.1#250

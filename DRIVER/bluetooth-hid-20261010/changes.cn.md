@@ -13,3 +13,7 @@ ASan/UBSan及泄漏检查通过映射/快速点击/组合键/释放/断联/队�
 当前BlueZ构建源码包含input/hog，原配对agent已有DisplayPinCode/DisplayPasskey；但板端未验证。内核仅新增BT_HIDP=m/UHID=m配置fragment，未改现用.config、zImage、模块、启动脚本或音频服务。
 限制：相对坐标鼠标、基础美式英文键位，无中文输入法；滚轮切换焦点，不是所有应用的滚动；Esc/鼠标右键仅发LVGL取消键，非全局退出。独立ONS/wiliwili尚未接入，视频层光标遮挡与真实触摸回归尚未验证。
 构建路径与SHA、回退见根WORKTREE_CHANGELOG.md。本轮无板端部署，不称蓝牙已适配完成、不称稳定版；需先恢复受控kernel构建记录，再生成HID模块并实测配对/自动重连/键鼠与蓝牙音响并用/三冷回归。
+# 2026-10-10 键盘安全通道诊断（待验证）
+
+Xbox 菜单操作已由用户确认有效；连续按键测试未收到键盘事件。键盘为 BLE HOG，Xbox 为传统 HIDP。键盘磁盘记录无 LongTermKey，内核出现 security requested but not available，抓包出现 BT_SECURITY Invalid argument。计划通过 BlueZ 重新开启适配器验证 audio-backend 中 hciconfig up 与 bluetoothd 初始化竞争的假设，不替换内核，不删除已有配对。适配器切换会短暂断开 Xbox，之后恢复。尚未进行冷启动验收。
+
