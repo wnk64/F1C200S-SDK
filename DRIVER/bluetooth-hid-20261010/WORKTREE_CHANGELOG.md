@@ -1,5 +1,9 @@
 # Worktree Change Log
 
+## 2026-10-11 planned / Reduce framebuffer black-border writes
+Timing after native1:1: sameCastlevaniaXX sample fps58.78/59.46 draw29.49/29.73; averagecore9420/8612us,blit3834/3912us per emulatedframe, maxwork44214/42028us. Fixed frameskip1 yields30displayfps at60corefps. Do not equate display and emulation rate. Cursor fix222c43b initially crashed because LVGL8 dereferences NULL cursor; corrected30135e5, sample now runs. Probe opt-in F1_EMU_PROFILE; default off.
+Hypothesis: clearing480x448 border every draw wastes uncached framebuffer bandwidth. Keep nativepixels/color conversion; clear borders only first frame or dimension change, redraw valid game rectangle each frame. Scope both blitters/display wrappers and tests. Preserve lowercontrolband, cursor absent, core/audio/frameskip unchanged. Rebuild/test; compare sameROM18second sample before claiming improvement. Original artifacts/source commits retained hostside; no kernel/network changes,3coldboots pending.
+
 ## 2026-10-10 planned / Force no-cursor and measure SFC stalls
 Baseline8e7e998; current sfcPID3067 has no F1_HIDE_MOUSE_CURSOR in environment: parent launcher1974 predates export change. Force option in all four emulator/browser mains, shared platform does not create cursor object when disabled. Menu default unaffected. Add opt-in F1_EMU_PROFILE=1 SFC5second section timing; default off. Controlled20second same-ROM sample after graceful supervisor stop, then restore menu; gameSRAM saved on TERM, no kernel/audio/network changes. Measure before performance policy changes; coldboots0, no stable claim.
 

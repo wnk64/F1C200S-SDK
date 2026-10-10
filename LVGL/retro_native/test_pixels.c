@@ -17,6 +17,11 @@ int main(void)
     assert(((uint32_t*)dst)[144*480+120]==0xff0000);
     assert(((uint32_t*)dst)[144*480+119]==0);
     assert(((uint32_t*)dst)[304*480+120]==0);
+    ((uint32_t*)dst)[0]=0x123456;
+    assert(!retro_blit_frame(dst,bytes,1920,src,240,160,480,2,1.5f,0));
+    assert(((uint32_t*)dst)[0]==0x123456);
+    assert(!retro_blit(dst,bytes,1920,src,240,160,480,2,1.5f));
+    assert(((uint32_t*)dst)[0]==0);
     for(size_t i=448*1920;i<bytes+32;i++)assert(dst[i]==0xa5);
     assert(retro_blit(dst,bytes,1920,src,0,480,1280,2,1)==-1);
     assert(retro_blit(dst,bytes,1920,src,640,480,1,2,1)==-1);

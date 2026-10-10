@@ -13,6 +13,11 @@ int main(void)
     assert(((uint32_t*)dst)[480*112+111]==0);
     assert(((uint32_t*)dst)[480*335+367]==0xff0000);
     assert(((uint32_t*)dst)[480*336+112]==0);
+    ((uint32_t*)dst)[0]=0x123456;
+    assert(!sfc_blit_frame(dst,size,1920,src,256,224,256,0));
+    assert(((uint32_t*)dst)[0]==0x123456);
+    assert(!sfc_blit(dst,size,1920,src,256,224,256));
+    assert(((uint32_t*)dst)[0]==0);
     assert(((uint32_t*)dst)[0]==0);
     for(size_t i=448*1920;i<size+32;i++)assert(dst[i]==0xa5);
     assert(sfc_blit(dst,size-1,1920,src,256,224,256)==-1);
