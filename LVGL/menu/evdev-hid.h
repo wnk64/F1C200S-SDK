@@ -12,7 +12,7 @@
 
 enum { F1_HID_DEVICES = 8, F1_HID_EVENTS = 64,
        F1_UP = 0x100, F1_DOWN, F1_LEFT, F1_RIGHT, F1_HOME, F1_END, F1_NEXT, F1_PREV };
-typedef struct { unsigned key; int down; } f1_hid_key;
+typedef struct { unsigned key; int down, gamepad; } f1_hid_key;
 typedef struct { int x, y, down; } f1_hid_point;
 typedef struct {
     int fd, number, mouse, keyboard, gamepad, left, shift, caps;
@@ -30,6 +30,7 @@ typedef struct {
     uint64_t next_scan;
 } f1_hid;
 static void f1_key_push(f1_hid *, unsigned, int);
+static void f1_pad_key_push(f1_hid *, unsigned, int);
 static inline uint16_t f1_hid_pad(const f1_hid *s)
 {
     uint16_t pad = 0;
@@ -55,11 +56,11 @@ static void f1_pad_axes(f1_hid *s,f1_hid_device *d)
         if(direction)d->axes |= 1u<<(a==0?(direction<0?6:7):(direction<0?4:5));
     }
     unsigned prior=before&((1u<<4)|(1u<<6)),next=d->axes&((1u<<4)|(1u<<6));
-    if(prior&&!next)f1_key_push(s,F1_PREV,0);
-    if(next&&!prior)f1_key_push(s,F1_PREV,1);
+    if(prior&&!next)f1_pad_key_push(s,F1_PREV,0);
+    if(next&&!prior)f1_pad_key_push(s,F1_PREV,1);
     prior=before&((1u<<5)|(1u<<7));next=d->axes&((1u<<5)|(1u<<7));
-    if(prior&&!next)f1_key_push(s,F1_NEXT,0);
-    if(next&&!prior)f1_key_push(s,F1_NEXT,1);
+    if(prior&&!next)f1_pad_key_push(s,F1_NEXT,0);
+    if(next&&!prior)f1_pad_key_push(s,F1_NEXT,1);
 }
 #define F1_BITS(n) (((n) + 8 * sizeof(unsigned long)) / (8 * sizeof(unsigned long)))
 static int f1_bit(const unsigned long *bits, unsigned bit)
@@ -106,7 +107,12 @@ static void f1_key_push(f1_hid *s, unsigned key, int down)
 {
     if (!key) return;
     if (s->kn == F1_HID_EVENTS) { s->kh = s->kn = 0; s->overflows++; }
-    s->keys[(s->kh + s->kn++) % F1_HID_EVENTS] = (f1_hid_key){key, down};
+    s->keys[(s->kh + s->kn++) % F1_HID_EVENTS] = (f1_hid_key){key, down, 0};
+}
+static void f1_pad_key_push(f1_hid *s, unsigned key, int down)
+{
+    f1_key_push(s, key, down);
+    if (key) s->keys[(s->kh + s->kn - 1) % F1_HID_EVENTS].gamepad = 1;
 }
 static void f1_point_push(f1_hid *s)
 {
@@ -123,7 +129,7 @@ static void f1_hid_event(f1_hid *s, f1_hid_device *d, const struct input_event *
         unsigned key=e->code==BTN_SOUTH||e->code==BTN_START?'\n':e->code==BTN_EAST||e->code==BTN_MODE?27:0;
         if(bit==4||bit==6)key=F1_PREV;
         if(bit==5||bit==7)key=F1_NEXT;
-        if(key)f1_key_push(s,key,e->value!=0);
+        if(key)f1_pad_key_push(s,key,e->value!=0);
     }
     if(d->gamepad&&e->type==EV_ABS){
         int trigger=e->code==ABS_Z?2:e->code==ABS_RZ?3:-1;
@@ -171,7 +177,7 @@ static void f1_hid_event(f1_hid *s, f1_hid_device *d, const struct input_event *
 }
 static void f1_hid_drop(f1_hid *s, f1_hid_device *d)
 {
-    if(d->gamepad){f1_key_push(s,F1_PREV,0);f1_key_push(s,F1_NEXT,0);f1_key_push(s,'\n',0);f1_key_push(s,27,0);}
+    if(d->gamepad){f1_pad_key_push(s,F1_PREV,0);f1_pad_key_push(s,F1_NEXT,0);f1_pad_key_push(s,'\n',0);f1_pad_key_push(s,27,0);}
     for (int key = 0; key < 128; key++) if (d->mapped[key]) f1_key_push(s, d->mapped[key], 0);
     if (d->fd >= 0) close(d->fd);
     int mouse = d->mouse;

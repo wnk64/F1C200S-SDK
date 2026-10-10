@@ -45,6 +45,9 @@ int main(void)
     f1_hid_init(&s);d=&s.devices[0];d->gamepad=1;
     d->axis_min[0]=d->axis_min[1]=0;d->axis_max[0]=d->axis_max[1]=65535;
     event(&s,d,EV_KEY,BTN_SOUTH,1);assert(f1_hid_pad(&s)==1&&s.keys[0].key=='\n');
+    assert(s.keys[0].gamepad);
+    event(&s,d,EV_KEY,BTN_EAST,1);assert(s.keys[1].key==27&&s.keys[1].gamepad);
+    assert(f1_hid_pad(&s)&(1u<<8));
     event(&s,d,EV_ABS,ABS_X,0);assert(f1_hid_pad(&s)&(1u<<6));
     event(&s,d,EV_ABS,ABS_Y,65535);assert(f1_hid_pad(&s)&(1u<<5));
     event(&s,d,EV_ABS,ABS_X,32768);assert(!(f1_hid_pad(&s)&(1u<<6)));

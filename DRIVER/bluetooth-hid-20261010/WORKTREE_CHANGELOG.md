@@ -1,5 +1,9 @@
 # Worktree Change Log
 
+## 2026-10-10 planned / Deploy native emulators with HID controls
+User confirms keyboard navigation works. Source baseline343c977/5801eef emulator mapping, complete tracked native frontend/core sources and Makefiles. Preserve existing runtime menu/player/cast/kernel/audio and dirty DTBs. Build using existing Buildroot ARMv5 soft-float toolchain, no kernel build.
+Hypothesis: synthesized gamepad Enter/Esc navigation must not enter emulator keyboard loops; tag event origin and ignore gamepad navigation while retaining raw joypad state. Scope evdev-hid.h, mapping test, sfc_native/frontend.c, retro_native/frontend.c. Stage candidates on SD, original menu entries preserved, add two entries within12application limit. Tests sanitizer/ARM execution and board core load/headless fixtures; real game speed/audio/UI and3coldboots pending. Rollback menu config remove new entries, original binaries untouched.
+
 ## 2026-10-10 planned / Restore relocated menu helper
 Baseline: project e2b77b0; GUI1984410ae0c932b8cdb14cd92b8f9128ee3ca744264de69c716a941809e602d1 unchanged. connections.c resolves connections-helper-ip relative to /proc/self/exe; HID SD directory lacks that executable. Stable helper exists under menu_graphics_boot_20261003; SHA8129fa341b7c9eca649c5c73abca3fd12f1566afe6bf1beab9ea92fe991127a8.
 Action: copy existing unchanged helper into /root/roms/candidates/bluetooth_hid_20261010/connections-helper-ip, verify checksum and executable flag, run wifi-list/bt-list/wifi-scan/bt-scan through candidate path. Original remains untouched; remove only added candidate file to undo. No rebuild, kernel/network/bond/source changes. Bluetooth BLE startup issue separate, pending. Cold boots 0; no stable acceptance claim.

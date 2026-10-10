@@ -180,6 +180,7 @@ int main(int argc,char **argv)
             uint64_t t=platform_ms();lv_tick_inc(t-tick);tick=t;lv_timer_handler();
             f1_hid_poll(&game_input,t,480,800);
             while(game_input.kn){f1_hid_key key=game_input.keys[game_input.kh];game_input.kh=(game_input.kh+1)%F1_HID_EVENTS;game_input.kn--;
+                if(key.gamepad)continue;
                 if(key.key==27&&key.down)quit=1;
                 uint32_t mask=key_mask(key.key);if(key.down)keyboard_pad|=mask;else keyboard_pad&=~mask;}
             game_input.pn=0;

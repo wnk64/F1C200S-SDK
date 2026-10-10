@@ -139,6 +139,7 @@ static void input_poll(void)
     if(headless)return;
     f1_hid_poll(&keys,platform_ms(),480,800);
     while(keys.kn){f1_hid_key k=keys.keys[keys.kh];keys.kh=(keys.kh+1)%F1_HID_EVENTS;keys.kn--;
+        if(k.gamepad)continue;
         if(k.key==27&&k.down)quit=1;
         unsigned mask=key_mask(k.key);if(k.down)key_pad|=mask;else key_pad&=~mask;}
     keys.pn=0;
