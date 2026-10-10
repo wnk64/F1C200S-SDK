@@ -2388,10 +2388,7 @@ static INLINE void CPUShutdown(void)
          if (IAPU.APUExecuting)
          {
             ICPU.CPUExecuting = false;
-            do
-            {
-               APU_EXECUTE1();
-            } while (APU.Cycles < CPU.NextEvent);
+            APUExecuteUntil(CPU.NextEvent);
             ICPU.CPUExecuting = true;
          }
 #endif
