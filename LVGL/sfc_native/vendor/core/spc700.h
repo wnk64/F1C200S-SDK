@@ -63,7 +63,6 @@ typedef struct
 #define ONE_APU_CYCLE 21
 
 void APUExecute(void);
-void APUExecuteUntil(int32_t target_cycles);
 
 #define APU_EXECUTE1() \
 APUExecute();
