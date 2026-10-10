@@ -26,6 +26,10 @@ static int requested_power;
 static const char *config_path;
 static void (*back_action)(void);
 static void signal_stop(int n) { (void)n; quit = 1; }
+static void cancel_key(lv_event_t *event)
+{
+    if(lv_event_get_key(event)==LV_KEY_ESC&&back_action)back_action();
+}
 lv_obj_t *label(lv_obj_t *parent, const char *text, int px, int py, int width, uint32_t color)
 {
     lv_obj_t *o = lv_label_create(parent);
@@ -45,6 +49,7 @@ lv_obj_t *button(lv_obj_t *parent, int x, int y, int width, int height, uint32_t
     lv_obj_set_style_bg_color(b, lv_color_hex(0xD5DFE3), LV_STATE_PRESSED);
     lv_obj_set_style_border_width(b, 1, 0);
     lv_obj_set_style_border_color(b, lv_color_hex(0xDDE3E7), 0);
+    lv_obj_add_event_cb(b,cancel_key,LV_EVENT_KEY,NULL);
     return b;
 }
 static void home(void);

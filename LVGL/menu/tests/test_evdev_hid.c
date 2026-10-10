@@ -42,6 +42,15 @@ int main(void)
     for (int n = 0; n < 1000; n++) f1_point_push(&s);
     assert(s.pn <= F1_HID_EVENTS);
     f1_hid_close(&s);
+    f1_hid_init(&s);d=&s.devices[0];d->gamepad=1;
+    d->axis_min[0]=d->axis_min[1]=0;d->axis_max[0]=d->axis_max[1]=65535;
+    event(&s,d,EV_KEY,BTN_SOUTH,1);assert(f1_hid_pad(&s)==1&&s.keys[0].key=='\n');
+    event(&s,d,EV_ABS,ABS_X,0);assert(f1_hid_pad(&s)&(1u<<6));
+    event(&s,d,EV_ABS,ABS_Y,65535);assert(f1_hid_pad(&s)&(1u<<5));
+    event(&s,d,EV_ABS,ABS_X,32768);assert(!(f1_hid_pad(&s)&(1u<<6)));
+    event(&s,d,EV_ABS,ABS_HAT0X,-1);assert(f1_hid_pad(&s)&(1u<<6));
+    event(&s,d,EV_KEY,BTN_TR,1);assert(f1_hid_pad(&s)&(1u<<11));
+    f1_hid_drop(&s,d);assert(!f1_hid_pad(&s));
     puts("evdev HID mapping/rapid click/modifiers/disconnect/queue bounds PASS");
     return 0;
 }

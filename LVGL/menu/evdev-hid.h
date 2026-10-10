@@ -15,7 +15,9 @@ enum { F1_HID_DEVICES = 8, F1_HID_EVENTS = 64,
 typedef struct { unsigned key; int down; } f1_hid_key;
 typedef struct { int x, y, down; } f1_hid_point;
 typedef struct {
-    int fd, number, mouse, keyboard, left, shift, caps;
+    int fd, number, mouse, keyboard, gamepad, left, shift, caps;
+    uint16_t buttons, axes;
+    int axis_min[2], axis_max[2], axis_direction[2], hat_direction[2];
     dev_t dev; ino_t ino;
     unsigned mapped[128];
 } f1_hid_device;
@@ -27,6 +29,38 @@ typedef struct {
     int x, y, width, height, mouse_count;
     uint64_t next_scan;
 } f1_hid;
+static void f1_key_push(f1_hid *, unsigned, int);
+static uint16_t f1_hid_pad(const f1_hid *s)
+{
+    uint16_t pad = 0;
+    for(int i=0;i<F1_HID_DEVICES;i++)pad |= s->devices[i].buttons | s->devices[i].axes;
+    return pad;
+}
+static int f1_pad_button(unsigned code)
+{
+    switch(code){
+    case BTN_SOUTH:return 0;case BTN_EAST:return 8;case BTN_NORTH:return 9;case BTN_WEST:return 1;
+    case BTN_SELECT:return 2;case BTN_START:return 3;case BTN_TL:return 10;case BTN_TR:return 11;
+    case BTN_TL2:return 12;case BTN_TR2:return 13;case BTN_THUMBL:return 14;case BTN_THUMBR:return 15;
+    case BTN_DPAD_UP:return 4;case BTN_DPAD_DOWN:return 5;case BTN_DPAD_LEFT:return 6;case BTN_DPAD_RIGHT:return 7;
+    default:return -1;
+    }
+}
+static void f1_pad_axes(f1_hid *s,f1_hid_device *d)
+{
+    uint16_t before=d->axes;
+    d->axes=0;
+    for(int a=0;a<2;a++){
+        int direction=d->hat_direction[a]?d->hat_direction[a]:d->axis_direction[a];
+        if(direction)d->axes |= 1u<<(a==0?(direction<0?6:7):(direction<0?4:5));
+    }
+    unsigned prior=before&((1u<<4)|(1u<<6)),next=d->axes&((1u<<4)|(1u<<6));
+    if(prior&&!next)f1_key_push(s,F1_PREV,0);
+    if(next&&!prior)f1_key_push(s,F1_PREV,1);
+    prior=before&((1u<<5)|(1u<<7));next=d->axes&((1u<<5)|(1u<<7));
+    if(prior&&!next)f1_key_push(s,F1_NEXT,0);
+    if(next&&!prior)f1_key_push(s,F1_NEXT,1);
+}
 #define F1_BITS(n) (((n) + 8 * sizeof(unsigned long)) / (8 * sizeof(unsigned long)))
 static int f1_bit(const unsigned long *bits, unsigned bit)
 { return (bits[bit / (8 * sizeof(unsigned long))] >> (bit % (8 * sizeof(unsigned long)))) & 1; }
@@ -83,6 +117,22 @@ static void f1_point_push(f1_hid *s)
 }
 static void f1_hid_event(f1_hid *s, f1_hid_device *d, const struct input_event *e)
 {
+    if(d->gamepad&&e->type==EV_KEY){
+        int bit=f1_pad_button(e->code);
+        if(bit>=0){if(e->value)d->buttons|=1u<<bit;else d->buttons&=~(1u<<bit);}
+        unsigned key=e->code==BTN_SOUTH||e->code==BTN_START?'\n':e->code==BTN_EAST||e->code==BTN_MODE?27:0;
+        if(bit==4||bit==6)key=F1_PREV;
+        if(bit==5||bit==7)key=F1_NEXT;
+        if(key)f1_key_push(s,key,e->value!=0);
+    }
+    if(d->gamepad&&e->type==EV_ABS){
+        int axis=e->code==ABS_X?0:e->code==ABS_Y?1:-1;
+        if(axis>=0){int64_t span=(int64_t)d->axis_max[axis]-d->axis_min[axis];
+            int64_t center=(int64_t)d->axis_min[axis]+span/2;
+            d->axis_direction[axis]=span>0?(e->value<center-span/4?-1:e->value>center+span/4?1:0):0;}
+        if(e->code==ABS_HAT0X||e->code==ABS_HAT0Y)d->hat_direction[e->code==ABS_HAT0X?0:1]=e->value<0?-1:e->value>0?1:0;
+        f1_pad_axes(s,d);
+    }
     if (d->mouse && e->type == EV_REL) {
         /* Clamp the delta before addition to avoid overflow on malformed events. */
         int limit = e->code == REL_X ? s->width : s->height;
@@ -116,6 +166,7 @@ static void f1_hid_event(f1_hid *s, f1_hid_device *d, const struct input_event *
 }
 static void f1_hid_drop(f1_hid *s, f1_hid_device *d)
 {
+    if(d->gamepad){f1_key_push(s,F1_PREV,0);f1_key_push(s,F1_NEXT,0);f1_key_push(s,'\n',0);f1_key_push(s,27,0);}
     for (int key = 0; key < 128; key++) if (d->mapped[key]) f1_key_push(s, d->mapped[key], 0);
     if (d->fd >= 0) close(d->fd);
     int mouse = d->mouse;
@@ -145,9 +196,14 @@ static void f1_hid_scan(f1_hid *s, uint64_t now)
         if (!exists || found || empty < 0) continue;
         int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC), mouse, keyboard, touch;
         if (fd < 0) continue;
-        if (f1_capabilities(fd, &mouse, &keyboard, &touch) || (!mouse && !keyboard)) { close(fd); continue; }
+        unsigned long pad_keys[F1_BITS(KEY_MAX)]={0};
+        int gamepad=ioctl(fd,EVIOCGBIT(EV_KEY,sizeof(pad_keys)),pad_keys)>=0&&f1_bit(pad_keys,BTN_GAMEPAD);
+        if (f1_capabilities(fd, &mouse, &keyboard, &touch) || (!mouse && !keyboard&&!gamepad)) { close(fd); continue; }
         f1_hid_device *d = &s->devices[empty]; d->fd = fd; d->number = number;
         d->mouse = mouse; d->keyboard = keyboard; d->dev = st.st_rdev; d->ino = st.st_ino;
+        d->gamepad=gamepad;
+        for(int a=0;a<2;a++){struct input_absinfo info;
+            if(gamepad&&ioctl(fd,EVIOCGABS(a==0?ABS_X:ABS_Y),&info)==0){d->axis_min[a]=info.minimum;d->axis_max[a]=info.maximum;}}
         s->mouse_count += mouse;
     }
 }
