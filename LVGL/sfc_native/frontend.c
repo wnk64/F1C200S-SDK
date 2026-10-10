@@ -22,6 +22,9 @@ static volatile sig_atomic_t quit;
 static uint16_t *pixels;
 static uint8_t *sub, *z, *subz;
 static uint32_t touch_pad, keyboard_pad;
+static uint32_t test_pad;
+static volatile sig_atomic_t test_start, test_jump;
+static void test_signal(int sig) { if(sig==SIGUSR1)test_start=1;else test_jump=1; }
 static int paused, frameskip = 1;
 static f1_hid game_input;
 static snd_pcm_t *pcm;
@@ -51,7 +54,7 @@ uint32_t S9xReadJoypad(int32_t port)
     if(port)return 0;
     static const uint32_t masks[]={SNES_B_MASK,SNES_Y_MASK,SNES_SELECT_MASK,SNES_START_MASK,
         SNES_UP_MASK,SNES_DOWN_MASK,SNES_LEFT_MASK,SNES_RIGHT_MASK,SNES_A_MASK,SNES_X_MASK,SNES_TL_MASK,SNES_TR_MASK};
-    uint32_t pad=touch_pad|keyboard_pad;unsigned buttons=f1_hid_pad(&game_input);
+    uint32_t pad=touch_pad|keyboard_pad|test_pad;unsigned buttons=f1_hid_pad(&game_input);
     for(unsigned i=0;i<sizeof(masks)/sizeof(*masks);i++)if(buttons&(1u<<i))pad|=masks[i];
     return pad;
 }
@@ -179,6 +182,9 @@ int main(int argc,char **argv)
     unsigned frames=0,draws=0,changes=0,nonblack=0;uint32_t hash=2166136261u,last_hash=0;int64_t started=now_us(),deadline=started;
     uint64_t tick=headless?0:platform_ms();
     int profile=getenv("F1_EMU_PROFILE")&&atoi(getenv("F1_EMU_PROFILE"));
+    int test_input=profile&&getenv("F1_EMU_TEST_INPUT")&&atoi(getenv("F1_EMU_TEST_INPUT"));
+    int64_t start_until=0,jump_until=0;
+    if(test_input){signal(SIGUSR1,test_signal);signal(SIGUSR2,test_signal);}
     int64_t report_at=started,core_us=0,blit_us=0,audio_us=0,ui_us=0,max_us=0;
     unsigned report_frames=0,report_draws=0;
     int64_t section_max[4]={0};unsigned long_frames=0;
@@ -186,6 +192,12 @@ int main(int argc,char **argv)
     while(!quit&&(!headless||frames<limit)) {
         int64_t frame_at=profile?now_us():0,section_at=frame_at;
         int64_t cpu_at=profile?cpu_us():0;
+        if(test_input){
+            int64_t t=now_us();
+            if(test_start){test_start=0;start_until=t+120000;fprintf(stderr,"SFC test START frame=%u\n",frames);}
+            if(test_jump){test_jump=0;jump_until=t+250000;fprintf(stderr,"SFC test RIGHT+B frame=%u\n",frames);}
+            test_pad=(t<start_until?SNES_START_MASK:0)|(t<jump_until?(SNES_B_MASK|SNES_RIGHT_MASK):0);
+        }
         if(!headless){
             uint64_t t=platform_ms();lv_tick_inc(t-tick);tick=t;lv_timer_handler();
             f1_hid_poll(&game_input,t,480,800);
