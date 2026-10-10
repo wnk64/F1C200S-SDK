@@ -8,6 +8,7 @@
 #include <linux/input.h>
 #include <linux/kd.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <time.h>
@@ -24,6 +25,7 @@ static int x, y, pressed, slot;
 static uint64_t last_irq;
 static f1_hid hid;
 static lv_obj_t *mouse_cursor;
+static int mouse_cursor_enabled = 1;
 static lv_group_t *key_group;
 static uint64_t next_touch_scan;
 static int hid_initialized;
@@ -99,7 +101,7 @@ static void hid_poll(void)
         next_hid_poll = now + 8;
         f1_hid_poll(&hid, now, lv_disp_get_hor_res(display), lv_disp_get_ver_res(display));
     }
-    if (hid.mouse_count) lv_obj_clear_flag(mouse_cursor, LV_OBJ_FLAG_HIDDEN);
+    if (hid.mouse_count && mouse_cursor_enabled) lv_obj_clear_flag(mouse_cursor, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(mouse_cursor, LV_OBJ_FLAG_HIDDEN);
 }
 static void mouse_read(lv_indev_drv_t *driver, lv_indev_data_t *data)
@@ -182,6 +184,8 @@ int platform_open(void)
     static lv_indev_drv_t pointer; lv_indev_drv_init(&pointer);
     pointer.type = LV_INDEV_TYPE_POINTER; pointer.read_cb = pointer_read;
     lv_indev_drv_register(&pointer);
+    const char *hide_cursor = getenv("F1_HIDE_MOUSE_CURSOR");
+    mouse_cursor_enabled = !hide_cursor || strcmp(hide_cursor, "1");
     mouse_cursor = lv_label_create(lv_layer_sys()); lv_label_set_text(mouse_cursor, LV_SYMBOL_PLAY);
     lv_obj_set_style_text_font(mouse_cursor, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_color(mouse_cursor, lv_color_hex(0xd32643), 0);

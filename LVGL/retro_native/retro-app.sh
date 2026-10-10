@@ -1,5 +1,6 @@
 #!/bin/sh
 set -u
+export F1_HIDE_MOUSE_CURSOR=1
 SELF=$(CDPATH= cd "$(dirname "$0")" && pwd)
 case "${1:-}" in gba|ps1|md) system=$1;; *) exit 1;; esac
 test -x "$SELF/retro-native" && test -x "$SELF/retro-browser" && test -r "$SELF/cores/$system.so" && test -r "$SELF/cjk28.bin" || exit 1

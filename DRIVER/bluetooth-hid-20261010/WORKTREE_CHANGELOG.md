@@ -1,5 +1,9 @@
 # Worktree Change Log
 
+## 2026-10-10 planned / No visible cursor in emulators
+Baseline a563622; native artifacts recorded below and retained hostside; original menu executable unchanged. Shared platform displays mouse cursor whenever any mouse-capable device exists, including BT keyboard composite mouse. Add opt-in F1_HIDE_MOUSE_CURSOR=1 read once at platform_open; hide through hid_poll while retaining all input handling. Only emulator launchers export option; browser and game inherit it, menu unchanged.
+Scope: LVGL/menu/platform.c, sfc-app.sh, retro-app.sh, emulators-app.sh. Build native and browsers with existing Makefiles, deploy .next then rename on SD without modifying running executables in place. Existing active game changes on next launch. Dependencies: emulator framebuffer/LVGL/input; no kernel/network/audio changes. Cold boots0, physical visual confirmation pending.
+
 ## 2026-10-10 planned / Deploy native emulators with HID controls
 User confirms keyboard navigation works. Source baseline343c977/5801eef emulator mapping, complete tracked native frontend/core sources and Makefiles. Preserve existing runtime menu/player/cast/kernel/audio and dirty DTBs. Build using existing Buildroot ARMv5 soft-float toolchain, no kernel build.
 Hypothesis: synthesized gamepad Enter/Esc navigation must not enter emulator keyboard loops; tag event origin and ignore gamepad navigation while retaining raw joypad state. Scope evdev-hid.h, mapping test, sfc_native/frontend.c, retro_native/frontend.c. Stage candidates on SD, original menu entries preserved, add two entries within12application limit. Tests sanitizer/ARM execution and board core load/headless fixtures; real game speed/audio/UI and3coldboots pending. Rollback menu config remove new entries, original binaries untouched.

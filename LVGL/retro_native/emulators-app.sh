@@ -1,5 +1,6 @@
 #!/bin/sh
 set -u
+export F1_HIDE_MOUSE_CURSOR=1
 SELF=$(CDPATH= cd "$(dirname "$0")" && pwd)
 selection=$(mktemp /tmp/f1-emulator-system.XXXXXX) || exit 1
 child=
