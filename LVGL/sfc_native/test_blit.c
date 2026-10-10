@@ -14,6 +14,13 @@ int main(void)
     for(size_t i=448*1920;i<size+32;i++)assert(dst[i]==0xa5);
     assert(sfc_blit(dst,size-1,1920,src,256,224,256)==-1);
     assert(sfc_blit(dst,size,1920,src,0,224,256)==-1);
+    assert(sfc_blit(dst,size,1921,src,256,224,256)==-1);
     assert(!sfc_blit(dst,size,1920,src,512,478,512));
+    for(unsigned i=0;i<512*478;i++)src[i]=0x07e0;
+    assert(!sfc_blit(dst,size,1920,src,256,224,256));
+    assert(((uint32_t*)dst)[480*14]==0x00ff00);
+    for(unsigned i=0;i<512*478;i++)src[i]=0x001f;
+    assert(!sfc_blit(dst,size,1920,src,256,224,256));
+    assert(((uint32_t*)dst)[480*14]==0x0000ff);
     free(dst);free(src);puts("SFC RGB565/aspect/bounds/control-region PASS");return 0;
 }

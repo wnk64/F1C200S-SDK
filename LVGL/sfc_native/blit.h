@@ -6,7 +6,7 @@ static int sfc_blit(uint8_t *dst, size_t bytes, unsigned pitch, const uint16_t *
                     unsigned width, unsigned height, unsigned src_pitch)
 {
     if (!dst || !src || !width || width > 512 || !height || height > 478 ||
-        src_pitch < width || pitch < 480 * 4 || bytes < (size_t)pitch * 800) return -1;
+        src_pitch < width || pitch < 480 * 4 || pitch % 4 || bytes < (size_t)pitch * 800) return -1;
     unsigned out_w = 480, out_h = (unsigned)((uint64_t)height * out_w / width);
     if (out_h > 448) { out_h = 448; out_w = (unsigned)((uint64_t)width * out_h / height); }
     unsigned left = (480-out_w)/2, top = (448-out_h)/2;
