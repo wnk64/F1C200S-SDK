@@ -32,6 +32,8 @@ static snd_pcm_t *pcm;
 static int16_t audio_ring[4096*2];
 static unsigned audio_head, audio_count;
 static uint64_t audio_fraction, audio_dropped, audio_written;
+static int hash_audio;
+static uint32_t audio_hash=2166136261u;
 static lv_obj_t *pause_label;
 static void stop(int sig) { (void)sig; quit = 1; }
 static int64_t now_us(void)
@@ -134,6 +136,7 @@ static void audio_step(void)
     unsigned frames=audio_fraction/1000000;audio_fraction%=1000000;
     if(frames>800)frames=800;
     S9xMixSamples(samples,frames*2);
+    if(hash_audio)for(unsigned i=0;i<frames*2;i++){audio_hash^=(uint16_t)samples[i];audio_hash*=16777619u;}
     if(!pcm)return;
     if(audio_count+frames>4096){unsigned drop=audio_count+frames-4096;audio_head=(audio_head+drop)%4096;audio_count-=drop;audio_dropped+=drop;}
     for(unsigned i=0;i<frames;i++){unsigned at=(audio_head+audio_count+i)%4096;audio_ring[at*2]=samples[i*2];audio_ring[at*2+1]=samples[i*2+1];}
@@ -164,6 +167,7 @@ int main(int argc,char **argv)
 {
     setenv("F1_HIDE_MOUSE_CURSOR", "1", 1);
     int headless=argc==4&&!strcmp(argv[1],"--headless");
+    hash_audio=headless;
     const char *rom=headless?argv[3]:argc==2?argv[1]:NULL;
     unsigned limit=headless?strtoul(argv[2],NULL,10):0;
     struct stat st;
@@ -249,6 +253,7 @@ int main(int argc,char **argv)
         if(!headless){deadline+=Settings.FrameTime;int64_t wait=deadline-now_us();if(wait>0&&wait<50000)usleep(wait);else if(wait< -100000)deadline=now_us();}
     }
     fprintf(stderr,"SFC frames=%u draws=%u changes=%u nonblack=%u elapsed_us=%lld hash=%08x audio_written=%llu audio_dropped=%llu\n",frames,draws,changes,nonblack,(long long)(now_us()-started),hash,(unsigned long long)audio_written,(unsigned long long)audio_dropped);
+    if(hash_audio)fprintf(stderr,"SFC audio_hash=%08x\n",audio_hash);
     if(!headless)sram(rom,1);
     result=0;
     f1_hid_close(&game_input);
