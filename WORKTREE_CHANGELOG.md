@@ -187,6 +187,10 @@ Acceptance: pending; cold boot cycles 0/3. No video-playback acceptance implied.
 
 cb2fc19新增launch-audio-recovery-with-menu.sh，eb55d01根仓库菜单入口切换，仅wiliwili一行，投屏/触摸/设置保留。板端apps.conf1e28b728936a047627d7867e5008093325b05a76ab213bd47bd3ed4143c438cb，重启菜单成功。正式入口默认debug0且unset OSD隔离/测试变量，不自动播放。旧loop应用、播放器、启动器保留；回退apps.conf最后一行至launch-loop-with-menu.sh。一次性执行包装删除；候选未标稳定、未推GitHub稳定标签。
 
+## 2026-10-11 / Planned / Track missing SDK build input
+Base02ee015; original source clean. board_linux/build-curl.sh exists but is ignored by build-* and missing from Git archive. Curl vendor tests/data/Makefile.am and Makefile.in are also present but ignored, required for a complete release source export. Preserve existing file contents and all generated outputs, add exactly these3 source/build-input files to Git plus logs.
+Build: SDK fresh source export with isolated GCC6.4/OpenSSL/CedarX; original board_linux outputs untouched. Dependencies: HTTPS API/images and network media playback. No board deployment. Rollback: previous source commit remains; no runtime behavior change. Result pending source completeness and full media build.
+
 ## 2026-10-03 / pending长时回归 / PCM短暂背压不再误重开
 
 基线5571b6e，计划/详细证据audio-backpressure-20261003.md。用户报告视频正常、声音偶卡，实测500ms EAGAIN触发耳机回退与3秒蓝牙重开，BlueALSA无断链。dadad4b仅改audio_output.h把EAGAIN/零写入作为背压20ms等待，最长5秒无进展才恢复，真实ENODEV即时恢复，停止/暂停/路由可中断；同句柄prepare处理欠载。显式debug和注入测试650ms，正式入口unset注入变量。
