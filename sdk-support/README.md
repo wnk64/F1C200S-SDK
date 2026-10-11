@@ -57,4 +57,4 @@ Buildroot总包索引损坏也已修复；olddefconfig后必须仍选中基础�
 
 `./sdk build runtime-tools` 重编菜单使用的RTC/SNTP与静态IP工具，并运行同源码主机只读自测，不调用网络配置或授时写入功能。
 
-`./sdk build runtime-payload` 按runtime-layout.json将重编程序/模块安装至生成runtime-payload目录，安装前逐个核对构建报告哈希，拒绝未知目录/重复目标/路径及符号链接逃逸。此目标是最终rootfs集成的一步，尚不含启动服务、资源和完整基础系统，不是可烧录镜像。
+`./sdk build runtime-payload` 按runtime-layout.json将重编程序/模块安装至生成runtime-payload目录，安装前逐个核对构建报告哈希，拒绝未知目录/重复目标/路径及符号链接逃逸。另从锁定源码安装字体、RTL/AIC固件、应用脚本和首批RTC/耳机/自动声卡路由服务；安装副本的路径替换必须匹配且通过shell语法检查，保存原始及安装哈希。此目标是最终rootfs集成的一步，完整启动链、共享库、基础系统及分区镜像仍待完成，不是可烧录镜像。

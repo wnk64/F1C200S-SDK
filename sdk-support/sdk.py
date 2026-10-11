@@ -759,7 +759,7 @@ def build_runtime_payload():
                                 "replacements": spec.get("replacements", {})}
     report = {"layout_sha256": digest(layout_path), "files": files,
               "resource_provenance": provenance,
-              "scope": "compiled runtime payload; base rootfs/services/assets/image integration pending",
+              "scope": "compiled runtime payload with partial resources/services; base rootfs/full startup/libraries/image integration pending",
               "board_deployed": False}
     (OUT / "images/runtime-payload").mkdir(parents=True, exist_ok=True)
     (OUT / "images/runtime-payload/build.json").write_text(json.dumps(report, indent=2) + "\n")
