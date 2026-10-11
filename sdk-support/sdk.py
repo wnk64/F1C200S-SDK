@@ -2,8 +2,10 @@
 """Source-locked F1C200S SDK. Generated files never replace active build trees."""
 import argparse
 import contextlib
+import copy
 import fcntl
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -844,6 +846,102 @@ def build_runtime_payload():
     print("Installed {} source-built runtime artifacts".format(len(files)), flush=True)
 
 
+def archive_name(name):
+    normalized = posixpath.normpath(name)
+    if name.startswith("/") or ".." in name.split("/") or normalized.startswith("../"):
+        raise RuntimeError("Unsafe rootfs member: " + name)
+    return normalized
+
+
+def merge_rootfs_archive(base_path, payload, files, output_path):
+    excluded = {"etc/init.d/S41dhcpcd"}
+    with tarfile.open(str(base_path)) as base:
+        members = {}
+        for member in base.getmembers():
+            name = archive_name(member.name)
+            if name in members:
+                raise RuntimeError("Duplicate base rootfs member: " + name)
+            members[name] = member
+        if "etc/init.d/S41dhcpcd" in members:
+            member = members["etc/init.d/S41dhcpcd"]
+            if not member.isfile() or b"DAEMON=/sbin/dhcpcd" not in base.extractfile(member).read():
+                raise RuntimeError("Unrecognized global DHCP service; refuse exclusion")
+        for relative, expected in files.items():
+            if archive_name(relative) != relative:
+                raise RuntimeError("Runtime path is not normalized")
+            path = runtime_destination(payload, relative)
+            if not path.is_file() or digest(path) != expected:
+                raise RuntimeError("Runtime file changed before rootfs assembly: " + relative)
+            for parent in Path(relative).parents:
+                name = parent.as_posix()
+                if name in members and not members[name].isdir():
+                    raise RuntimeError("Runtime parent collides with base non-directory: " + name)
+            if relative in members and not members[relative].isfile():
+                raise RuntimeError("Runtime file collides with base special node: " + relative)
+        with tarfile.open(str(output_path), "w", format=tarfile.PAX_FORMAT) as output:
+            for name, member in sorted(members.items()):
+                if name in excluded or name in files:
+                    continue
+                item = copy.copy(member)
+                item.name = name
+                if item.islnk():
+                    item.linkname = archive_name(item.linkname)
+                stream = base.extractfile(member) if member.isfile() else None
+                output.addfile(item, stream)
+                if stream:
+                    stream.close()
+            added_directories = set(members)
+            for relative in sorted(files):
+                for parent in reversed(Path(relative).parents):
+                    name = parent.as_posix()
+                    if name == "." or name in added_directories:
+                        continue
+                    item = tarfile.TarInfo(name)
+                    item.type = tarfile.DIRTYPE
+                    item.mode = 0o755
+                    item.uid = item.gid = 0
+                    item.uname = item.gname = "root"
+                    output.addfile(item)
+                    added_directories.add(name)
+                path = payload / relative
+                item = output.gettarinfo(str(path), arcname=relative)
+                item.uid = item.gid = 0
+                item.uname = item.gname = "root"
+                if relative == "etc/rtl8723bs-sta.conf":
+                    item.mode = 0o600
+                with path.open("rb") as stream:
+                    output.addfile(item, stream)
+    return sorted(excluded & set(members))
+
+
+def build_integrated_rootfs():
+    check_output(create=True)
+    base_report = json.loads((OUT / "images/rootfs-base/build.json").read_text())
+    runtime_report = json.loads((OUT / "images/runtime-payload/build.json").read_text())
+    base = OUT / "work/ROOTFS/buildroot-2018.02.11/output/images/rootfs.tar"
+    if digest(base) != base_report["rootfs_tar_sha256"]:
+        raise RuntimeError("Base rootfs archive checksum mismatch")
+    if digest(ROOT / "sdk-support/runtime-layout.json") != runtime_report["layout_sha256"]:
+        raise RuntimeError("Runtime layout changed; rebuild runtime-payload")
+    images = OUT / "images/rootfs-integrated"
+    images.mkdir(parents=True, exist_ok=True)
+    temporary = images / "rootfs.tar.pending"
+    output = images / "rootfs.tar"
+    try:
+        excluded = merge_rootfs_archive(base, OUT / "runtime-payload", runtime_report["files"], temporary)
+        os.replace(str(temporary), str(output))
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+    report = {"base_rootfs_sha256": digest(base), "runtime_report_sha256": digest(OUT / "images/runtime-payload/build.json"),
+              "rootfs_tar_sha256": digest(output), "rootfs_tar_bytes": output.stat().st_size,
+              "excluded_services": excluded, "runtime_files": len(runtime_report["files"]),
+              "scope": "assembled rootfs candidate; full startup/dependency/image/hardware validation pending",
+              "board_deployed": False}
+    (images / "build.json").write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps(report, indent=2), flush=True)
+
+
 def build_runtime_tools(jobs):
     work, _, prefix, env = app_environment()
     network = work / "SCRCPT/network-and-audio-source"
@@ -1125,7 +1223,7 @@ def main():
     inspect = sub.add_parser("doctor")
     inspect.add_argument("--release", action="store_true")
     build = sub.add_parser("build")
-    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio", "wireless-modules", "wfd-protocol", "runtime-tools", "runtime-payload", "kernel-runtime"], default="all", nargs="?")
+    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio", "wireless-modules", "wfd-protocol", "runtime-tools", "runtime-payload", "kernel-runtime", "rootfs-integrated"], default="all", nargs="?")
     build.add_argument("-j", "--jobs", type=int, default=8)
     clean = sub.add_parser("clean")
     clean.add_argument("--component", choices=sorted(MANIFEST["components"]))
@@ -1192,6 +1290,9 @@ def main():
             return 0
         if args.component == "kernel-runtime":
             build_kernel_runtime()
+            return 0
+        if args.component == "rootfs-integrated":
+            build_integrated_rootfs()
             return 0
         build_boot(args.component, args.jobs)
         return 0

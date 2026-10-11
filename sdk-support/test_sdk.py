@@ -16,6 +16,50 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_rootfs_merge_preserves_special_nodes_and_installs_root_files(self):
+        base = self.root / "base.tar"
+        payload = self.root / "payload"
+        payload.mkdir()
+        (payload / "app").write_bytes(b"app")
+        with tarfile.open(str(base), "w") as archive:
+            directory = tarfile.TarInfo("dev")
+            directory.type = tarfile.DIRTYPE
+            archive.addfile(directory)
+            device = tarfile.TarInfo("dev/console")
+            device.type = tarfile.CHRTYPE
+            device.devmajor, device.devminor = 5, 1
+            archive.addfile(device)
+            link = tarfile.TarInfo("bin/sh")
+            link.type = tarfile.SYMTYPE
+            link.linkname = "busybox"
+            archive.addfile(link)
+            service = tarfile.TarInfo("etc/init.d/S41dhcpcd")
+            content = b"DAEMON=/sbin/dhcpcd\n"
+            service.size = len(content)
+            archive.addfile(service, io.BytesIO(content))
+        output = self.root / "merged.tar"
+        excluded = sdk.merge_rootfs_archive(base, payload, {"app": sdk.digest(payload / "app")}, output)
+        self.assertEqual(excluded, ["etc/init.d/S41dhcpcd"])
+        with tarfile.open(str(output)) as archive:
+            self.assertTrue(archive.getmember("dev/console").ischr())
+            self.assertEqual(archive.getmember("dev/console").devminor, 1)
+            self.assertEqual(archive.getmember("bin/sh").linkname, "busybox")
+            self.assertEqual(archive.getmember("app").uid, 0)
+            self.assertNotIn("etc/init.d/S41dhcpcd", archive.getnames())
+
+    def test_rootfs_merge_rejects_base_symlink_parent(self):
+        base = self.root / "base.tar"
+        payload = self.root / "payload"
+        (payload / "opt").mkdir(parents=True)
+        (payload / "opt/app").write_bytes(b"app")
+        with tarfile.open(str(base), "w") as archive:
+            link = tarfile.TarInfo("opt")
+            link.type = tarfile.SYMTYPE
+            link.linkname = "/tmp"
+            archive.addfile(link)
+        with self.assertRaises(RuntimeError):
+            sdk.merge_rootfs_archive(base, payload, {"opt/app": sdk.digest(payload / "opt/app")}, self.root / "merged.tar")
+
     def test_cast_dhcp_adapter_only_emits_valid_ack_addresses(self):
         script = Path(__file__).parent / "runtime-cast/cast-dhcp.sh"
         logs = (b"udhcpd: sending OFFER of 192.168.49.52\n"
