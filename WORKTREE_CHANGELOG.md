@@ -560,3 +560,13 @@ First preflight: config parser recognized BR2 only; corrected parameterized pars
 Tests: kernel parser and metadata allowlist regression added. Full runtime/cold-boot checks not performed.
 Deploy: none. Rollback: revert SDK-only commits.
 Decision: source compilation passed; protocol tooling, formal runtime layout, image construction, independent rebuild and physical acceptance remain pending.
+
+## 2026-10-11 / pending / WFD protocol build
+Hypothesis: rebuild archived complete WFD source with fresh SDK dependencies rather than install archived programs.
+Files: sdk-support/sdk.py, manifest.json, README.md, test_sdk.py, changes-20261011.md.
+Source: archive274cd479e49be7488a87242c702e653de82e29590093b99d226b7307a48bef4d, only protocol-tools/wpa_supplicant_2_4_aic_wfd; original archive retained. Objects/dependency files/binaries excluded, symlinks/escape rejected.
+Build: ./sdk build wfd-protocol -j2; generated GCC6.4 and libnl/OpenSSL sysroot; original WFD/P2P/AP configuration retained. Initial command-line CFLAGS prevented internal include/macros and failed; environment defaults retain Makefile additions.
+Result: supplicant1020584bytes SHA2565bd65e3088766a30d40f0be22f9566958f445fe18fef181180a9bb508c5b27fe; cli66004bytes02f9855142115e75da8dd3ad63706e6e4380096e3a267f23a7b05c629544f219; passphrase30604bytes70111e1983380b8b94f6f65344be1c50210334f5ad97b1a9e3bc49cb08fcc4ed. ARM/noSDL checks passed. Report images/wfd-protocol/build.json includes archive/config hashes.
+Commits: initial ddede0b, verified source export/provenance ec55335;31 tests passed. No running build remains.
+Deploy: none. Rollback: revert SDK-only commits, original source and board runtime unchanged.
+Decision: protocol source build passed; DHCP/runtime/image/portable clean rebuild and cold-boot acceptance pending.
