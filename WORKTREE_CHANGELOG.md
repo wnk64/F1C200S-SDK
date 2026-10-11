@@ -21,3 +21,12 @@ Target: real directory, not a symlink; old source location absent, no compatibil
 Preserved: dl, output and every original tracked/untracked file; no cleanup of original files.
 Build: not run; old absolute references in dependent source/SDK require later explicit relocation fixes.
 Board: not contacted or modified in this task.
+
+## 2026-10-11 / Planned / Restore missing upstream integration sources
+Base:1837d25; active.config SHA2569b7f12245973997e63e4d18f2582e81de6291de771c03864c04a106ebe8c0455. Existing output and dirty board/licheepi/nano/rootfs_overlay submodule preserved.
+Evidence: exact official2018.02.11 archive SHA2564d9cb4b862877eb2493bd857e0e3d49427b00fdeecd03bf5c24bfc952b586e5a;10058 identical source files,13 customized files preserved, only9 missing files all underlinux/.
+Files: linux/{Config.in,Config.ext.in,linux.mk,linux-ext-aufs.mk,linux-ext-ev3dev-linux-drivers.mk,linux-ext-fbtft.mk,linux-ext-rtai.mk,linux-ext-xenomai.mk,0001-timeconst.pl-Eliminate-Perl-warning.patch.conditional}.
+Hypothesis: restoring only the exact missing stock integration files will repair Kconfig traversal without changing custom packages, current.config, overlay or old build artifacts.
+Build: planned isolated SDK olddefconfig/source acquisition; no in-place rebuild or clean.
+Deploy:none. Rollback: revert the source-import commit; no existing source file is overwritten.
+Decision: pending repair verification; full SD image integration remains active.
