@@ -13,6 +13,7 @@ import posixpath
 import re
 import shlex
 import shutil
+import struct
 import subprocess
 import sys
 import tarfile
@@ -1217,6 +1218,150 @@ def build_bluetooth_audio(jobs):
     }, prefix)
 
 
+def sd_partition_table():
+    return [
+        {"name": "boot", "start": 2048, "sectors": 32768, "type": 0x0e},
+        {"name": "rootfs", "start": 34816, "sectors": 1013760, "type": 0x83},
+        {"name": "data", "start": 1048576, "sectors": 1048576, "type": 0x0c},
+    ]
+
+
+def sd_mbr(partitions, total_sectors, bootloader_bytes):
+    if len(partitions) != 3 or total_sectors < 1 or bootloader_bytes < 1:
+        raise RuntimeError("Invalid SD image layout")
+    previous = 0
+    result = bytearray(512)
+    struct.pack_into("<I", result, 440, 0xf1c20050)
+    for index, partition in enumerate(partitions):
+        start, length = partition["start"], partition["sectors"]
+        if start < previous or length < 1 or start + length > total_sectors:
+            raise RuntimeError("Overlapping/out-of-bounds SD partitions")
+        if index == 0 and (start < 2048 or 8192 + bootloader_bytes > start * 512):
+            raise RuntimeError("U-Boot overlaps the first partition")
+        struct.pack_into("<B3sB3sII", result, 446 + index * 16, 0x80 if index == 0 else 0,
+                         b"\xfe\xff\xff", partition["type"], b"\xfe\xff\xff", start, length)
+        previous = start + length
+    result[510:512] = b"\x55\xaa"
+    return bytes(result)
+
+
+def file_region_hash(path, offset, length):
+    sha = hashlib.sha256()
+    with path.open("rb") as stream:
+        stream.seek(offset)
+        while length:
+            block = stream.read(min(length, 1024 * 1024))
+            if not block:
+                raise RuntimeError("Truncated image region")
+            sha.update(block)
+            length -= len(block)
+    return sha.hexdigest()
+
+
+def build_sd_image():
+    check_output(create=True)
+    images = OUT / "images/sd-image"
+    images.mkdir(parents=True, exist_ok=True)
+    rootfs = OUT / "images/rootfs-integrated/rootfs.tar"
+    report = json.loads((rootfs.parent / "build.json").read_text())
+    if digest(rootfs) != report["rootfs_tar_sha256"]:
+        raise RuntimeError("Integrated rootfs checksum mismatch")
+    dependencies = json.loads((rootfs.parent / "dependencies.json").read_text())
+    if digest(rootfs.parent / "dependencies.json") != report["dependency_report_sha256"] or dependencies["issues"]:
+        raise RuntimeError("Integrated dependency audit missing/failed")
+    inputs = {
+        "uboot": OUT / "images/uboot/u-boot-sunxi-with-spl.bin",
+        "kernel": OUT / "images/kernel/zImage",
+        "dtb": OUT / "images/board/suniv-f1c100s-licheepi-nano.dtb",
+    }
+    for name in ("uboot", "kernel"):
+        source_report = json.loads((OUT / "images" / name / "build.json").read_text())
+        if digest(inputs[name]) != source_report["sha256"][inputs[name].name]:
+            raise RuntimeError("Boot input checksum mismatch: " + name)
+    if digest(inputs["dtb"]) != MANIFEST["project_sources"]["dtb_sha256"]:
+        raise RuntimeError("Boot DTB mismatch")
+    host = OUT / "work/ROOTFS/buildroot-2018.02.11/output/host"
+    tool_report = json.loads((OUT / "images/image-tools/build.json").read_text())
+    for name, spec in tool_report["tools"].items():
+        if digest(OUT / spec["path"]) != spec["sha256"]:
+            raise RuntimeError("Image tool checksum mismatch: " + name)
+    partitions = sd_partition_table()
+    total_sectors = partitions[-1]["start"] + partitions[-1]["sectors"]
+    mbr = sd_mbr(partitions, total_sectors, inputs["uboot"].stat().st_size)
+    with tempfile.TemporaryDirectory(prefix="sd-build-", dir=str(images)) as temporary:
+        stage = Path(temporary)
+        boot_script = stage / "boot.scr"
+        run([OUT / "sources/uboot/tools/mkimage", "-A", "arm", "-O", "linux", "-T", "script",
+             "-C", "none", "-n", "F1C200S SDK", "-d", ROOT / "sdk-support/boot.cmd", boot_script])
+        filesystems = {}
+        for partition in partitions:
+            path = stage / (partition["name"] + ".img")
+            with path.open("wb") as stream:
+                stream.truncate(partition["sectors"] * 512)
+            filesystems[partition["name"]] = path
+        run(["mkfs.vfat", "-F", "16", "-n", "F1BOOT", "-h", str(partitions[0]["start"]), filesystems["boot"]])
+        for path, name in ((inputs["kernel"], "zImage"), (inputs["dtb"], "suniv-f1c100s-licheepi-nano.dtb"), (boot_script, "boot.scr")):
+            run(["mcopy", "-i", filesystems["boot"], path, "::" + name])
+            recovered = stage / ("verify-" + name)
+            run(["mcopy", "-i", filesystems["boot"], "::" + name, recovered])
+            if digest(path) != digest(recovered):
+                raise RuntimeError("Boot FAT file verification failed: " + name)
+        root = stage / "root"
+        root.mkdir()
+        command = " && ".join([
+            "tar -xpf {} -C {}".format(shlex.quote(str(rootfs)), shlex.quote(str(root))),
+            "mkdir -p " + shlex.quote(str(root / "root/roms")),
+            "{} -t ext2 -F -b 4096 -I 256 -m 0 -L F1ROOT -d {} {}".format(
+                shlex.quote(str(host / "sbin/mke2fs")), shlex.quote(str(root)), shlex.quote(str(filesystems["rootfs"]))),
+        ])
+        run([host / "bin/fakeroot", "/bin/sh", "-c", command])
+        run([host / "sbin/e2fsck", "-fn", filesystems["rootfs"]])
+        console = capture([host / "sbin/debugfs", "-R", "stat /dev/console", filesystems["rootfs"]])
+        if "character special" not in console or not re.search(r"User:\s+0\s+Group:\s+0", console):
+            raise RuntimeError("Rootfs console node/ownership incorrect")
+        run(["mkfs.vfat", "-F", "32", "-n", "F1DATA", "-h", str(partitions[2]["start"]), filesystems["data"]])
+        for name in ("gba", "ps1", "md", "sfc", "ons", "video", "music", "documents", "pictures", "recordings", "uploads"):
+            run(["mmd", "-i", filesystems["data"], "::" + name])
+        for name in ("boot", "data"):
+            run(["fsck.vfat", "-n", filesystems[name]])
+        output = images / "f1c200s-sdk-candidate.img"
+        pending = images / "f1c200s-sdk-candidate.img.pending"
+        try:
+            with pending.open("wb") as stream:
+                stream.truncate(total_sectors * 512)
+                stream.seek(0)
+                stream.write(mbr)
+                stream.seek(8192)
+                with inputs["uboot"].open("rb") as source:
+                    shutil.copyfileobj(source, stream)
+                for partition in partitions:
+                    stream.seek(partition["start"] * 512)
+                    with filesystems[partition["name"]].open("rb") as source:
+                        shutil.copyfileobj(source, stream)
+                stream.flush()
+                os.fsync(stream.fileno())
+            partition_hashes = {}
+            for partition in partitions:
+                expected = digest(filesystems[partition["name"]])
+                actual = file_region_hash(pending, partition["start"] * 512, partition["sectors"] * 512)
+                if actual != expected:
+                    raise RuntimeError("SD image partition byte verification failed")
+                partition_hashes[partition["name"]] = actual
+            if file_region_hash(pending, 8192, inputs["uboot"].stat().st_size) != digest(inputs["uboot"]):
+                raise RuntimeError("SD U-Boot region mismatch")
+            os.replace(str(pending), str(output))
+        finally:
+            if pending.exists():
+                pending.unlink()
+    report = {"image": output.name, "sha256": digest(output), "bytes": output.stat().st_size,
+              "partitions": partitions, "partition_sha256": partition_hashes,
+              "rootfs_tar_sha256": digest(rootfs), "boot_input_sha256": {name: digest(path) for name, path in inputs.items()},
+              "offline_filesystem_checks": "passed", "board_deployed": False, "cold_boots": 0,
+              "scope": "flash-layout candidate; portable full build/clean and hardware acceptance pending"}
+    (images / "build.json").write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps(report, indent=2), flush=True)
+
+
 def build_image_tools(jobs):
     original, target, spec = stage("rootfs")
     env = os.environ.copy()
@@ -1393,7 +1538,7 @@ def main():
     inspect = sub.add_parser("doctor")
     inspect.add_argument("--release", action="store_true")
     build = sub.add_parser("build")
-    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio", "wireless-modules", "wfd-protocol", "runtime-tools", "runtime-payload", "kernel-runtime", "rootfs-integrated", "image-tools"], default="all", nargs="?")
+    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio", "wireless-modules", "wfd-protocol", "runtime-tools", "runtime-payload", "kernel-runtime", "rootfs-integrated", "image-tools", "sd-image"], default="all", nargs="?")
     build.add_argument("-j", "--jobs", type=int, default=8)
     clean = sub.add_parser("clean")
     clean.add_argument("--component", choices=sorted(MANIFEST["components"]))
@@ -1466,6 +1611,9 @@ def main():
             return 0
         if args.component == "image-tools":
             build_image_tools(args.jobs)
+            return 0
+        if args.component == "sd-image":
+            build_sd_image()
             return 0
         build_boot(args.component, args.jobs)
         return 0

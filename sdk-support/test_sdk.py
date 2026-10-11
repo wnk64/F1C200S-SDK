@@ -16,6 +16,18 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_sd_mbr_preserves_verified_layout_and_boot_gap(self):
+        partitions = sdk.sd_partition_table()
+        result = sdk.sd_mbr(partitions, 2097152, 548864)
+        self.assertEqual(result[510:512], b"\x55\xaa")
+        for index, start in enumerate((2048, 34816, 1048576)):
+            self.assertEqual(sdk.struct.unpack_from("<I", result, 446 + index * 16 + 8)[0], start)
+        with self.assertRaises(RuntimeError):
+            sdk.sd_mbr(partitions, 2097152, 2 * 1024 * 1024)
+        partitions[1]["start"] = 2048
+        with self.assertRaises(RuntimeError):
+            sdk.sd_mbr(partitions, 2097152, 548864)
+
     def test_boot_module_plan_is_read_only_and_dependency_ordered(self):
         script = Path(__file__).parent / "runtime-cast/S12board-hardware"
         result = subprocess.check_output(["/bin/sh", str(script), "--list-modules"]).decode("ascii")
