@@ -557,9 +557,21 @@ def build_retro_cores(jobs):
                                 "md.so": pico / "picodrive_libretro.so"}, prefix)
 
 
+def relocate_lan_backend(source):
+    old = 'static const char *backend="/root/roms/candidates/mplayer_geometry_20261005/mplayer-native-geometry";'
+    new = 'static const char *backend="/opt/f1/apps/media/mplayer-native";'
+    content = source.read_text()
+    if content.count(old) == 1 and new not in content:
+        source.write_text(content.replace(old, new))
+    elif content.count(new) != 1 or old in content:
+        raise RuntimeError("Unrecognized DLNA backend source; refusing speculative relocation")
+
+
 def build_lan(jobs):
     work, host, prefix, env = app_environment()
     directory = work / "SOFTWARE/lan-apps"
+    backend_source = directory / "vendor/gmrender/src/output_cedar.c"
+    relocate_lan_backend(backend_source)
     library = directory / "stage"
     sysroot = Path(capture([prefix + "gcc", "--print-sysroot"]))
     env["CC"] = prefix + "gcc"
@@ -601,6 +613,14 @@ def build_lan(jobs):
     run([cc, "-o", "lan-ui", "build/lan_ui.o", "build/civetweb.o", menu / "platform.o", menu / "menu_font_stream.o"] +
         sorted((menu / "build/lvgl").rglob("*.o")) + ["-lm", "-lpthread", "-ldl"], directory, env)
     publish_apps("lan", {"lan-ui": directory / "lan-ui", "gmediarender": directory / "vendor/gmrender/src/gmediarender"}, prefix)
+    binary = (OUT / "images/lan/gmediarender").read_bytes()
+    if b"/opt/f1/apps/media/mplayer-native\0" not in binary or b"/candidates/" in binary:
+        raise RuntimeError("DLNA binary backend path verification failed")
+    report_path = OUT / "images/lan/build.json"
+    report = json.loads(report_path.read_text())
+    report["backend"] = "/opt/f1/apps/media/mplayer-native"
+    report["relocated_backend_source_sha256"] = digest(backend_source)
+    report_path.write_text(json.dumps(report, indent=2) + "\n")
 
 
 def build_media_backends(jobs):

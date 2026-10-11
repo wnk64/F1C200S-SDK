@@ -16,6 +16,17 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_lan_backend_relocation_is_exact_and_repeatable(self):
+        source = self.root / "output_cedar.c"
+        old = 'static const char *backend="/root/roms/candidates/mplayer_geometry_20261005/mplayer-native-geometry";'
+        source.write_text("preserved\n" + old + "\n")
+        sdk.relocate_lan_backend(source)
+        self.assertEqual(source.read_text(), 'preserved\nstatic const char *backend="/opt/f1/apps/media/mplayer-native";\n')
+        sdk.relocate_lan_backend(source)
+        source.write_text("unexpected\n")
+        with self.assertRaises(RuntimeError):
+            sdk.relocate_lan_backend(source)
+
     def test_runtime_script_relocation_is_narrow_and_requires_known_input(self):
         content = b'#!/bin/sh\nPLAYER=/root/test/candidates/old/player\nexec "$PLAYER"\n'
         result = sdk.relocate_runtime_text(content, {"/root/test/candidates/old/player": "/opt/f1/player"})
