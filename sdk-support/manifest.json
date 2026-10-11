@@ -21,7 +21,7 @@
     },
     "rootfs": {
       "path": "ROOTFS/buildroot-2018.02.11",
-      "commit": "1837d25ead6093e10a7753349a99c43633db8f54",
+      "commit": "9465767a222f1f299d3800d20275ce4d99153b5d",
       "config_sha256": "9b7f12245973997e63e4d18f2582e81de6291de771c03864c04a106ebe8c0455",
       "stage_path": "work/ROOTFS/buildroot-2018.02.11",
       "required_files": ["Makefile", "Config.in", "linux/Config.in", "linux/linux.mk", "package/pkg-generic.mk", "support/dependencies/dependencies.sh"],
@@ -37,7 +37,6 @@
   },
   "release_blockers": [
     "The live SD U-Boot hash differs from the current workspace binary; historical source/config correspondence needs recovery.",
-    "Buildroot source is missing linux/Config.in and linux/linux.mk; restore matching full release source before rebuilding.",
     "Current rootfs overlay and runtime application/module install mappings need integration.",
     "AIC source, Wi-Fi Direct supplicant and Bluetooth audio rebuild recipes need locking.",
     "Fresh Buildroot toolchain/rootfs and all applications need clean-build verification.",

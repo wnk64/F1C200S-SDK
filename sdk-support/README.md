@@ -24,3 +24,7 @@ clean 仅删除有正确所有权标记的 .sdk-output，拒绝符号链接和�
 构建生成 images/<component>/build.json，记录提交、编译器、配置及产物 SHA256。构建成功不代表旧二进制逐字节一致或板子验收。当前不自动部署、不写 SD 卡、不停止投屏。
 
 rootfs-sources 获取/校验基础 Buildroot 依赖；rootfs-base 在隔离目录完整构建基础系统与工具链，不代表最终运行镜像。唯一排除的已知旧 overlay 子模块仍在原目录保留且不丢弃其修改；排除引用也被锁定，其他源码修改照常拒绝。旧 overlay/post-build 不再用于此基础构建，避免重新收集历史二进制。libcedarc 锁定完整 Git 提交而不跟随浮动 master。
+
+`./sdk clean --component rootfs` 只清基础系统的生成目录，保留其他已编译组件；默认 `./sdk clean` 仍清全部 SDK 生成数据。分组件清理同样检查输出所有权与原提交，拒绝未标记目录。
+
+`python3 sdk-support/audit-buildroot.py` 对比官方精确2018.02.11发行包和现有源码，发行包放在 Buildroot 的 dl 缓存内，SHA256锁定。审计不覆盖定制文件。该工具已用于补回原目录缺失的9个 linux/集成文件；13个现有定制文件保持原样。

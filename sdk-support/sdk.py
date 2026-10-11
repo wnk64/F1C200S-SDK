@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -170,6 +171,30 @@ def stage(name):
     return source, target, spec
 
 
+def clean_component(name):
+    check_output()
+    if not OUT.exists():
+        return
+    source, spec = component(name)
+    target = OUT / spec.get("stage_path", "sources/" + name)
+    if not contained(target, OUT) or target.is_symlink():
+        raise RuntimeError("Unsafe component output path")
+    images = OUT / "images" / name
+    if not contained(images, OUT) or images.is_symlink():
+        raise RuntimeError("Unsafe component image path")
+    if target.exists():
+        marker = target / ".sdk-source-commit"
+        if marker.is_symlink() or not marker.is_file():
+            raise RuntimeError("Refusing component without source ownership stamp")
+        commit = marker.read_text().strip()
+        if not re.fullmatch("[0-9a-f]{40}", commit):
+            raise RuntimeError("Invalid component source stamp")
+        capture(["git", "cat-file", "-e", commit + "^{commit}"], source)
+        shutil.rmtree(str(target))
+    if images.exists():
+        shutil.rmtree(str(images))
+
+
 def set_config(path, values):
     lines = []
     for line in path.read_text().splitlines():
@@ -286,7 +311,8 @@ def main():
     build = sub.add_parser("build")
     build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base"], default="all", nargs="?")
     build.add_argument("-j", "--jobs", type=int, default=8)
-    sub.add_parser("clean")
+    clean = sub.add_parser("clean")
+    clean.add_argument("--component", choices=sorted(MANIFEST["components"]))
     args = parser.parse_args()
     if not args.command:
         parser.error("a command is required")
@@ -294,6 +320,10 @@ def main():
         if args.command == "doctor":
             return doctor(args.release)
         if args.command == "clean":
+            if args.component:
+                clean_component(args.component)
+                print("Generated component output removed: " + args.component)
+                return 0
             check_output()
             if OUT.exists():
                 shutil.rmtree(str(OUT))

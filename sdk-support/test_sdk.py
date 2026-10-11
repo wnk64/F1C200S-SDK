@@ -52,6 +52,36 @@ class OutputSafetyTests(unittest.TestCase):
                 sdk.main()
         self.assertTrue((sdk.OUT / "source.c").exists())
 
+    def test_scoped_clean_preserves_other_components_and_sources(self):
+        source = self.root / "active-source"
+        source.mkdir()
+        (source / "keep.c").write_text("preserve")
+        sdk.check_output(create=True)
+        generated = sdk.OUT / "sources" / "example"
+        generated.mkdir(parents=True)
+        (generated / ".sdk-source-commit").write_text("a" * 40)
+        other = sdk.OUT / "sources" / "kernel"
+        other.mkdir()
+        (other / "zImage").write_text("preserve")
+        manifest = {"components": {"example": {"path": "active-source"}}}
+        with mock.patch.object(sdk, "MANIFEST", manifest), mock.patch.object(sdk, "capture", return_value=""):
+            sdk.clean_component("example")
+        self.assertFalse(generated.exists())
+        self.assertTrue((other / "zImage").is_file())
+        self.assertEqual((source / "keep.c").read_text(), "preserve")
+
+    def test_scoped_clean_rejects_unmarked_component(self):
+        (self.root / "active-source").mkdir()
+        sdk.check_output(create=True)
+        generated = sdk.OUT / "sources" / "example"
+        generated.mkdir(parents=True)
+        (generated / "source.c").write_text("preserve")
+        manifest = {"components": {"example": {"path": "active-source"}}}
+        with mock.patch.object(sdk, "MANIFEST", manifest):
+            with self.assertRaises(RuntimeError):
+                sdk.clean_component("example")
+        self.assertTrue((generated / "source.c").is_file())
+
     def test_unknown_directory_is_preserved(self):
         sdk.OUT.mkdir()
         sentinel = sdk.OUT / "source.c"
