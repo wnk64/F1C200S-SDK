@@ -805,6 +805,14 @@ def build_runtime_payload():
     if layout.get("sources"):
         roots["project"] = stage_project_sources()
         for origin in sorted({spec["origin"] for spec in layout["sources"]} - {"project"}):
+            if origin == "sdk":
+                roots[origin] = ROOT / "sdk-support"
+                for spec in (spec for spec in layout["sources"] if spec["origin"] == "sdk"):
+                    relative = "sdk-support/" + spec["path"]
+                    capture(["git", "cat-file", "-e", "HEAD:" + relative], ROOT)
+                    if capture(["git", "diff", "--name-only", "HEAD", "--", relative], ROOT):
+                        raise RuntimeError("SDK runtime source has uncommitted changes: " + relative)
+                continue
             _, roots[origin], _ = stage(origin)
     sources = runtime_source_plan(layout, target, roots, {entry[1] for entry in entries})
     target.mkdir(parents=True, exist_ok=True)

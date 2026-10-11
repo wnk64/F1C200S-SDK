@@ -16,6 +16,17 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_cast_dhcp_adapter_only_emits_valid_ack_addresses(self):
+        script = Path(__file__).parent / "runtime-cast/cast-dhcp.sh"
+        logs = (b"udhcpd: sending OFFER of 192.168.49.52\n"
+                b"udhcpd: sending ACK to 192.168.49.52\n"
+                b"udhcpd: sending ACK to 10.0.0.2\n"
+                b"udhcpd: sending ACK to 192.168.49.999\n"
+                b"udhcpd: sending ACK to 192.168.49.1\n"
+                b"udhcpd: error sending ACK to 192.168.49.9\n")
+        result = subprocess.run(["/bin/sh", str(script), "--parse-ack"], input=logs, stdout=subprocess.PIPE, check=True)
+        self.assertEqual(result.stdout, b"REQUEST udhcpd ip=192.168.49.52\n")
+
     def test_dhcp_config_generation_preserves_original_and_is_repeatable(self):
         source = self.root / "package/busybox/busybox.config"
         source.parent.mkdir(parents=True)
