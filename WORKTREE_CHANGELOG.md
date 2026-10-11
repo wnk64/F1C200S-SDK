@@ -41,3 +41,8 @@ Files: package/Config.in restored from the exact verified2018.02.11 upstream sou
 Hypothesis: full package-index restoration preserves intended original package selections and enables skeleton installation/rootfs image generation.
 Build: isolated SDK only. Reuse already built identical toolchain after verifying toolchain-related Kconfig values remain unchanged; rerun original9b7f1224 config with the repaired index. No original output cleanup.
 Deploy:none. Rollback: previous source commit9465767 retains the broken13-line index for provenance; revert only the index repair if necessary. Decision: pending configuration and full-build verification.
+
+### Index repair and configuration verification
+Source index commit30bdc8ef08c4c196fee4892b2f2b450ee58ef9f4 restores the official index plus two local Cedar includes. Original.config hash unchanged; old overlay dirty state retained. SDK repair reapplies the original config, verifies all toolchain/architecture/ABI settings unchanged, and restores BusyBox, both skeleton packages, ALSA, Dropbear, BlueZ5 and libcedarc selections. Effective isolated config SHA2560722011450c1ebb88e4768187c7e91a932e44ae3843223051368dbbaf36f1a9f.
+Initial full build completed the toolchain but not a usable system: only5MiB target and failed rootfs.tar due to missing skeleton accounts. Stock skeleton source files were present; package-index corruption caused the omission. This failed target is not an accepted image.
+Next: continue all restored package builds using the verified compatible toolchain, then validate rootfs contents and integrate current runtime components. No board deployment/cold boot yet.
