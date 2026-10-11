@@ -68,3 +68,7 @@ LAN后端在生成源码副本中定点改为/opt/f1/apps/media/mplayer-native�
 基础BusyBox配置在SDK副本中启用udhcpd，替代缺少C源的历史tiny_dhcpd_49；runtime-cast适配只在投屏启动时使用，把ACK转为既有watcher日志接口，租约和FIFO在/tmp。不在普通开机时启动DHCP服务器，此替代需要实机连接回归。
 
 runtime-payload已加入正式投屏入口、AIC loader、PBC/RTSP watcher和内存准备脚本；源从锁定主仓库提交读取。原preflight校验仍保留，MD5由当前重编产物/前序安装文件生成，组装时再次离线逐项核对。运行层当前125文件，51测试通过，触摸退出helper的sink身份也在生成副本中迁移并重编。硬件启动/分区镜像/实际连接仍未验收，不代表最终烧卡固件完成。
+
+新增硬件入口后运行层131文件：S12按USB PHY→MUSB及ION→Cedar依赖顺序加载，S14电源/S15屏幕/S34HID/S47IP5209使用对应重编模块；逐个核验模块名称和5.7.1。S19data只挂载既有p3并创建数据目录，不自动分区或格式化。
+
+`./sdk build image-tools` 从锁定Buildroot构建host e2fsprogs；`./sdk build sd-image` 把已编U-Boot/kernel/DTB/合并rootfs组成1GiB三分区候选镜像：.sdk-output/images/sd-image/f1c200s-sdk-candidate.img。host需现有mtools/dosfstools，命令只写生成目录普通文件，不写块设备或自动烧卡。FAT文件回读、ext2/FAT检查、root console节点、分区和U-Boot区域hash已离线通过；当前镜像未实机冷启动，不是已验收稳定固件。53单测通过；一键全源build/clean及可携带性验收仍在进行。

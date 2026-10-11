@@ -625,3 +625,14 @@ Verification:51 tests passed, including nested path longest-first relocation, cu
 Result:125 runtime files; rootfs201369600bytes SHA256761018d076661b468738cb4c5632f2ccc1f1d94873b9e988a8bf0e6b66bf8770;301 ARM ELF dependencies resolve. Reports retained.
 Deploy:none, no cast session/hardware/SD mutation. Build processes terminal. Rollback:revert SDK-only commits; original sources/runtime unchanged.
 Decision:cast source installation and offline checks passed; actual DHCP/PBC/RTSP/display/triple-touch behavior, hardware startup/data mount/SD image/portable build-clean/cold-boot acceptance pending. Full objective active.
+
+## 2026-10-11 / pending / Hardware startup and first SD image candidate
+Hypothesis: integrate exact-release hardware module startup and non-destructive data mounting, then generate a three-partition SD image file from source-built inputs.
+Files:sdk-support/sdk.py/test_sdk.py/runtime-layout.json/runtime-cast/S12board-hardware/S19data/manifest.json/README.md/changes-20261011.md.
+Startup:38195d8 installs dependency-ordered USB PHY/MUSB and ION/Cedar loader, existing power/panel/HID/IP5209 services with formal module paths/checksums.131 runtime files,52 tests,301 ARM ELF dependency audit passed; rootfs201390080bytes6bdcb7e8dff7e09df9c51af910baf95669eeed2f6542232d84e631fd7262a3ae. No BU/old gmenu startup. S19data only mounts existing VFATp3; never partitions/formats a card.
+Tools:old host mke2fs lacks-d;image-tools builds e2fsprogs1.43.9 from locked Buildroot in generated host. No system-tool replacement.
+Image:20cd2e5 generated1073741824byte .sdk-output/images/sd-image/f1c200s-sdk-candidate.img SHA256b930ea25b0f1d52f57644090c20500e07aecc92b08dbeb3e6af4eb37f156cb55.
+Layout:U-Boot at8192; boot FAT16 start2048 size32768 sectors; rootfs ext2 start34816 size1013760; data FAT32 start1048576 size1048576. Existing verified boot layout retained; data contains empty app folders only.
+Checks:53 tests passed, overlapping partitions/boot region refused;3 FAT boot files copied back/hash matched;ext2 e2fsck all5 passes;console root character node;both FAT fsck passed;merged image partition regions equal generated filesystem hashes;U-Boot region matches71e34730... . Report images/sd-image/build.json retained.
+Deploy:none, no physical card/board writes, cold_boots0. All build sessions terminal, generated temporary filesystem trees removed after assembly.
+Decision:image file generated and offline verified, still unaccepted candidate. One-command full build/clean, portable independent rebuild, ABI and full hardware/application three-cold-boot regressions remain pending. Full objective active.

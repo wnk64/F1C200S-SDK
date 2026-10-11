@@ -133,9 +133,9 @@
     "dtb_sha256": "8ca3cd42bc6c2ebea132d93e8bbe7027f863c66c5edad8540ff5284fc0b996ff"
   },
   "release_blockers": [
-    "Current rootfs overlay and runtime application/module install mappings need integration.",
-    "AIC source, Wi-Fi Direct supplicant and Bluetooth audio rebuild recipes need locking.",
-    "Fresh Buildroot toolchain/rootfs and all applications need clean-build verification.",
-    "SD image layout and physical cold-boot regression cycles remain unverified."
+    "Full one-command build orchestration and portable source/environment packaging remain unverified.",
+    "Independent complete clean/rebuild and ABI symbol checks remain unverified.",
+    "SD image candidate passed offline layout/filesystem checks but has zero physical cold-boot acceptance cycles.",
+    "Normal WLAN, Bluetooth, all menu applications, source-built DHCP cast path and display need end-to-end image regression."
   ]
 }
