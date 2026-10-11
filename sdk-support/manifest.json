@@ -60,7 +60,7 @@
     "wiliwili": {
       "path": "LVGL/wiliwili_lvgl",
       "stage_path": "work/LVGL/wiliwili_lvgl",
-      "commit": "02ee015abfa787e5430d84cf3cf8ce90525add93",
+      "commit": "0c773e14c095c57aeb911f8d97bbd79b0536801b",
       "required_files": ["board_linux/Makefile", "board_linux/build-curl.sh", "board_linux/platform_linux.cpp"]
     },
     "cedar-player": {
