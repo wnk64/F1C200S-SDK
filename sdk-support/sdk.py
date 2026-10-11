@@ -207,6 +207,128 @@ def set_config(path, values):
     path.write_text("\n".join(lines) + "\n")
 
 
+def stage_project_sources():
+    spec = MANIFEST["project_sources"]
+    if capture(["git", "rev-parse", "--show-toplevel"], ROOT) != str(ROOT):
+        raise RuntimeError("Missing project source repository")
+    for relative in spec["paths"]:
+        path = ROOT / relative
+        if not contained(path, ROOT) or path.is_symlink() or not path.is_dir():
+            raise RuntimeError("Invalid project source directory: " + relative)
+        capture(["git", "cat-file", "-e", spec["commit"] + ":" + relative], ROOT)
+    changed = set(capture(["git", "diff", "--name-only", spec["commit"], "--"] + spec["paths"], ROOT).splitlines())
+    if changed - set(spec.get("unused_artifact_changes", [])):
+        raise RuntimeError("Project source changed since locked snapshot: " + ", ".join(sorted(changed)))
+    check_output(create=True)
+    work = OUT / "work"
+    if work.is_symlink() or not contained(work, OUT):
+        raise RuntimeError("Unsafe application staging path")
+    work.mkdir(exist_ok=True)
+    stamps = OUT / "stamps"
+    if stamps.is_symlink() or not contained(stamps, OUT):
+        raise RuntimeError("Unsafe source stamp path")
+    stamps.mkdir(exist_ok=True)
+    stamp = stamps / "project-sources.json"
+    if stamp.exists():
+        if stamp.is_symlink() or json.loads(stamp.read_text()) != spec:
+            raise RuntimeError("Project source lock changed; clean SDK output before restaging")
+        return work
+    for relative in spec["paths"]:
+        if (work / relative).exists() or (work / relative).is_symlink():
+            raise RuntimeError("Refusing to overwrite unrecognized staged project source: " + relative)
+    with tempfile.TemporaryFile() as archive:
+        subprocess.run(["git", "archive", spec["commit"]] + spec["paths"], cwd=str(ROOT),
+                       stdout=archive, check=True)
+        archive.seek(0)
+        extract_archive(archive, work)
+    stamp.write_text(json.dumps(spec, indent=2) + "\n")
+    return work
+
+
+def build_board(jobs):
+    work = stage_project_sources()
+    _, kernel, _ = stage("kernel")
+    for required in ("vmlinux", "System.map", "scripts/dtc/dtc", "Module.symvers"):
+        if not (kernel / required).is_file():
+            raise RuntimeError("Build the isolated kernel first: " + required)
+    env = os.environ.copy()
+    env["PATH"] = str(compiler_bin()) + os.pathsep + env.get("PATH", "")
+    env["LC_ALL"] = "C"
+    base = ["make", "ARCH=arm", "CROSS_COMPILE=arm-linux-gnueabi-", "LOCALVERSION="]
+    if capture(base + ["-s", "kernelrelease"], kernel, env) != MANIFEST["kernel_release"]:
+        raise RuntimeError("Isolated kernel release mismatch")
+    images = OUT / "images/board"
+    images.mkdir(parents=True, exist_ok=True)
+    source = work / MANIFEST["project_sources"]["dtb_source"]
+    preprocessed = images / "board.preprocessed.dts"
+    dtb = images / "suniv-f1c100s-licheepi-nano.dtb"
+    network = work / "SCRCPT/network-and-audio-source"
+    run(["arm-linux-gnueabi-gcc", "-E", "-nostdinc", "-undef", "-D__DTS__", "-x", "assembler-with-cpp",
+         "-I", network / "newboard_rtl8723bs_20260930", "-I", network / "newboard_20260930",
+         "-I", kernel / "arch/arm/boot/dts", "-I", kernel / "include", source, "-o", preprocessed], env=env)
+    run([kernel / "scripts/dtc/dtc", "-I", "dts", "-O", "dtb", "-o", dtb, preprocessed], env=env)
+    if digest(dtb) != MANIFEST["project_sources"]["dtb_sha256"]:
+        raise RuntimeError("Rebuilt DTB is not identical to the current board DTB")
+    modules = {}
+    groups = [
+        ("DRIVER/panel-and-board", ["tk032f8004_panel.ko"]),
+        ("DRIVER/board-power-20261004", ["f1_board_power.ko"]),
+        ("DRIVER/bluetooth-hid-20261010/src", ["hidp.ko", "uhid.ko"]),
+    ]
+    for relative, targets in groups:
+        module_dir = work / relative
+        run(base + ["-j{}".format(jobs), "M=" + str(module_dir), "modules"], kernel, env)
+        for target in targets:
+            path = module_dir / target
+            if not path.is_file():
+                raise RuntimeError("Missing required board module: " + str(path))
+            vermagic = capture(["modinfo", "-F", "vermagic", path])
+            if not vermagic.startswith(MANIFEST["kernel_release"] + " "):
+                raise RuntimeError("Module release mismatch: " + str(path))
+            shutil.copy2(str(path), str(images / path.name))
+            modules[path.name] = {"sha256": digest(path), "vermagic": vermagic}
+    report = {"source_commit": MANIFEST["project_sources"]["commit"], "dtb_sha256": digest(dtb),
+              "modules": modules, "board_deployed": False, "cold_boots": 0}
+    (images / "build.json").write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps(report, indent=2), flush=True)
+
+
+def build_app_ui(jobs):
+    work = stage_project_sources()
+    host = work / "ROOTFS/buildroot-2018.02.11/output/host"
+    prefix = host / "bin/arm-buildroot-linux-gnueabi-"
+    if not Path(str(prefix) + "gcc").is_file():
+        raise RuntimeError("Build the isolated rootfs/toolchain first")
+    env = os.environ.copy()
+    env["PATH"] = str(host / "bin") + os.pathsep + env.get("PATH", "")
+    env["LC_ALL"] = "C"
+    common = ["make", "-j{}".format(jobs), "ROOT=" + str(work), "HOST=" + str(host),
+              "CC=" + str(prefix) + "gcc", "CXX=" + str(prefix) + "g++",
+              "AR=" + str(prefix) + "ar", "STRIP=" + str(prefix) + "strip"]
+    groups = [
+        ("LVGL/menu", ["f1-menu", "connections-helper", "cast-wait-touch", "f1-console-mode"]),
+        ("LVGL/media_player", ["mplayer-ui", "media-browser"]),
+        ("SOFTWARE/mic-recorder", ["mic-recorder"]),
+        ("LVGL/sfc_native", ["sfc-native", "sfc-browser"]),
+        ("LVGL/retro_native", ["retro-native", "retro-browser"]),
+        ("LVGL/reader", ["reader", "reader-browser"]),
+    ]
+    results = {}
+    images = OUT / "images/apps-ui"
+    images.mkdir(parents=True, exist_ok=True)
+    for directory, targets in groups:
+        run(common + targets, work / directory, env)
+        for target in targets:
+            path = work / directory / target
+            run([str(prefix) + "strip", path], env=env)
+            shutil.copy2(str(path), str(images / target))
+            results[target] = digest(path)
+    report = {"source_commit": MANIFEST["project_sources"]["commit"], "sha256": results,
+              "board_deployed": False, "scope": "UI/frontend subset, not all applications"}
+    (images / "build.json").write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps(report, indent=2), flush=True)
+
+
 def build_rootfs(jobs, sources_only=False):
     original, target, spec = stage("rootfs")
     _, cedarc, _ = stage("libcedarc")
@@ -228,6 +350,20 @@ def build_rootfs(jobs, sources_only=False):
     env["LC_ALL"] = "C"
     run(["make", "olddefconfig"], target, env)
     run(["make", "-j{}".format(jobs), "source" if sources_only else "all"], target, env)
+    if not sources_only:
+        artifact = target / "output/images/rootfs.tar"
+        if not artifact.is_file():
+            raise RuntimeError("Buildroot did not produce the base rootfs archive")
+        compiler = target / "output/host/bin/arm-buildroot-linux-gnueabi-gcc"
+        images = OUT / "images/rootfs-base"
+        images.mkdir(parents=True, exist_ok=True)
+        report = {"source_commit": spec["commit"], "input_config_sha256": spec["config_sha256"],
+                  "effective_config_sha256": digest(target / ".config"),
+                  "rootfs_tar_sha256": digest(artifact), "rootfs_tar_bytes": artifact.stat().st_size,
+                  "compiler": capture([compiler, "--version"]),
+                  "scope": "base system only; runtime integration pending", "board_deployed": False}
+        (images / "build.json").write_text(json.dumps(report, indent=2) + "\n")
+        print(json.dumps(report, indent=2), flush=True)
     print("Base rootfs {} complete; runtime integration is still pending".format(
         "source acquisition" if sources_only else "build"), flush=True)
 
@@ -309,7 +445,7 @@ def main():
     inspect = sub.add_parser("doctor")
     inspect.add_argument("--release", action="store_true")
     build = sub.add_parser("build")
-    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base"], default="all", nargs="?")
+    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui"], default="all", nargs="?")
     build.add_argument("-j", "--jobs", type=int, default=8)
     clean = sub.add_parser("clean")
     clean.add_argument("--component", choices=sorted(MANIFEST["components"]))
@@ -337,6 +473,12 @@ def main():
             raise RuntimeError("Full SD image recipe has not been integrated yet")
         if args.component in ("rootfs-sources", "rootfs-base"):
             build_rootfs(args.jobs, sources_only=args.component == "rootfs-sources")
+            return 0
+        if args.component == "board":
+            build_board(args.jobs)
+            return 0
+        if args.component == "apps-ui":
+            build_app_ui(args.jobs)
             return 0
         build_boot(args.component, args.jobs)
         return 0

@@ -10,6 +10,8 @@
 ./sdk build uboot
 ./sdk build rootfs-sources
 ./sdk build rootfs-base
+./sdk build board
+./sdk build apps-ui
 ./sdk clean
 ```
 
@@ -32,3 +34,5 @@ rootfs-sources 获取/校验基础 Buildroot 依赖；rootfs-base 在隔离目�
 `python3 sdk-support/reproduce-uboot.py --source c5335a4` 用完整历史源码、原配置和板端测得的构建版本/时间重编 U-Boot，仅比较隔离产物与板端引导区 SHA256，不写 SD 卡。不同则失败，不认作对应原版。此历史核实必须在其他 SDK 构建结束后运行，共用构建/清理锁。
 
 boot.cmd 来自当前板端启动脚本的文字内容，保留已用的内核/DTB地址、root分区和CMA20M参数。脚本中的旧HDMI参数也先原样保留，不代表实际RGB屏分辨率；最终DTB必须使用已核实的480×800厂商屏参源码。
+
+board 从锁定的项目源码重新生成当前厂商屏参 DTB，并要求与板端 DTB 的 SHA256 完全一致；随后用隔离内核编译面板、电源、HIDP/UHID四个模块并检查5.7.1版本。apps-ui 用隔离工具链编译菜单、媒体控制界面、录音、阅读器、SFC和通用模拟器前端。它不是全部应用构建：ONS、wiliwili、媒体解码器和模拟器核心等仍需独立接入；两项目前待首次实编译，不代表板端验收。

@@ -35,6 +35,20 @@
       "commit": "e4246be521203adb2d93d52482239044a7f9b6fe"
     }
   },
+  "project_sources": {
+    "commit": "8b521e2a476c1f2cff9f0876862ad39310a7ab8a",
+    "paths": [
+      "LVGL/menu", "LVGL/touch", "LVGL/media_player", "LVGL/reader",
+      "LVGL/ons_native", "LVGL/sfc_native", "LVGL/retro_native",
+      "SOFTWARE/mplayer-cedar", "SOFTWARE/mic-recorder", "SOFTWARE/lan-apps",
+      "SCRCPT/cast-and-menu-source", "SCRCPT/network-and-audio-source",
+      "DRIVER/panel-and-board", "DRIVER/bluetooth-hid-20261010",
+      "DRIVER/board-power-20261004"
+    ],
+    "unused_artifact_changes": ["DRIVER/panel-and-board/f1c200s-tk032f8004-current-20260913.dtb"],
+    "dtb_source": "DRIVER/panel-and-board/suniv-f1c200s-newboard-vendor-timing.dts",
+    "dtb_sha256": "8ca3cd42bc6c2ebea132d93e8bbe7027f863c66c5edad8540ff5284fc0b996ff"
+  },
   "release_blockers": [
     "The live SD U-Boot hash differs from the current workspace binary; historical source/config correspondence needs recovery.",
     "Current rootfs overlay and runtime application/module install mappings need integration.",

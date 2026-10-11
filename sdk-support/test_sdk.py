@@ -154,6 +154,43 @@ class OutputSafetyTests(unittest.TestCase):
         sdk.set_config(config, {"CONFIG_A": '"new"', "CONFIG_B": "y"})
         self.assertEqual(config.read_text(), 'CONFIG_C=y\nCONFIG_A="new"\nCONFIG_B=y\n')
 
+    def test_project_stage_preserves_toolchain_and_uses_locked_archive(self):
+        source = self.root / "LVGL/menu"
+        source.mkdir(parents=True)
+        (source / "Makefile").write_text("source")
+        sdk.check_output(create=True)
+        toolchain = sdk.OUT / "work/ROOTFS/output/host"
+        toolchain.mkdir(parents=True)
+        (toolchain / "preserve").write_text("toolchain")
+        manifest = {"project_sources": {"commit": "a" * 40, "paths": ["LVGL/menu"]}}
+        def git_capture(args, cwd=None):
+            return str(self.root) if "--show-toplevel" in args else ""
+        def git_archive(args, cwd=None, stdout=None, check=None):
+            with tarfile.open(fileobj=stdout, mode="w") as archive:
+                content = b"locked source"
+                item = tarfile.TarInfo("LVGL/menu/Makefile")
+                item.size = len(content)
+                archive.addfile(item, io.BytesIO(content))
+        with mock.patch.object(sdk, "MANIFEST", manifest), mock.patch.object(sdk, "capture", side_effect=git_capture), mock.patch.object(sdk.subprocess, "run", side_effect=git_archive):
+            work = sdk.stage_project_sources()
+        self.assertEqual((work / "LVGL/menu/Makefile").read_text(), "locked source")
+        self.assertEqual((toolchain / "preserve").read_text(), "toolchain")
+        self.assertEqual((source / "Makefile").read_text(), "source")
+
+    def test_project_stage_rejects_existing_unowned_source(self):
+        (self.root / "LVGL/menu").mkdir(parents=True)
+        sdk.check_output(create=True)
+        generated = sdk.OUT / "work/LVGL/menu"
+        generated.mkdir(parents=True)
+        (generated / "source.c").write_text("preserve")
+        manifest = {"project_sources": {"commit": "a" * 40, "paths": ["LVGL/menu"]}}
+        def git_capture(args, cwd=None):
+            return str(self.root) if "--show-toplevel" in args else ""
+        with mock.patch.object(sdk, "MANIFEST", manifest), mock.patch.object(sdk, "capture", side_effect=git_capture):
+            with self.assertRaises(RuntimeError):
+                sdk.stage_project_sources()
+        self.assertEqual((generated / "source.c").read_text(), "preserve")
+
 
 if __name__ == "__main__":
     unittest.main()
