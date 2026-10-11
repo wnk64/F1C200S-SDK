@@ -16,6 +16,24 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_rootfs_dependency_audit_reports_missing_library(self):
+        archive_path = self.root / "rootfs.tar"
+        with tarfile.open(str(archive_path), "w") as archive:
+            member = tarfile.TarInfo("usr/bin/app")
+            data = b"\x7fELFtest"
+            member.size = len(data)
+            archive.addfile(member, io.BytesIO(data))
+        def readelf(args):
+            if "-h" in args:
+                return "Machine: ARM\n"
+            if "-d" in args:
+                return "(NEEDED) Shared library: [missing.so]"
+            return ""
+        with mock.patch.object(sdk, "capture", side_effect=readelf):
+            report = sdk.audit_rootfs_dependencies(archive_path, "readelf")
+        self.assertEqual(report["elf_count"], 1)
+        self.assertEqual(report["issues"], [{"file": "usr/bin/app", "error": "missing shared library", "dependency": "missing.so"}])
+
     def test_rootfs_link_resolution_handles_absolute_relative_and_loops(self):
         library = tarfile.TarInfo("lib/libc-real.so")
         absolute = tarfile.TarInfo("usr/lib/libc.so")

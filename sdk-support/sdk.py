@@ -963,8 +963,8 @@ def audit_rootfs_dependencies(archive_path, readelf):
                     search.append(path.replace("${ORIGIN}", posixpath.dirname(name)).replace("$ORIGIN", posixpath.dirname(name)).lstrip("/"))
             resolved_dependencies = {}
             for library in needed:
-                resolved_path = next((resolved_archive_path(members, posixpath.join(directory, library))
-                                      for directory in search if resolved_archive_path(members, posixpath.join(directory, library))), None)
+                resolved_path = next((resolve_archive_path(members, posixpath.join(directory, library))
+                                      for directory in search if resolve_archive_path(members, posixpath.join(directory, library))), None)
                 if not resolved_path:
                     issues.append({"file": name, "error": "missing shared library", "dependency": library})
                 else:
