@@ -608,6 +608,7 @@ def build_rootfs(jobs, sources_only=False):
         "BR2_PACKAGE_LIBCEDARX": "y",
         "BR2_PACKAGE_FDK_AAC": "y",
         "BR2_PACKAGE_FAAD2": "y",
+        "BR2_PACKAGE_LIBMAD": "y",
     })
     (target / "local.mk").write_text("LIBCEDARC_OVERRIDE_SRCDIR = {}\nLIBCEDARX_OVERRIDE_SRCDIR = {}\n".format(cedarc, cedarx))
     downloads = original / "dl"
