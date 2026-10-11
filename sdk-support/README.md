@@ -19,7 +19,7 @@
 
 当前验证状态（以此节为准，后文保留各阶段接入记录）：`./sdk build -j2` 已成功跑通19阶段，生成1GiB SD候选镜像；55项单测通过。这轮使用已有隔离缓存，尚未验证clean后独立全量重编、可携带打包或实机三次冷启动，因此不是已验收发布版。`./sdk clean` 会删除生成目录内的候选镜像，使用前应明确是否需要保留交付产物。
 
-共享库检查增加GNU版本定义/需求逐项核验，按实际NEEDED解析目标匹配；它不覆盖全部符号重定位、运行时dlopen及硬件行为。
+共享库检查增加GNU版本定义/需求逐项核验，按实际NEEDED解析目标匹配；它不覆盖全部符号重定位、运行时dlopen及硬件行为。fb5c20f已通过57项单测，301个ARM ELF、840项版本需求检查无问题，并重新组装候选镜像；该新检查版本尚未独立全链重编。
 
 环境：Linux、Python 3.5+、Git、make、GCC、bison、flex、bc、OpenSSL 开发头文件、pkg-config。内核/U-Boot 使用 Linaro GCC 7.2.1。默认查找 TOOLCHAIN/linaro-7.2.1/bin，兼容当前虚拟机 /opt 下的原工具链；其他位置用 KERNEL_TOOLCHAIN=/absolute/bin 指定。不自动安装工具或修改主机环境。
 

@@ -133,8 +133,8 @@
     "dtb_sha256": "8ca3cd42bc6c2ebea132d93e8bbe7027f863c66c5edad8540ff5284fc0b996ff"
   },
   "release_blockers": [
-    "Full one-command build orchestration and portable source/environment packaging remain unverified.",
-    "Independent complete clean/rebuild and ABI symbol checks remain unverified.",
+    "One-command orchestration passed with isolated caches; portable source/environment packaging remains unverified.",
+    "Independent complete clean/rebuild and full symbol relocation/runtime ABI checks remain unverified; GNU version checks passed.",
     "SD image candidate passed offline layout/filesystem checks but has zero physical cold-boot acceptance cycles.",
     "Normal WLAN, Bluetooth, all menu applications, source-built DHCP cast path and display need end-to-end image regression."
   ]
