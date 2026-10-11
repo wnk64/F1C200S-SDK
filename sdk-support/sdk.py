@@ -24,6 +24,7 @@ MANIFEST = json.loads((ROOT / "sdk-support/manifest.json").read_text())
 ROOTFS_REQUIRED_PACKAGES = [
     "BR2_PACKAGE_BUSYBOX", "BR2_PACKAGE_SKELETON_INIT_COMMON", "BR2_PACKAGE_SKELETON_INIT_SYSV",
     "BR2_PACKAGE_ALSA_LIB", "BR2_PACKAGE_DROPBEAR", "BR2_PACKAGE_BLUEZ5_UTILS", "BR2_PACKAGE_LIBCEDARC",
+    "BR2_PACKAGE_LIBDRM",
 ]
 
 
@@ -378,6 +379,7 @@ def build_rootfs(jobs, sources_only=False):
         "BR2_ROOTFS_POST_IMAGE_SCRIPT": '""',
         "BR2_PACKAGE_OVERRIDE_FILE": '"$(CONFIG_DIR)/local.mk"',
         "BR2_WGET": '"wget --passive-ftp -nd --timeout=30 --tries=1"',
+        "BR2_PACKAGE_LIBDRM": "y",
     })
     (target / "local.mk").write_text("LIBCEDARC_OVERRIDE_SRCDIR = {}\n".format(cedarc))
     downloads = original / "dl"

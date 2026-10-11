@@ -57,6 +57,7 @@ def main():
                 "BR2_ROOTFS_OVERLAY": '""', "BR2_ROOTFS_POST_BUILD_SCRIPT": '""',
                 "BR2_ROOTFS_POST_FAKEROOT_SCRIPT": '""', "BR2_ROOTFS_POST_IMAGE_SCRIPT": '""',
                 "BR2_PACKAGE_OVERRIDE_FILE": '"$(CONFIG_DIR)/local.mk"',
+                "BR2_PACKAGE_LIBDRM": "y",
             })
             env = os.environ.copy()
             env["LC_ALL"] = "C"
