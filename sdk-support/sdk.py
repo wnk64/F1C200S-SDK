@@ -628,8 +628,8 @@ def build_bluetooth_audio(jobs):
          "-I", route, route / "audio-route.c", route / "shared/dbus-client.c"] + flags +
         ["-lbluetooth", "-o", output], route, env)
     publish_apps("bluetooth-audio", {
-        "bluealsa": source / "src/bluealsa",
-        "bluealsa-aplay": source / "utils/bluealsa-aplay",
+        "bluealsa": install / "usr/bin/bluealsa",
+        "bluealsa-aplay": install / "usr/bin/bluealsa-aplay",
         "libasound_module_pcm_bluealsa.so": install / "usr/lib/alsa-lib/libasound_module_pcm_bluealsa.so",
         "libasound_module_ctl_bluealsa.so": install / "usr/lib/alsa-lib/libasound_module_ctl_bluealsa.so",
         "f1-audio-route": output,
