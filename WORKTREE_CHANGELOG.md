@@ -614,3 +614,14 @@ Audit:38ce1d5 initial dependency audit failed on function-name typo;4f48218 corr
 Result:images/rootfs-integrated/rootfs.tar201338880bytes SHA256988a814d9da8a138da4c85386d1177baa2ca3ec7957789b0ec8c2da3ec8b9c4c; dependencies.json6400a205779d42eef94ddeed3b2b1567240faa4664acd6dde39b687c15ebea13.
 Deploy:none; all build sessions terminal, no board/kernel/SD writes. Rollback:revert SDK-only commits, active baselines preserved.
 Decision:assembled rootfs candidate and file dependencies verified; complete cast entry/hardware startup/ABI/SD image/portable clean rebuild/three cold boots remain pending. Full objective active.
+
+## 2026-10-11 / pending / Formal cast entry installation and checksum verification
+Hypothesis: retain existing FIFO/PBC/RTSP/native-rotation lifecycle while installing locked source launchers at formal paths and refreshing every checksum to source-built artifacts.
+Files:sdk-support/sdk.py, test_sdk.py, runtime-layout.json, runtime-cast/wpa.conf, README.md, changes-20261011.md.
+Source:project2f1d627 direct git blobs for cast scripts, SDKtracked credential-free WFD config. No historical unchecked executable imported, no original source changed.
+Integration:f5e304b installs cast entry/start/loader/PBC/RTSP/memory preparation, uses BusyBox DHCP adapter, keeps5745MHz/800x480@60/rotate90/ALSAdefault/FIFO RAM. Source and install hashes plus checksum input paths recorded.
+Correction:024a529 generated cast-wait-touch sink literal migrated to formal sink identity and apps-ui rebuilt. Exact/repeatable transformation test added, unknown source refused.
+Verification:51 tests passed, including nested path longest-first relocation, current-content MD5 substitution, missing checksum input rejection, cast installed-target tamper rejection.13 distinct preflight target MD5s plus session watcher checks agree with actual payload. Shell syntax checks passed.
+Result:125 runtime files; rootfs201369600bytes SHA256761018d076661b468738cb4c5632f2ccc1f1d94873b9e988a8bf0e6b66bf8770;301 ARM ELF dependencies resolve. Reports retained.
+Deploy:none, no cast session/hardware/SD mutation. Build processes terminal. Rollback:revert SDK-only commits; original sources/runtime unchanged.
+Decision:cast source installation and offline checks passed; actual DHCP/PBC/RTSP/display/triple-touch behavior, hardware startup/data mount/SD image/portable build-clean/cold-boot acceptance pending. Full objective active.

@@ -66,3 +66,5 @@ LAN后端在生成源码副本中定点改为/opt/f1/apps/media/mplayer-native�
 `./sdk build rootfs-integrated` 校验并合并基础rootfs.tar与当前runtime-payload，保留特殊节点、链接与权限，运行文件统一root所有者；仅排除与专用WLAN冲突的全局S41dhcpcd启动脚本。合并后逐一检查所有ELF架构、加载器及NEEDED路径解析，失败不发布新归档，报告位于images/rootfs-integrated/dependencies.json。当前117运行文件合入后约192MiB、301个ARM ELF文件依赖检查通过；不代表ABI/运行验收，完整投屏入口与烧卡镜像仍未完成。
 
 基础BusyBox配置在SDK副本中启用udhcpd，替代缺少C源的历史tiny_dhcpd_49；runtime-cast适配只在投屏启动时使用，把ACK转为既有watcher日志接口，租约和FIFO在/tmp。不在普通开机时启动DHCP服务器，此替代需要实机连接回归。
+
+runtime-payload已加入正式投屏入口、AIC loader、PBC/RTSP watcher和内存准备脚本；源从锁定主仓库提交读取。原preflight校验仍保留，MD5由当前重编产物/前序安装文件生成，组装时再次离线逐项核对。运行层当前125文件，51测试通过，触摸退出helper的sink身份也在生成副本中迁移并重编。硬件启动/分区镜像/实际连接仍未验收，不代表最终烧卡固件完成。
