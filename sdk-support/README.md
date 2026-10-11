@@ -62,3 +62,7 @@ Buildroot总包索引损坏也已修复；olddefconfig后必须仍选中基础�
 `./sdk build kernel-runtime` 按已编隔离kernel的modules.order导出全部配置模块，要求严格5.7.1，保存源/config/zImage/模块哈希。通用hci_uart由wireless-modules的外置H5替代；先构建wireless-modules再执行此目标。runtime-payload同时安装该完整模块集、普通WLAN/SSH/蓝牙加载服务、菜单与wiliwili启动文件。菜单调用的connections-helper-ip安装为同一重编helper的兼容名称，不复制历史程序。
 
 LAN后端在生成源码副本中定点改为/opt/f1/apps/media/mplayer-native，编译后必须在二进制内找到该路径且无候选路径；原开发源码不修改。当前运行文件114项，不代表最终rootfs/固件完成，完整投屏启动链、硬件加载、共享库与SD镜像仍待整合。
+
+`./sdk build rootfs-integrated` 校验并合并基础rootfs.tar与当前runtime-payload，保留特殊节点、链接与权限，运行文件统一root所有者；仅排除与专用WLAN冲突的全局S41dhcpcd启动脚本。合并后逐一检查所有ELF架构、加载器及NEEDED路径解析，失败不发布新归档，报告位于images/rootfs-integrated/dependencies.json。当前117运行文件合入后约192MiB、301个ARM ELF文件依赖检查通过；不代表ABI/运行验收，完整投屏入口与烧卡镜像仍未完成。
+
+基础BusyBox配置在SDK副本中启用udhcpd，替代缺少C源的历史tiny_dhcpd_49；runtime-cast适配只在投屏启动时使用，把ACK转为既有watcher日志接口，租约和FIFO在/tmp。不在普通开机时启动DHCP服务器，此替代需要实机连接回归。

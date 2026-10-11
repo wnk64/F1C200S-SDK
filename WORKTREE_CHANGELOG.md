@@ -604,3 +604,13 @@ Menu:dc842c3 installs S90/supervisor/12-entry app list and wiliwili launchers/CA
 Tests:41 passed; shell syntax checks for install scripts; exact/idempotent/reject-unknown DLNA transform, dynamic module report/release checks, same-hash helper aliases verified.
 Result:114 runtime files installed, reports retained. No deployment, service execution or SD writes. Full cast launcher/hardware boot/libs/base rootfs/SD image/portable rebuild/cold-boot acceptance pending.
 Rollback:revert SDK-only integration commits; original sources/outputs and board runtime preserved.
+
+## 2026-10-11 / pending / DHCP and merged rootfs dependency audit
+Hypothesis: rebuild missing DHCP service from existing BusyBox source, then combine verified base and runtime files without importing old binaries or conflicting global network startup.
+Source: no tiny_dhcpd_49 C source found in full host search/current archives/history, old binaries preserved and excluded from SDK. BusyBox1.27.2 complete Buildroot source used; CONFIG_UDHCPD=y in generated config only. Adapter be239f6/a47348e converts valid ACK to REQUEST watcher interface, RAM lease/FIFO and owned-child cleanup; no boot DHCP server.
+Build:base rootfs63313920bytes SHA256941aba2dfffcd037ad55159b7dedfd2a0ed320d4f29cfcfa8e8fb1017a773478. Udhcpd applet installed;117 runtime files integrated. Actual protocol/hardware acceptance pending.
+Assembly:b180d49 merge preserves tar nodes/links/permissions, root-owned runtime files, only S41dhcpcd excluded after verifying its known service content. Original Buildroot target/archive/config not overwritten.
+Audit:38ce1d5 initial dependency audit failed on function-name typo;4f48218 corrected and added missing-library simulation.47 tests passed.301 ARM ELF files inspected; interpreter/NEEDED files resolve in archive, issues0. Not symbol-version/ABI or runtime acceptance.
+Result:images/rootfs-integrated/rootfs.tar201338880bytes SHA256988a814d9da8a138da4c85386d1177baa2ca3ec7957789b0ec8c2da3ec8b9c4c; dependencies.json6400a205779d42eef94ddeed3b2b1567240faa4664acd6dde39b687c15ebea13.
+Deploy:none; all build sessions terminal, no board/kernel/SD writes. Rollback:revert SDK-only commits, active baselines preserved.
+Decision:assembled rootfs candidate and file dependencies verified; complete cast entry/hardware startup/ABI/SD image/portable clean rebuild/three cold boots remain pending. Full objective active.
