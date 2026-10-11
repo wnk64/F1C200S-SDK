@@ -66,6 +66,11 @@ def validate_source(name):
         if not (path / required).is_file():
             raise RuntimeError("Missing required source file: {}/{}".format(name, required))
         capture(["git", "cat-file", "-e", "{}:{}".format(spec["commit"], required)], path)
+    for relative, required in spec.get("required_text", {}).items():
+        content = (path / relative).read_text()
+        for text in required:
+            if text not in content:
+                raise RuntimeError("Required source index entry missing in {}: {}".format(relative, text))
     changed = set(capture(["git", "diff", "--name-only", "HEAD", "--"], path).splitlines())
     excluded = spec.get("excluded_submodules", {})
     for submodule, commit in excluded.items():
@@ -143,6 +148,8 @@ def extract_archive(archive, target):
 
 def stage(name):
     source, spec = validate_source(name)
+    commit = spec.get("export_commit", spec["commit"])
+    capture(["git", "cat-file", "-e", commit + "^{commit}"], source)
     config = ROOT / "sdk-support/configs" / (name + ".config")
     if "config_sha256" in spec and digest(config) != spec["config_sha256"]:
         raise RuntimeError("SDK configuration copy mismatch: {}".format(name))
@@ -152,19 +159,32 @@ def stage(name):
         raise RuntimeError("Invalid stage path for {}".format(name))
     stamp = target / ".sdk-source-commit"
     if target.exists():
-        if target.is_symlink() or not stamp.is_file() or stamp.read_text().strip() != spec["commit"]:
+        if target.is_symlink() or stamp.is_symlink() or not stamp.is_file():
             raise RuntimeError("Staged source mismatch; run ./sdk clean: {}".format(target))
+        previous = stamp.read_text().strip()
+        if previous != commit:
+            if not re.fullmatch("[0-9a-f]{40}", previous):
+                raise RuntimeError("Invalid staged source stamp")
+            changed = capture(["git", "diff", "--name-only", previous, commit], source).splitlines()
+            if set(changed) - {"WORKTREE_CHANGELOG.md", "变更记录.md"}:
+                raise RuntimeError("Staged code changed; clean this component before rebuilding")
+            if changed:
+                with tempfile.TemporaryFile() as archive:
+                    subprocess.run(["git", "archive", commit] + changed, cwd=str(source), stdout=archive, check=True)
+                    archive.seek(0)
+                    extract_archive(archive, target)
+            stamp.write_text(commit + "\n")
         return source, target, spec
     target.mkdir(parents=True)
     try:
         with tempfile.TemporaryFile() as archive:
-            subprocess.run(["git", "archive", spec["commit"]], cwd=str(source),
+            subprocess.run(["git", "archive", commit], cwd=str(source),
                            stdout=archive, check=True)
             archive.seek(0)
             extract_archive(archive, target)
         if "config_sha256" in spec:
             shutil.copy2(str(config), str(target / ".config"))
-        stamp.write_text(spec["commit"] + "\n")
+        stamp.write_text(commit + "\n")
     except BaseException:
         shutil.rmtree(str(target))
         raise
@@ -403,7 +423,7 @@ def build_boot(name, jobs):
             raise RuntimeError("Build did not produce {}".format(path))
         shutil.copy2(str(path), str(images / path.name))
         results[path.name] = digest(path)
-    report = {"component": name, "source_commit": spec["commit"],
+    report = {"component": name, "source_commit": spec.get("export_commit", spec["commit"]),
               "compiler": capture([str(compiler_bin() / "arm-linux-gnueabi-gcc"), "--version"]),
               "sha256": results, "board_deployed": False, "cold_boots": 0}
     (images / "build.json").write_text(json.dumps(report, indent=2) + "\n")

@@ -191,6 +191,41 @@ class OutputSafetyTests(unittest.TestCase):
                 sdk.stage_project_sources()
         self.assertEqual((generated / "source.c").read_text(), "preserve")
 
+    def test_stage_rejects_code_change_without_deleting_previous_build(self):
+        source = self.root / "active-source"
+        source.mkdir()
+        sdk.check_output(create=True)
+        target = sdk.OUT / "sources/example"
+        target.mkdir(parents=True)
+        (target / ".sdk-source-commit").write_text("a" * 40)
+        (target / "compiled.o").write_text("preserve")
+        spec = {"commit": "b" * 40}
+        with mock.patch.object(sdk, "validate_source", return_value=(source, spec)), mock.patch.object(sdk, "capture", return_value="source.c"):
+            with self.assertRaises(RuntimeError):
+                sdk.stage("example")
+        self.assertEqual((target / "compiled.o").read_text(), "preserve")
+
+    def test_stage_refreshes_only_metadata_without_resetting_build(self):
+        source = self.root / "active-source"
+        source.mkdir()
+        sdk.check_output(create=True)
+        target = sdk.OUT / "sources/example"
+        target.mkdir(parents=True)
+        (target / ".sdk-source-commit").write_text("a" * 40)
+        (target / "compiled.o").write_text("preserve")
+        spec = {"commit": "b" * 40}
+        def git_archive(args, cwd=None, stdout=None, check=None):
+            with tarfile.open(fileobj=stdout, mode="w") as archive:
+                content = b"new record"
+                item = tarfile.TarInfo("WORKTREE_CHANGELOG.md")
+                item.size = len(content)
+                archive.addfile(item, io.BytesIO(content))
+        with mock.patch.object(sdk, "validate_source", return_value=(source, spec)), mock.patch.object(sdk, "capture", return_value="WORKTREE_CHANGELOG.md"), mock.patch.object(sdk.subprocess, "run", side_effect=git_archive):
+            sdk.stage("example")
+        self.assertEqual((target / "compiled.o").read_text(), "preserve")
+        self.assertEqual((target / "WORKTREE_CHANGELOG.md").read_text(), "new record")
+        self.assertEqual((target / ".sdk-source-commit").read_text().strip(), "b" * 40)
+
 
 if __name__ == "__main__":
     unittest.main()
