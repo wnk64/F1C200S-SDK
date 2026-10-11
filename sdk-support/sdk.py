@@ -61,6 +61,10 @@ def validate_source(name):
         raise RuntimeError("Missing complete component repository: {}".format(name))
     if capture(["git", "rev-parse", "HEAD"], path) != spec["commit"]:
         raise RuntimeError("Unreviewed source commit: {}; review manifest before updating".format(name))
+    for required in spec.get("required_files", []):
+        if not (path / required).is_file():
+            raise RuntimeError("Missing required source file: {}/{}".format(name, required))
+        capture(["git", "cat-file", "-e", "{}:{}".format(spec["commit"], required)], path)
     changed = set(capture(["git", "diff", "--name-only", "HEAD", "--"], path).splitlines())
     excluded = spec.get("excluded_submodules", {})
     for submodule, commit in excluded.items():

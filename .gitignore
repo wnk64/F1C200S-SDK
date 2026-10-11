@@ -20,3 +20,4 @@ build/
 Module.symvers
 modules.order
 lvgl-source.tar.gz
+/.sdk-output/
