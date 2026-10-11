@@ -51,6 +51,7 @@ def export_repository(source, destination, commits, head, sdk):
     sdk.run(["git", "checkout", "--detach", head], destination)
     for commit in sorted(set(commits)):
         sdk.capture(["git", "cat-file", "-e", commit + "^{commit}"], destination)
+        sdk.run(["git", "update-ref", "refs/sdk-lock/" + commit, commit], destination)
     alternates = destination / ".git/objects/info/alternates"
     if alternates.exists():
         raise RuntimeError("Export repository depends on external Git objects")

@@ -653,3 +653,5 @@ Files:sdk-support/package_sdk.py,sdk.py,test_sdk.py,README.md,changes-20261011.m
 Protected:original repositories,dirty files,build outputs and candidate image unchanged;no board deployment or media formatting. No new development worktree;only exported delivery copy.
 Checks:reject existing export destination/external symlinks,verify copied files,Git source locks and no alternates;unset compiler override and run exported doctor. Preserve source licenses. Git-history privacy/public redistribution review remains pending.
 Rollback:2a71e34 SDK;only marked generated export is disposable. Triple-cold-boot acceptance remains0,full objective active.
+Result:754c637 first export passed,61 tests;all Git connectivity checks passed,doctor selects exported TOOLCHAIN/linaro-7.2.1 without KERNEL_TOOLCHAIN or external compiler PATH,no generated output included.
+Planned refinement:pin each required commit under refs/sdk-lock before removing origin so Git GC cannot prune build-only commits. Recreate only the new,unused generated export after checking package-report/main_commit and absence of its .sdk-output;original source and image retained. Independent build remainspending.

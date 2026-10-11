@@ -20,6 +20,24 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_package_refuses_existing_export_without_modifying_it(self):
+        sdk.check_output(create=True)
+        destination = sdk.OUT / "portable-sdk"
+        destination.mkdir()
+        (destination / "keep").write_bytes(b"keep")
+        with mock.patch.object(sdk, "doctor", return_value=0):
+            with self.assertRaises(RuntimeError):
+                package.build_package(sdk)
+        self.assertEqual((destination / "keep").read_bytes(), b"keep")
+
+    def test_export_repository_pins_required_commits_before_removing_remote(self):
+        calls = []
+        with mock.patch.object(sdk, "run", side_effect=lambda args, *unused: calls.append(args)), mock.patch.object(sdk, "capture", return_value=""):
+            package.export_repository(self.root / "original", self.root / "export", ["commit-a", "commit-b"], "commit-a", sdk)
+        removal = next(index for index, args in enumerate(calls) if args[:3] == ["git", "remote", "remove"])
+        for commit in ("commit-a", "commit-b"):
+            self.assertLess(calls.index(["git", "update-ref", "refs/sdk-lock/" + commit, commit]), removal)
+
     def test_export_stub_cleanup_refuses_untracked_or_git_directory(self):
         root = self.root / "export"
         component = root / "component"
