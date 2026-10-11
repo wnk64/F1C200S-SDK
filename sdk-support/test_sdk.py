@@ -16,6 +16,33 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_full_build_order_covers_all_components_and_image_last(self):
+        names = [name for name, operation in sdk.full_build_steps(2)]
+        self.assertEqual(len(names), len(set(names)))
+        self.assertEqual(names[0], "rootfs-base")
+        self.assertEqual(names[-3:], ["runtime-payload", "rootfs-integrated", "sd-image"])
+        for first, second in (("kernel", "wireless-modules"), ("wireless-modules", "kernel-runtime"),
+                              ("apps-ui", "lan"), ("media-backends", "runtime-payload"),
+                              ("bluetooth-audio", "runtime-payload"), ("ons", "runtime-payload"),
+                              ("retro-cores", "runtime-payload"), ("image-tools", "sd-image")):
+            self.assertLess(names.index(first), names.index(second))
+
+    def test_full_build_stops_on_error_and_records_failed_stage(self):
+        called = []
+        def failure():
+            raise RuntimeError("intentional build failure")
+        steps = [("first", lambda: called.append("first")), ("failed", failure),
+                 ("must-not-run", lambda: called.append("must-not-run"))]
+        with mock.patch.object(sdk, "doctor", return_value=0), mock.patch.object(sdk, "digest", return_value="hash"), mock.patch.object(sdk, "full_build_steps", return_value=steps):
+            with self.assertRaises(RuntimeError):
+                sdk.build_all(2)
+        self.assertEqual(called, ["first"])
+        report = json.loads((sdk.OUT / "images/full-build/build.json").read_text())
+        self.assertFalse(report["build_complete"])
+        self.assertFalse(report["hardware_accepted"])
+        self.assertEqual(report["current_step"], "failed")
+        self.assertEqual(report["completed_steps"], ["first"])
+
     def test_sd_mbr_preserves_verified_layout_and_boot_gap(self):
         partitions = sdk.sd_partition_table()
         result = sdk.sd_mbr(partitions, 2097152, 548864)

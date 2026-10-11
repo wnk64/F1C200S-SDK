@@ -1532,6 +1532,64 @@ def doctor(release=False):
     return 1 if errors else 0
 
 
+def full_build_steps(jobs):
+    return [
+        ("rootfs-base", lambda: build_rootfs(jobs)),
+        ("kernel", lambda: build_boot("kernel", jobs)),
+        ("uboot", lambda: build_boot("uboot", jobs)),
+        ("board", lambda: build_board(jobs)),
+        ("wireless-modules", lambda: build_wireless_modules(jobs)),
+        ("kernel-runtime", build_kernel_runtime),
+        ("apps-ui", lambda: build_app_ui(jobs)),
+        ("ons", lambda: build_ons(jobs)),
+        ("retro-cores", lambda: build_retro_cores(jobs)),
+        ("lan", lambda: build_lan(jobs)),
+        ("media-backends", lambda: build_media_backends(jobs)),
+        ("miracast-sink", lambda: build_miracast_sink(jobs)),
+        ("bluetooth-audio", lambda: build_bluetooth_audio(jobs)),
+        ("wfd-protocol", lambda: build_wfd_protocol(jobs)),
+        ("runtime-tools", lambda: build_runtime_tools(jobs)),
+        ("image-tools", lambda: build_image_tools(jobs)),
+        ("runtime-payload", build_runtime_payload),
+        ("rootfs-integrated", build_integrated_rootfs),
+        ("sd-image", build_sd_image),
+    ]
+
+
+def build_all(jobs):
+    if doctor(release=False):
+        raise RuntimeError("Full build source/environment preflight failed")
+    check_output(create=True)
+    images = OUT / "images/full-build"
+    images.mkdir(parents=True, exist_ok=True)
+    path = images / "build.json"
+    report = {"build_complete": False, "hardware_accepted": False, "completed_steps": [],
+              "manifest_sha256": digest(ROOT / "sdk-support/manifest.json"),
+              "recipe_sha256": digest(ROOT / "sdk-support/sdk.py"), "jobs": jobs,
+              "board_deployed": False}
+    for name, operation in full_build_steps(jobs):
+        report["current_step"] = name
+        path.write_text(json.dumps(report, indent=2) + "\n")
+        print("FULL BUILD STEP: " + name, flush=True)
+        try:
+            operation()
+        except BaseException as error:
+            report["error"] = str(error)
+            path.write_text(json.dumps(report, indent=2) + "\n")
+            raise
+        report["completed_steps"].append(name)
+    image_report_path = OUT / "images/sd-image/build.json"
+    image_report = json.loads(image_report_path.read_text())
+    image_path = image_report_path.parent / image_report["image"]
+    if digest(image_path) != image_report["sha256"]:
+        raise RuntimeError("Full build final image checksum mismatch")
+    report.update({"build_complete": True, "image_sha256": image_report["sha256"],
+                   "image": str(image_path.relative_to(OUT)),
+                   "image_report_sha256": digest(image_report_path), "current_step": "complete"})
+    path.write_text(json.dumps(report, indent=2) + "\n")
+    print("Full candidate image build completed; hardware acceptance remains pending: " + str(image_path), flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command")
@@ -1561,9 +1619,8 @@ def main():
         if args.jobs < 1 or args.jobs > 64:
             raise RuntimeError("jobs must be between 1 and 64")
         if args.component == "all":
-            if doctor(release=True):
-                return 1
-            raise RuntimeError("Full SD image recipe has not been integrated yet")
+            build_all(args.jobs)
+            return 0
         if args.component in ("rootfs-sources", "rootfs-base"):
             build_rootfs(args.jobs, sources_only=args.component == "rootfs-sources")
             return 0
