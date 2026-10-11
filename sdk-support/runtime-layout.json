@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "artifacts": {
+    "apps-ui": {
+      "f1-menu": "opt/f1/apps/menu/f1-menu",
+      "connections-helper": "opt/f1/apps/menu/connections-helper",
+      "cast-wait-touch": "opt/f1/apps/menu/cast-wait-touch",
+      "f1-console-mode": "opt/f1/apps/menu/f1-console-mode",
+      "mplayer-ui": "opt/f1/apps/media/mplayer-ui",
+      "media-browser": "opt/f1/apps/media/media-browser",
+      "mic-recorder": "opt/f1/apps/recorder/mic-recorder",
+      "sfc-native": "opt/f1/apps/sfc/sfc-native",
+      "sfc-browser": "opt/f1/apps/sfc/sfc-browser",
+      "retro-native": "opt/f1/apps/retro/retro-native",
+      "retro-browser": "opt/f1/apps/retro/retro-browser",
+      "reader": "opt/f1/apps/reader/reader",
+      "reader-browser": "opt/f1/apps/reader/reader-browser"
+    },
+    "ons": {
+      "ons-lvgl-tremor": "opt/f1/apps/ons/ons-lvgl-tremor",
+      "ons-rom-browser": "opt/f1/apps/ons/ons-rom-browser"
+    },
+    "retro-cores": {
+      "gba.so": "opt/f1/apps/retro/cores/gba.so",
+      "ps1.so": "opt/f1/apps/retro/cores/ps1.so",
+      "md.so": "opt/f1/apps/retro/cores/md.so"
+    },
+    "lan": {
+      "lan-ui": "opt/f1/apps/lan/lan-ui",
+      "gmediarender": "opt/f1/apps/lan/gmediarender"
+    },
+    "media-backends": {
+      "mplayer-native": "opt/f1/apps/media/mplayer-native",
+      "cedar_drm_player": "opt/f1/apps/cast/cedar_drm_player",
+      "wiliwili-lvgl": "opt/f1/apps/wiliwili/wiliwili-lvgl",
+      "cedar-net-player": "opt/f1/apps/wiliwili/cedar-net-player"
+    },
+    "miracast-sink": {"miracast_sink_dump.lowest.brarm": "opt/f1/apps/cast/miracast_sink_dump.lowest"},
+    "wfd-protocol": {
+      "wpa_supplicant": "root/aic_miracast/wpa24_aic_wfd_supplicant",
+      "wpa_cli": "root/aic_miracast/wpa24_aic_wfd_cli",
+      "wpa_passphrase": "root/aic_miracast/wpa24_aic_wfd_passphrase"
+    },
+    "bluetooth-audio": {
+      "bluealsa": "usr/bin/bluealsa",
+      "bluealsa-aplay": "usr/bin/bluealsa-aplay",
+      "libasound_module_pcm_bluealsa.so": "usr/lib/alsa-lib/libasound_module_pcm_bluealsa.so",
+      "libasound_module_ctl_bluealsa.so": "usr/lib/alsa-lib/libasound_module_ctl_bluealsa.so",
+      "f1-audio-route": "usr/bin/f1-audio-route"
+    },
+    "runtime-tools": {
+      "f1-rtc-time-ui": "opt/f1-time/f1-rtc-time-ui",
+      "f1-ip-config": "opt/f1-network/f1-ip-config"
+    },
+    "wireless-modules": {
+      "aic_load_fw.ko": "lib/modules/5.7.1/extra/aic_load_fw.ko",
+      "aic8800_fdrv.ko": "lib/modules/5.7.1/extra/aic8800_fdrv.ko",
+      "ip5209_power.ko": "lib/modules/5.7.1/extra/ip5209_power.ko",
+      "hci_uart.ko": "lib/modules/5.7.1/extra/hci_uart.ko"
+    },
+    "board": {
+      "tk032f8004_panel.ko": "lib/modules/5.7.1/extra/tk032f8004_panel.ko",
+      "f1_board_power.ko": "lib/modules/5.7.1/extra/f1_board_power.ko",
+      "hidp.ko": "lib/modules/5.7.1/extra/hidp.ko",
+      "uhid.ko": "lib/modules/5.7.1/extra/uhid.ko"
+    }
+  }
+}

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import importlib.util
 import io
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -15,6 +16,46 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def runtime_fixture(self):
+        sdk.check_output(create=True)
+        images = sdk.OUT / "images/example"
+        images.mkdir(parents=True)
+        artifact = images / "app"
+        artifact.write_bytes(b"compiled")
+        (images / "build.json").write_text(json.dumps({"artifacts": {"app": {"sha256": sdk.digest(artifact)}}}))
+        return sdk.OUT / "runtime-payload", {"artifacts": {"example": {"app": "opt/app"}}}
+
+    def test_runtime_plan_checks_actual_artifact_hash(self):
+        target, layout = self.runtime_fixture()
+        plan = sdk.runtime_payload_plan(layout, target)
+        self.assertEqual(plan[0][1], target / "opt/app")
+        plan[0][0].write_bytes(b"tampered")
+        with self.assertRaises(RuntimeError):
+            sdk.runtime_payload_plan(layout, target)
+
+    def test_runtime_plan_rejects_destination_escape(self):
+        target, layout = self.runtime_fixture()
+        layout["artifacts"]["example"]["app"] = "../escape"
+        with self.assertRaises(RuntimeError):
+            sdk.runtime_payload_plan(layout, target)
+
+    def test_runtime_plan_rejects_symlink_parent_inside_payload(self):
+        target, layout = self.runtime_fixture()
+        (target / "real").mkdir(parents=True)
+        (target / "opt").symlink_to(target / "real", target_is_directory=True)
+        with self.assertRaises(RuntimeError):
+            sdk.runtime_payload_plan(layout, target)
+
+    def test_runtime_plan_rejects_duplicate_destinations(self):
+        target, layout = self.runtime_fixture()
+        images = sdk.OUT / "images/example"
+        (images / "other").write_bytes(b"compiled")
+        report = {"sha256": {"app": sdk.digest(images / "app"), "other": sdk.digest(images / "other")}}
+        (images / "build.json").write_text(json.dumps(report))
+        layout["artifacts"]["example"]["other"] = "opt/app"
+        with self.assertRaises(RuntimeError):
+            sdk.runtime_payload_plan(layout, target)
+
     def test_protocol_stage_excludes_old_objects_and_other_components(self):
         archive_path = self.root / "protocol.tar.gz"
         with tarfile.open(str(archive_path), "w:gz") as archive:

@@ -56,3 +56,5 @@ Buildroot总包索引损坏也已修复；olddefconfig后必须仍选中基础�
 `./sdk build wfd-protocol` 从固定SHA256的完整协议归档选择WFD版wpa_supplicant源码，排除历史二进制/对象，并重新编译supplicant、cli和passphrase。保留原WFD/P2P/AP配置，报告记录归档及配置哈希。已主机实编通过，不代表最终运行镜像已完成。
 
 `./sdk build runtime-tools` 重编菜单使用的RTC/SNTP与静态IP工具，并运行同源码主机只读自测，不调用网络配置或授时写入功能。
+
+`./sdk build runtime-payload` 按runtime-layout.json将重编程序/模块安装至生成runtime-payload目录，安装前逐个核对构建报告哈希，拒绝未知目录/重复目标/路径及符号链接逃逸。此目标是最终rootfs集成的一步，尚不含启动服务、资源和完整基础系统，不是可烧录镜像。

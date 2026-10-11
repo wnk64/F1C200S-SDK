@@ -652,6 +652,63 @@ def build_miracast_sink(jobs):
     }, prefix)
 
 
+def runtime_payload_plan(layout, target):
+    entries = []
+    destinations = set()
+    for group, artifacts in sorted(layout["artifacts"].items()):
+        images = OUT / "images" / group
+        if not contained(images, OUT) or images.is_symlink():
+            raise RuntimeError("Unsafe artifact group")
+        report = json.loads((images / "build.json").read_text())
+        for name, relative in sorted(artifacts.items()):
+            destination = target / relative
+            if Path(relative).is_absolute() or ".." in Path(relative).parts or not contained(destination, target):
+                raise RuntimeError("Unsafe runtime destination: " + relative)
+            if destination.is_symlink() or any(parent.is_symlink() for parent in destination.parents if parent == target or target in parent.parents):
+                raise RuntimeError("Symlink in runtime destination: " + relative)
+            if destination in destinations:
+                raise RuntimeError("Duplicate runtime destination: " + relative)
+            destinations.add(destination)
+            source = images / name
+            if not contained(source, images) or source.is_symlink() or not source.is_file():
+                raise RuntimeError("Missing/unsafe runtime artifact: " + str(source))
+            if "sha256" in report:
+                expected = report["sha256"][name]
+            else:
+                expected = report.get("artifacts", report.get("modules", {}))[name]["sha256"]
+            if digest(source) != expected:
+                raise RuntimeError("Runtime artifact checksum mismatch: " + str(source))
+            entries.append((source, destination, expected))
+    return entries
+
+
+def build_runtime_payload():
+    check_output(create=True)
+    target = OUT / "runtime-payload"
+    marker = target / ".sdk-runtime-payload"
+    if target.exists() and (target.is_symlink() or marker.is_symlink() or not marker.is_file() or marker.read_text() != TOKEN):
+        raise RuntimeError("Refusing to overwrite unowned runtime payload")
+    layout_path = ROOT / "sdk-support/runtime-layout.json"
+    layout = json.loads(layout_path.read_text())
+    entries = runtime_payload_plan(layout, target)
+    target.mkdir(parents=True, exist_ok=True)
+    marker.write_text(TOKEN)
+    files = {}
+    for source, destination, expected in entries:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(str(source), str(destination))
+        destination.chmod(0o644 if destination.suffix in (".ko", ".so") else 0o755)
+        if digest(destination) != expected:
+            raise RuntimeError("Installed runtime checksum mismatch")
+        files[str(destination.relative_to(target))] = expected
+    report = {"layout_sha256": digest(layout_path), "files": files,
+              "scope": "compiled runtime payload; base rootfs/services/assets/image integration pending",
+              "board_deployed": False}
+    (OUT / "images/runtime-payload").mkdir(parents=True, exist_ok=True)
+    (OUT / "images/runtime-payload/build.json").write_text(json.dumps(report, indent=2) + "\n")
+    print("Installed {} source-built runtime artifacts".format(len(files)), flush=True)
+
+
 def build_runtime_tools(jobs):
     work, _, prefix, env = app_environment()
     network = work / "SCRCPT/network-and-audio-source"
@@ -919,7 +976,7 @@ def main():
     inspect = sub.add_parser("doctor")
     inspect.add_argument("--release", action="store_true")
     build = sub.add_parser("build")
-    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio", "wireless-modules", "wfd-protocol", "runtime-tools"], default="all", nargs="?")
+    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio", "wireless-modules", "wfd-protocol", "runtime-tools", "runtime-payload"], default="all", nargs="?")
     build.add_argument("-j", "--jobs", type=int, default=8)
     clean = sub.add_parser("clean")
     clean.add_argument("--component", choices=sorted(MANIFEST["components"]))
@@ -980,6 +1037,9 @@ def main():
             return 0
         if args.component == "runtime-tools":
             build_runtime_tools(args.jobs)
+            return 0
+        if args.component == "runtime-payload":
+            build_runtime_payload()
             return 0
         build_boot(args.component, args.jobs)
         return 0
