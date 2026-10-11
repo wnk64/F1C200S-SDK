@@ -84,7 +84,10 @@ def validate_source(name):
         entry = capture(["git", "ls-files", "--stage", "--", submodule], path)
         if entry != "160000 {} 0\t{}".format(commit, submodule):
             raise RuntimeError("Excluded legacy submodule reference changed: {}".format(submodule))
-    if changed - set(excluded) - set(spec.get("preserved_artifact_changes", [])):
+    metadata = set(spec.get("preserved_metadata_changes", []))
+    if metadata - {"WORKTREE_CHANGELOG.md", "变更记录.md"}:
+        raise RuntimeError("Only change records may be preserved as metadata")
+    if changed - set(excluded) - set(spec.get("preserved_artifact_changes", [])) - metadata:
         raise RuntimeError("Tracked source differs from locked commit: {}".format(name))
     if "config_sha256" in spec and digest(path / ".config") != spec["config_sha256"]:
         raise RuntimeError("Configuration hash mismatch: {}".format(name))
@@ -358,6 +361,51 @@ def build_board(jobs):
             modules[path.name] = {"sha256": digest(path), "vermagic": vermagic}
     report = {"source_commit": MANIFEST["project_sources"]["commit"], "dtb_sha256": digest(dtb),
               "modules": modules, "board_deployed": False, "cold_boots": 0}
+    (images / "build.json").write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps(report, indent=2), flush=True)
+
+
+def build_wireless_modules(jobs):
+    work = stage_project_sources()
+    _, kernel, _ = stage("kernel")
+    for required in (".config", "vmlinux", "System.map", "arch/arm/boot/zImage", "Module.symvers"):
+        if not (kernel / required).is_file():
+            raise RuntimeError("Build the isolated kernel first: " + required)
+    values = config_values((kernel / ".config").read_text())
+    if values.get("CONFIG_LOCALVERSION") != '""' or values.get("CONFIG_LOCALVERSION_AUTO") == "y":
+        raise RuntimeError("Kernel localversion must remain empty and automatic suffixes disabled")
+    env = os.environ.copy()
+    env["PATH"] = str(compiler_bin()) + os.pathsep + env.get("PATH", "")
+    env["LC_ALL"] = "C"
+    base = ["make", "ARCH=arm", "CROSS_COMPILE=arm-linux-gnueabi-", "LOCALVERSION="]
+    if capture(base + ["-s", "kernelrelease"], kernel, env) != MANIFEST["kernel_release"]:
+        raise RuntimeError("Isolated kernel release mismatch")
+    _, aic, _ = stage("aic-rxguard")
+    _, peripherals, _ = stage("aic-peripherals")
+    groups = [
+        (aic / "drivers/aic8800", ["aic_load_fw/aic_load_fw.ko", "aic8800_fdrv/aic8800_fdrv.ko"],
+         ["CONFIG_PREALLOC_RX_SKB=y", "CONFIG_F1C200S_PREALLOC_RX_SMALL=y"]),
+        (peripherals / "drivers/aic8800/peripherals/ip5209_20260930", ["ip5209_power.ko"], []),
+        (work / "SCRCPT/network-and-audio-source/newboard_20260930/bluetooth", ["hci_uart.ko"], []),
+    ]
+    images = OUT / "images/wireless-modules"
+    images.mkdir(parents=True, exist_ok=True)
+    modules = {}
+    for directory, targets, flags in groups:
+        run(base + ["-j{}".format(jobs), "M=" + str(directory)] + flags + ["modules"], kernel, env)
+        for target in targets:
+            path = directory / target
+            if not path.is_file():
+                raise RuntimeError("Missing required module: " + str(path))
+            vermagic = capture(["modinfo", "-F", "vermagic", path])
+            if not vermagic.startswith(MANIFEST["kernel_release"] + " "):
+                raise RuntimeError("Module release mismatch: " + str(path))
+            shutil.copy2(str(path), str(images / path.name))
+            modules[path.name] = {"sha256": digest(path), "vermagic": vermagic}
+    report = {"source_components": {name: MANIFEST["components"][name].get("export_commit", MANIFEST["components"][name]["commit"])
+                                    for name in ("kernel", "aic-rxguard", "aic-peripherals")},
+              "project_commit": MANIFEST["project_sources"]["commit"], "modules": modules,
+              "kernel_release": MANIFEST["kernel_release"], "board_deployed": False, "cold_boots": 0}
     (images / "build.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2), flush=True)
 
@@ -778,7 +826,7 @@ def main():
     inspect = sub.add_parser("doctor")
     inspect.add_argument("--release", action="store_true")
     build = sub.add_parser("build")
-    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio"], default="all", nargs="?")
+    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio", "wireless-modules"], default="all", nargs="?")
     build.add_argument("-j", "--jobs", type=int, default=8)
     clean = sub.add_parser("clean")
     clean.add_argument("--component", choices=sorted(MANIFEST["components"]))
@@ -830,6 +878,9 @@ def main():
             return 0
         if args.component == "bluetooth-audio":
             build_bluetooth_audio(args.jobs)
+            return 0
+        if args.component == "wireless-modules":
+            build_wireless_modules(args.jobs)
             return 0
         build_boot(args.component, args.jobs)
         return 0

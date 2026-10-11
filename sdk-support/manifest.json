@@ -3,6 +3,21 @@
   "release_ready": false,
   "kernel_release": "5.7.1",
   "components": {
+    "aic-rxguard": {
+      "path": "DRIVER/aic8800-ugreen-v14/Linux/aic8800_linux_driver",
+      "stage_path": "work/DRIVER/aic-rxguard",
+      "commit": "4c5338d85e21bef04dd8a2b42b4e8bcfe67d4e20",
+      "export_commit": "53bec9ea327282707ceb9996f1607b51f117728b",
+      "preserved_metadata_changes": ["WORKTREE_CHANGELOG.md"],
+      "required_files": ["drivers/aic8800/Makefile", "drivers/aic8800/aic_load_fw/aicwf_rx_prealloc.c", "drivers/aic8800/aic8800_fdrv/aicwf_txrxif.c"]
+    },
+    "aic-peripherals": {
+      "path": "DRIVER/aic8800-ugreen-v14/Linux/aic8800_linux_driver",
+      "stage_path": "work/DRIVER/aic-peripherals",
+      "commit": "4c5338d85e21bef04dd8a2b42b4e8bcfe67d4e20",
+      "preserved_metadata_changes": ["WORKTREE_CHANGELOG.md"],
+      "required_files": ["drivers/aic8800/peripherals/ip5209_20260930/Makefile", "drivers/aic8800/peripherals/ip5209_20260930/ip5209_power.c"]
+    },
     "bluealsa": {
       "path": "SOFTWARE/legacy-LicheePi_Nano/third_party/bluealsa-f1c200s/bluez-alsa",
       "stage_path": "work/SOFTWARE/bluealsa",
