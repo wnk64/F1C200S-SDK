@@ -1,6 +1,12 @@
 {
   "schema": 1,
+  "kernel_modules": true,
   "sources": [
+    {"origin":"project","path":"SCRCPT/network-and-audio-source/newboard_rtl8723bs_20260930/load-wifi.sh","targets":["opt/f1-network/load-wifi.sh"],"executable":true,"replacements":{"$(dirname \"$0\")/r8723bs.ko":"/lib/modules/5.7.1/kernel/drivers/staging/rtl8723bs/r8723bs.ko"}},
+    {"origin":"project","path":"SCRCPT/network-and-audio-source/newboard_rtl8723bs_20260930/load-bluetooth.sh","targets":["opt/f1-network/load-bluetooth.sh"],"executable":true,"replacements":{"$HERE/btrtl.ko":"/lib/modules/5.7.1/kernel/drivers/bluetooth/btrtl.ko","$HERE/hci_uart.ko":"/lib/modules/5.7.1/extra/hci_uart.ko"}},
+    {"origin":"project","path":"SCRCPT/network-and-audio-source/bs_primary_network_20260930/S17rtl8723bs-sta","targets":["etc/init.d/S17rtl8723bs-sta"],"executable":true,"replacements":{"/root/aic_miracast/candidates/rtl8723bs_poll_20260930":"/opt/f1-network","$BASE/r8723bs.ko":"/lib/modules/5.7.1/kernel/drivers/staging/rtl8723bs/r8723bs.ko"}},
+    {"origin":"project","path":"SCRCPT/network-and-audio-source/bs_primary_network_20260930/S18ssh","targets":["etc/init.d/S18ssh"],"executable":true},
+    {"origin":"project","path":"SCRCPT/network-and-audio-source/bs_primary_network_20260930/S48rtl8723bs","targets":["etc/init.d/S48rtl8723bs"],"executable":true,"replacements":{"/root/aic_miracast/candidates/rtl8723bs_poll_20260930":"/opt/f1-network"}},
     {"origin":"project","path":"LVGL/menu/cjk28.bin","targets":["opt/f1/apps/menu/cjk28.bin","opt/f1/apps/media/cjk28.bin","opt/f1/apps/ons/cjk28.bin","opt/f1/apps/reader/cjk28.bin","opt/f1/apps/sfc/cjk28.bin","opt/f1/apps/retro/cjk28.bin","opt/f1/apps/recorder/cjk28.bin","opt/f1/apps/lan/cjk28.bin"]},
     {"origin":"project","path":"LVGL/menu/TakaoPGothic.ttf","targets":["usr/share/fonts/TakaoPGothic.ttf"]},
     {"origin":"project","path":"LVGL/menu/TAKAO_LICENSE.txt","targets":["usr/share/licenses/f1-fonts/TAKAO_LICENSE.txt"]},

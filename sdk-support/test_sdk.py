@@ -16,6 +16,25 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_runtime_plan_includes_complete_kernel_module_report(self):
+        target, layout = self.runtime_fixture()
+        images = sdk.OUT / "images/kernel-runtime"
+        module = images / "drivers/example.ko"
+        module.parent.mkdir(parents=True)
+        module.write_bytes(b"module")
+        manifest = {"kernel_release": "5.7.1"}
+        report = {"kernel_release": "5.7.1", "modules": {"drivers/example.ko": {"sha256": sdk.digest(module)}}}
+        (images / "build.json").write_text(json.dumps(report))
+        layout["kernel_modules"] = True
+        with mock.patch.object(sdk, "MANIFEST", manifest):
+            plan = sdk.runtime_payload_plan(layout, target)
+        self.assertIn(target / "lib/modules/5.7.1/kernel/drivers/example.ko", [entry[1] for entry in plan])
+        report["kernel_release"] = "5.7.1+"
+        (images / "build.json").write_text(json.dumps(report))
+        with mock.patch.object(sdk, "MANIFEST", manifest):
+            with self.assertRaises(RuntimeError):
+                sdk.runtime_payload_plan(layout, target)
+
     def test_lan_backend_relocation_is_exact_and_repeatable(self):
         source = self.root / "output_cedar.c"
         old = 'static const char *backend="/root/roms/candidates/mplayer_geometry_20261005/mplayer-native-geometry";'

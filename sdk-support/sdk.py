@@ -365,6 +365,47 @@ def build_board(jobs):
     print(json.dumps(report, indent=2), flush=True)
 
 
+def build_kernel_runtime():
+    _, kernel, spec = stage("kernel")
+    for relative in (".config", "vmlinux", "System.map", "arch/arm/boot/zImage", "modules.order"):
+        if not (kernel / relative).is_file():
+            raise RuntimeError("Build complete isolated kernel first: " + relative)
+    values = config_values((kernel / ".config").read_text(), prefix="CONFIG_")
+    if values.get("CONFIG_LOCALVERSION") != '""' or values.get("CONFIG_LOCALVERSION_AUTO") == "y":
+        raise RuntimeError("Kernel localversion configuration mismatch")
+    env = os.environ.copy()
+    env["PATH"] = str(compiler_bin()) + os.pathsep + env.get("PATH", "")
+    base = ["make", "ARCH=arm", "CROSS_COMPILE=arm-linux-gnueabi-", "LOCALVERSION="]
+    if capture(base + ["-s", "kernelrelease"], kernel, env) != MANIFEST["kernel_release"]:
+        raise RuntimeError("Kernel release mismatch")
+    images = OUT / "images/kernel-runtime"
+    modules = {}
+    superseded = ["drivers/bluetooth/hci_uart.ko"]
+    for relative in (kernel / "modules.order").read_text().splitlines():
+        path = kernel / relative
+        if not contained(path, kernel) or path.is_symlink() or not path.is_file() or path.suffix != ".ko":
+            raise RuntimeError("Missing/unsafe configured kernel module: " + relative)
+        if relative in superseded:
+            continue
+        vermagic = capture(["modinfo", "-F", "vermagic", path])
+        if not vermagic.startswith(MANIFEST["kernel_release"] + " "):
+            raise RuntimeError("Configured kernel module release mismatch: " + relative)
+        destination = images / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(str(path), str(destination))
+        modules[relative] = {"sha256": digest(destination), "vermagic": vermagic}
+    if not modules or "drivers/staging/rtl8723bs/r8723bs.ko" not in modules or "drivers/bluetooth/btrtl.ko" not in modules:
+        raise RuntimeError("Required normal WLAN/Bluetooth module missing")
+    external = json.loads((OUT / "images/wireless-modules/build.json").read_text())
+    if not external["modules"]["hci_uart.ko"]["vermagic"].startswith(MANIFEST["kernel_release"] + " "):
+        raise RuntimeError("Replacement H5 UART module missing/mismatched")
+    report = {"source_commit": spec["commit"], "config_sha256": digest(kernel / ".config"),
+              "zimage_sha256": digest(kernel / "arch/arm/boot/zImage"), "kernel_release": MANIFEST["kernel_release"],
+              "modules": modules, "superseded_by_external_h5": superseded, "board_deployed": False}
+    (images / "build.json").write_text(json.dumps(report, indent=2) + "\n")
+    print("Exported {} matching kernel modules".format(len(modules)), flush=True)
+
+
 def build_wireless_modules(jobs):
     work = stage_project_sources()
     _, kernel, _ = stage("kernel")
@@ -719,7 +760,14 @@ def runtime_source_plan(layout, target, roots, destinations):
 def runtime_payload_plan(layout, target):
     entries = []
     destinations = set()
-    for group, artifacts in sorted(layout["artifacts"].items()):
+    groups = dict(layout["artifacts"])
+    if layout.get("kernel_modules"):
+        report = json.loads((OUT / "images/kernel-runtime/build.json").read_text())
+        if report["kernel_release"] != MANIFEST["kernel_release"]:
+            raise RuntimeError("Kernel runtime report release mismatch")
+        groups["kernel-runtime"] = {relative: "lib/modules/{}/kernel/{}".format(MANIFEST["kernel_release"], relative)
+                                    for relative in report["modules"]}
+    for group, artifacts in sorted(groups.items()):
         images = OUT / "images" / group
         if not contained(images, OUT) or images.is_symlink():
             raise RuntimeError("Unsafe artifact group")
@@ -1053,7 +1101,7 @@ def main():
     inspect = sub.add_parser("doctor")
     inspect.add_argument("--release", action="store_true")
     build = sub.add_parser("build")
-    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio", "wireless-modules", "wfd-protocol", "runtime-tools", "runtime-payload"], default="all", nargs="?")
+    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio", "wireless-modules", "wfd-protocol", "runtime-tools", "runtime-payload", "kernel-runtime"], default="all", nargs="?")
     build.add_argument("-j", "--jobs", type=int, default=8)
     clean = sub.add_parser("clean")
     clean.add_argument("--component", choices=sorted(MANIFEST["components"]))
@@ -1117,6 +1165,9 @@ def main():
             return 0
         if args.component == "runtime-payload":
             build_runtime_payload()
+            return 0
+        if args.component == "kernel-runtime":
+            build_kernel_runtime()
             return 0
         build_boot(args.component, args.jobs)
         return 0
