@@ -45,7 +45,7 @@ class OutputSafetyTests(unittest.TestCase):
     def test_symlink_output_is_rejected(self):
         external = self.root / "active-source"
         external.mkdir()
-        sdk.OUT.symlink_to(external, target_is_directory=True)
+        sdk.OUT.symlink_to(str(external), target_is_directory=True)
         with self.assertRaises(RuntimeError):
             sdk.check_output(create=True)
         self.assertTrue(external.is_dir())
@@ -60,7 +60,7 @@ class OutputSafetyTests(unittest.TestCase):
         sdk.OUT.mkdir()
         real = self.root / "marker"
         real.write_text(sdk.TOKEN)
-        (sdk.OUT / sdk.MARKER).symlink_to(real)
+        (sdk.OUT / sdk.MARKER).symlink_to(str(real))
         with self.assertRaises(RuntimeError):
             sdk.check_output()
 

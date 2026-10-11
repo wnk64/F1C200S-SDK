@@ -29,40 +29,45 @@ def digest(path):
 
 
 def capture(args, cwd=None, env=None):
-    return subprocess.check_output(args, cwd=cwd, env=env, universal_newlines=True).strip()
+    return subprocess.check_output(list(map(str, args)), cwd=str(cwd) if cwd else None,
+                                   env=env, universal_newlines=True).strip()
 
 
 def run(args, cwd=None, env=None):
     args = list(map(str, args))
     print("+", " ".join(args), flush=True)
-    subprocess.run(args, cwd=cwd, env=env, check=True)
+    subprocess.run(args, cwd=str(cwd) if cwd else None, env=env, check=True)
+
+
+def resolved(path):
+    return Path(os.path.realpath(str(path)))
 
 
 def contained(path, parent):
-    return path.resolve() != parent.resolve() and parent.resolve() in path.resolve().parents
+    return resolved(path) != resolved(parent) and resolved(parent) in resolved(path).parents
 
 
 def component(name):
     spec = MANIFEST["components"][name]
     path = ROOT / spec["path"]
     if not contained(path, ROOT) or path.is_symlink():
-        raise RuntimeError(f"Source must be a real directory inside SDK: {path}")
+        raise RuntimeError("Source must be a real directory inside SDK: {}".format(path))
     return path, spec
 
 
 def validate_source(name):
     path, spec = component(name)
     if capture(["git", "rev-parse", "--show-toplevel"], path) != str(path):
-        raise RuntimeError(f"Missing complete component repository: {name}")
+        raise RuntimeError("Missing complete component repository: {}".format(name))
     if capture(["git", "rev-parse", "HEAD"], path) != spec["commit"]:
-        raise RuntimeError(f"Unreviewed source commit: {name}; review manifest before updating")
+        raise RuntimeError("Unreviewed source commit: {}; review manifest before updating".format(name))
     if capture(["git", "diff", "--name-only", "HEAD", "--"], path):
-        raise RuntimeError(f"Tracked source differs from locked commit: {name}")
+        raise RuntimeError("Tracked source differs from locked commit: {}".format(name))
     if digest(path / ".config") != spec["config_sha256"]:
-        raise RuntimeError(f"Configuration hash mismatch: {name}")
+        raise RuntimeError("Configuration hash mismatch: {}".format(name))
     if "baseline_sha256" in spec:
         if digest(path / spec["artifact"]) != spec["baseline_sha256"]:
-            raise RuntimeError(f"Active baseline artifact mismatch: {name}")
+            raise RuntimeError("Active baseline artifact mismatch: {}".format(name))
     return path, spec
 
 
@@ -77,13 +82,13 @@ def compiler_bin():
         if gcc.is_file():
             version = capture([str(gcc), "-dumpfullversion"])
             if version != "7.2.1":
-                raise RuntimeError(f"Expected Linaro GCC 7.2.1, got {version}")
+                raise RuntimeError("Expected Linaro GCC 7.2.1, got {}".format(version))
             return path.resolve()
     raise RuntimeError("Linaro 7.2.1 missing; set KERNEL_TOOLCHAIN to its bin directory")
 
 
 def check_output(create=False):
-    if OUT.is_symlink() or OUT.resolve() != ROOT / ".sdk-output":
+    if OUT.is_symlink() or resolved(OUT) != ROOT / ".sdk-output":
         raise RuntimeError("Unsafe SDK output path")
     if OUT.exists():
         marker = OUT / MARKER
@@ -99,7 +104,7 @@ def check_output(create=False):
 @contextlib.contextmanager
 def locked():
     # Directory-inode locking also covers clean without recreating a lock file.
-    descriptor = os.open(ROOT, os.O_RDONLY)
+    descriptor = os.open(str(ROOT), os.O_RDONLY)
     try:
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -115,14 +120,14 @@ def extract_archive(archive, target):
         for member in tree.getmembers():
             destination = target / member.name
             if not contained(destination, target):
-                raise RuntimeError(f"Archive path escapes stage: {member.name}")
+                raise RuntimeError("Archive path escapes stage: {}".format(member.name))
             if member.issym() and not contained(destination.parent / member.linkname, target):
-                raise RuntimeError(f"Archive symlink escapes stage: {member.name}")
+                raise RuntimeError("Archive symlink escapes stage: {}".format(member.name))
             if member.islnk() and not contained(target / member.linkname, target):
-                raise RuntimeError(f"Archive hardlink escapes stage: {member.name}")
+                raise RuntimeError("Archive hardlink escapes stage: {}".format(member.name))
             if not (member.isfile() or member.isdir() or member.issym() or member.islnk()):
-                raise RuntimeError(f"Unsupported archive member: {member.name}")
-        tree.extractall(target)
+                raise RuntimeError("Unsupported archive member: {}".format(member.name))
+        tree.extractall(str(target))
 
 
 def stage(name):
@@ -132,19 +137,19 @@ def stage(name):
     stamp = target / ".sdk-source-commit"
     if target.exists():
         if target.is_symlink() or not stamp.is_file() or stamp.read_text().strip() != spec["commit"]:
-            raise RuntimeError(f"Staged source mismatch; run ./sdk clean: {target}")
+            raise RuntimeError("Staged source mismatch; run ./sdk clean: {}".format(target))
         return source, target, spec
     target.mkdir(parents=True)
     try:
         with tempfile.TemporaryFile() as archive:
-            subprocess.run(["git", "archive", spec["commit"]], cwd=source,
+            subprocess.run(["git", "archive", spec["commit"]], cwd=str(source),
                            stdout=archive, check=True)
             archive.seek(0)
             extract_archive(archive, target)
-        shutil.copy2(ROOT / "sdk-support/configs" / f"{name}.config", target / ".config")
+        shutil.copy2(str(ROOT / "sdk-support/configs" / (name + ".config")), str(target / ".config"))
         stamp.write_text(spec["commit"] + "\n")
     except BaseException:
-        shutil.rmtree(target)
+        shutil.rmtree(str(target))
         raise
     return source, target, spec
 
@@ -154,7 +159,7 @@ def build_boot(name, jobs):
     if name == "kernel":
         for required in (".config", "vmlinux", "System.map", "arch/arm/boot/zImage"):
             if not (source / required).is_file():
-                raise RuntimeError(f"Incomplete protected kernel baseline: {required}")
+                raise RuntimeError("Incomplete protected kernel baseline: {}".format(required))
     env = os.environ.copy()
     env["PATH"] = str(compiler_bin()) + os.pathsep + env.get("PATH", "")
     env["LC_ALL"] = "C"
@@ -168,10 +173,10 @@ def build_boot(name, jobs):
             raise RuntimeError("Kernel local version lock violated")
         release = capture(args + ["-s", "kernelrelease"], target, env)
         if release != MANIFEST["kernel_release"]:
-            raise RuntimeError(f"Kernel release mismatch: {release}")
-    run(args + [f"-j{jobs}"], target, env)
+            raise RuntimeError("Kernel release mismatch: {}".format(release))
+    run(args + ["-j{}".format(jobs)], target, env)
     if name == "kernel":
-        run(args + [f"-j{jobs}", "modules"], target, env)
+        run(args + ["-j{}".format(jobs), "modules"], target, env)
     images = OUT / "images" / name
     images.mkdir(parents=True, exist_ok=True)
     artifacts = [spec["artifact"], ".config"]
@@ -181,8 +186,8 @@ def build_boot(name, jobs):
     for artifact in artifacts:
         path = target / artifact
         if not path.is_file():
-            raise RuntimeError(f"Build did not produce {path}")
-        shutil.copy2(path, images / path.name)
+            raise RuntimeError("Build did not produce {}".format(path))
+        shutil.copy2(str(path), str(images / path.name))
         results[path.name] = digest(path)
     report = {"component": name, "source_commit": spec["commit"],
               "compiler": capture([str(compiler_bin() / "arm-linux-gnueabi-gcc"), "--version"]),
@@ -196,26 +201,26 @@ def doctor(release=False):
     for name in MANIFEST["components"]:
         try:
             validate_source(name)
-            config = ROOT / "sdk-support/configs" / f"{name}.config"
+            config = ROOT / "sdk-support/configs" / (name + ".config")
             if digest(config) != MANIFEST["components"][name]["config_sha256"]:
-                raise RuntimeError(f"SDK configuration copy mismatch: {name}")
-            print(f"OK source/config: {name}")
+                raise RuntimeError("SDK configuration copy mismatch: {}".format(name))
+            print("OK source/config: {}".format(name))
         except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
             errors.append(str(error))
     try:
-        print(f"OK kernel compiler: {compiler_bin()}")
+        print("OK kernel compiler: {}".format(compiler_bin()))
         check_output()
     except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
         errors.append(str(error))
     for command in ("make", "gcc", "bison", "flex", "bc", "openssl", "pkg-config"):
         if not shutil.which(command):
-            errors.append(f"Missing host tool: {command}")
+            errors.append("Missing host tool: {}".format(command))
     for blocker in MANIFEST["release_blockers"]:
-        print(f"PENDING release: {blocker}")
+        print("PENDING release: {}".format(blocker))
     if release and not MANIFEST["release_ready"]:
         errors.append("Full image is not release-ready; refusing an incomplete SDK image")
     for error in errors:
-        print(f"ERROR: {error}", file=sys.stderr)
+        print("ERROR: {}".format(error), file=sys.stderr)
     return 1 if errors else 0
 
 
@@ -237,7 +242,7 @@ def main():
         if args.command == "clean":
             check_output()
             if OUT.exists():
-                shutil.rmtree(OUT)
+                shutil.rmtree(str(OUT))
             print("SDK output removed; active source/config/toolchain/downloads preserved")
             return 0
         if args.jobs < 1 or args.jobs > 64:
@@ -252,5 +257,5 @@ if __name__ == "__main__":
     try:
         sys.exit(main())
     except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
-        print(f"SDK failed: {error}", file=sys.stderr)
+        print("SDK failed: {}".format(error), file=sys.stderr)
         sys.exit(1)
