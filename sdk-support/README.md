@@ -21,6 +21,10 @@
 
 `./sdk package` 将完整源码仓库、锁定提交、必要的基线检查材料、工具链和Buildroot下载依赖导出到 `.sdk-output/portable-sdk`。它不是源码映射或仅补丁包，也不会复制原目录的未跟踪编译缓存、游戏或个人媒体；存在目标则拒绝覆盖。导出内含Git历史，公开上传前仍需进行隐私及再分发许可证审计。导出成功只表示文件/源检查通过，不代表独立重编或硬件验收通过。该目录和报告都属于生成数据，原SDK的clean会删除它；进入导出目录后可单独执行 `./sdk clean`、`./sdk build -j2` 验证，不影响原开发目录。
 
+管理工具 `python3 sdk-support/archive_sdk.py` 只为已独立重编并清理过的导出创建源码tar.gz。必须先保留完整构建报告、SD报告和对应镜像至父SDK的 `.sdk-output/images/portable-validation`，再在导出内实际运行 `./sdk clean`。工具核对提交/构建报告/镜像/依赖和基线，逐个回读tar文件校验后生成 `.sdk-output/packages`；不自动清理、不烧卡，也不授予硬件验收状态。
+
+已核实主机构建环境为 Ubuntu 16.04.7 x86_64、GCC 5.4.0、Python 3.5.2、Git 2.7.4。除基本构建工具外，需 autoconf/automake/libtool、OpenSSL/ncurses开发包、pkg-config、cpio/unzip/rsync/wget、mtools/dosfstools。仅重定位目录已测试，尚未验证新版Ubuntu或容器，不保证直接在任意Linux发行版编译。
+
 共享库检查增加GNU版本定义/需求逐项核验，按实际NEEDED解析目标匹配；它不覆盖全部符号重定位、运行时dlopen及硬件行为。fb5c20f已通过57项单测，301个ARM ELF、840项版本需求检查无问题，并重新组装候选镜像；该新检查版本尚未独立全链重编。
 
 环境：Linux、Python 3.5+、Git、make、GCC、bison、flex、bc、OpenSSL 开发头文件、pkg-config。内核/U-Boot 使用 Linaro GCC 7.2.1。默认查找 TOOLCHAIN/linaro-7.2.1/bin，兼容当前虚拟机 /opt 下的原工具链；其他位置用 KERNEL_TOOLCHAIN=/absolute/bin 指定。不自动安装工具或修改主机环境。

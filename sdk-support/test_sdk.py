@@ -3,6 +3,7 @@ import importlib.util
 import io
 import json
 import os
+import sys
 from pathlib import Path
 import subprocess
 import tarfile
@@ -13,6 +14,10 @@ from unittest import mock
 package_spec = importlib.util.spec_from_file_location("package_sdk", str(Path(__file__).with_name("package_sdk.py")))
 package = importlib.util.module_from_spec(package_spec)
 package_spec.loader.exec_module(package)
+sys.modules["package_sdk"] = package
+archive_spec = importlib.util.spec_from_file_location("archive_sdk", str(Path(__file__).with_name("archive_sdk.py")))
+archive_tool = importlib.util.module_from_spec(archive_spec)
+archive_spec.loader.exec_module(archive_tool)
 
 spec = importlib.util.spec_from_file_location("f1sdk", str(Path(__file__).with_name("sdk.py")))
 sdk = importlib.util.module_from_spec(spec)
@@ -20,6 +25,33 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_source_archive_roundtrip_preserves_files_modes_and_links(self):
+        source = self.root / "source"
+        source.mkdir()
+        (source / "sdk").write_bytes(b"#!/bin/sh\n")
+        (source / "sdk").chmod(0o755)
+        (source / "alias").symlink_to("sdk")
+        output = self.root / "sdk.tar.gz"
+        report = archive_tool.archive_tree(source, output, sdk)
+        self.assertEqual(report["files_verified"], 2)
+        self.assertEqual(report["sha256"], sdk.digest(output))
+        with tarfile.open(str(output)) as archive:
+            self.assertEqual(archive.extractfile("F1c200S_SOFT/sdk").read(), b"#!/bin/sh\n")
+            self.assertEqual(archive.getmember("F1c200S_SOFT/alias").linkname, "sdk")
+
+    def test_source_archive_refuses_unclean_sdk_and_existing_archive(self):
+        source = self.root / "source"
+        source.mkdir()
+        output = self.root / "sdk.tar.gz"
+        (source / ".sdk-output").mkdir()
+        with self.assertRaises(RuntimeError):
+            archive_tool.archive_tree(source, output, sdk)
+        (source / ".sdk-output").rmdir()
+        output.write_bytes(b"keep")
+        with self.assertRaises(RuntimeError):
+            archive_tool.archive_tree(source, output, sdk)
+        self.assertEqual(output.read_bytes(), b"keep")
+
     def test_package_refuses_existing_export_without_modifying_it(self):
         sdk.check_output(create=True)
         destination = sdk.OUT / "portable-sdk"

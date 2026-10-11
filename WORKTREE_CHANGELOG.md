@@ -655,3 +655,9 @@ Checks:reject existing export destination/external symlinks,verify copied files,
 Rollback:2a71e34 SDK;only marked generated export is disposable. Triple-cold-boot acceptance remains0,full objective active.
 Result:754c637 first export passed,61 tests;all Git connectivity checks passed,doctor selects exported TOOLCHAIN/linaro-7.2.1 without KERNEL_TOOLCHAIN or external compiler PATH,no generated output included.
 Planned refinement:pin each required commit under refs/sdk-lock before removing origin so Git GC cannot prune build-only commits. Recreate only the new,unused generated export after checking package-report/main_commit and absence of its .sdk-output;original source and image retained. Independent build remainspending.
+
+## 2026-10-12 / Planned / Independent rebuild and delivery archive
+Source:dc17314 export passed,63 tests,required Git commits pinned;TOOLCHAIN copy checks passed. Export clean preserved baseline hashes and had no build cache. ./sdk build -j2 running inside .sdk-output/portable-sdk with system-only PATH and KERNEL_TOOLCHAIN unset. Do not modify this tested source snapshot while its build runs.
+Host:Ubuntu16.04.7,GCC5.4.0,Python3.5.2,Git2.7.4;newer distributions not verified.
+Archive plan:add sdk-support/archive_sdk.py/test_sdk.py and records in main SDK only. Require retained successful independent build/image reports and image hashes,then actual exported ./sdk clean,then verify and archive all source/dependencies with tar-member readback. Never claim hardware acceptance or write block devices.
+Protected:original source/build/image and live exported build unchanged. SSH read-only query10.0.0.234 timed out;no board writes or cause inference. Rollback:dc17314 management tools;full objective active,cold_boots0.
