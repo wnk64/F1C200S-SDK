@@ -16,6 +16,35 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_elf_version_parser_separates_definitions_parents_and_needs(self):
+        text = """Version definition section '.gnu.version_d' contains 2 entries:
+  0x001c: Rev: 1 Flags: none Index: 2 Cnt: 2 Name: GLIBC_2.4
+  0x0038: Parent 1: GLIBC_2.3
+Version needs section '.gnu.version_r' contains 1 entry:
+  0x0000: Version: 1 File: libc.so.6 Cnt: 2
+  0x0010: Name: GLIBC_2.4 Flags: none Version: 2
+  0x0020: Name: OPTIONAL_1 Flags: WEAK Version: 3
+"""
+        result = sdk.elf_versions(text)
+        self.assertEqual(result["definitions"], ["GLIBC_2.4"])
+        self.assertEqual(result["needs"]["libc.so.6"], [
+            {"name": "GLIBC_2.4", "weak": False}, {"name": "OPTIONAL_1", "weak": True}])
+        self.assertEqual(sdk.elf_versions("No version information found in this file."), {"definitions": [], "needs": {}})
+
+    def test_elf_version_audit_requires_actual_provider_definition(self):
+        binaries = {"app": {"needed": {"libc.so.6": "lib/libc.so"}, "versions": {
+            "needs": {"libc.so.6": [{"name": "GLIBC_2.4", "weak": False}]}, "definitions": []}},
+            "lib/libc.so": {"needed": {}, "versions": {"needs": {}, "definitions": ["GLIBC_2.4"]}}}
+        self.assertEqual(sdk.audit_elf_versions(binaries), (1, []))
+        binaries["lib/libc.so"]["versions"]["definitions"] = ["GLIBC_2.3"]
+        checked, issues = sdk.audit_elf_versions(binaries)
+        self.assertEqual(checked, 1)
+        self.assertEqual(issues[0]["error"], "missing ELF version definition")
+        binaries["app"]["versions"]["needs"]["libc.so.6"][0]["weak"] = True
+        self.assertEqual(sdk.audit_elf_versions(binaries), (1, []))
+        del binaries["lib/libc.so"]
+        self.assertEqual(sdk.audit_elf_versions(binaries)[1][0]["error"], "missing ELF version provider")
+
     def test_full_build_order_covers_all_components_and_image_last(self):
         names = [name for name, operation in sdk.full_build_steps(2)]
         self.assertEqual(len(names), len(set(names)))

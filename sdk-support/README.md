@@ -17,6 +17,10 @@
 
 `./sdk build` 为最终完整镜像入口。目前存在运行依赖未集成项，入口会明确拒绝生成不完整镜像。见 manifest.json 的 release_blockers；不能用旧二进制冒充全源码编译成功。
 
+当前验证状态（以此节为准，后文保留各阶段接入记录）：`./sdk build -j2` 已成功跑通19阶段，生成1GiB SD候选镜像；55项单测通过。这轮使用已有隔离缓存，尚未验证clean后独立全量重编、可携带打包或实机三次冷启动，因此不是已验收发布版。`./sdk clean` 会删除生成目录内的候选镜像，使用前应明确是否需要保留交付产物。
+
+共享库检查增加GNU版本定义/需求逐项核验，按实际NEEDED解析目标匹配；它不覆盖全部符号重定位、运行时dlopen及硬件行为。
+
 环境：Linux、Python 3.5+、Git、make、GCC、bison、flex、bc、OpenSSL 开发头文件、pkg-config。内核/U-Boot 使用 Linaro GCC 7.2.1。默认查找 TOOLCHAIN/linaro-7.2.1/bin，兼容当前虚拟机 /opt 下的原工具链；其他位置用 KERNEL_TOOLCHAIN=/absolute/bin 指定。不自动安装工具或修改主机环境。
 
 构建从锁定 Git 提交导出源码，配置由 sdk-support/configs 提供，输出全部在 .sdk-output 下。不会在当前内核、U-Boot 原目录执行 clean 或覆盖产物。内核严格为5.7.1，显式传 LOCALVERSION=。

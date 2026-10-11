@@ -636,3 +636,11 @@ Layout:U-Boot at8192; boot FAT16 start2048 size32768 sectors; rootfs ext2 start3
 Checks:53 tests passed, overlapping partitions/boot region refused;3 FAT boot files copied back/hash matched;ext2 e2fsck all5 passes;console root character node;both FAT fsck passed;merged image partition regions equal generated filesystem hashes;U-Boot region matches71e34730... . Report images/sd-image/build.json retained.
 Deploy:none, no physical card/board writes, cold_boots0. All build sessions terminal, generated temporary filesystem trees removed after assembly.
 Decision:image file generated and offline verified, still unaccepted candidate. One-command full build/clean, portable independent rebuild, ABI and full hardware/application three-cold-boot regressions remain pending. Full objective active.
+
+## 2026-10-11 / pending / Full build and version-requirement audit
+Build:d9b2bba ./sdk build -j2 completed all19 stages, exit0,55 tests. Candidate1073741824bytes SHA25676a4b72076e9faf33ad0e667ba6912f66f24e59b40c9d5443b78706f625470d3. Integrated rootfs115ea23470c26fe5f81887c6c9f8420b9352824846d2b8ecd13245b0a434fa89. Existing isolated cache used; not an independent clean rebuild.
+Planned:extend readelf audit from file resolution to GNU version definitions/requirements on actual resolved providers. Unit tests cover successful and missing versions/providers,weak requirements and parsing. No original component source/config or board changes.
+Files:sdk-support/sdk.py/test_sdk.py/changes-20261011.md/README.md and this record.
+Protected:all image applications and dynamic libraries; no hardware deployment. Full symbol relocation/dlopen and runtime behavior are not covered by this offline version check.
+Rollback:d9b2bba SDK recipe/tests; existing original component repositories and board remain unchanged.
+Portability:TOOLCHAIN directory absent, kernel compiler still external /opt Linaro7.2.1; must package compiler before portable acceptance. Full objective active,cold_boots0.

@@ -1018,6 +1018,54 @@ def resolve_archive_path(members, name):
     raise RuntimeError("Rootfs symlink loop: " + name)
 
 
+def elf_versions(text):
+    definitions = set()
+    needs = {}
+    section = None
+    library = None
+    for line in text.splitlines():
+        if line.startswith("Version definition section"):
+            section = "definitions"
+        elif line.startswith("Version needs section"):
+            section = "needs"
+        elif line.startswith("Version symbols section"):
+            section = None
+        if section == "definitions" and "Rev:" in line:
+            match = re.search(r"\bName:\s+(\S+)", line)
+            if match:
+                definitions.add(match.group(1))
+        elif section == "needs":
+            match = re.search(r"\bFile:\s+(\S+)", line)
+            if match:
+                library = match.group(1)
+                needs.setdefault(library, [])
+            match = re.search(r"\bName:\s+(\S+)\s+Flags:\s+(\S+)", line)
+            if match:
+                if not library:
+                    raise RuntimeError("ELF version requirement without provider")
+                needs[library].append({"name": match.group(1), "weak": match.group(2) == "WEAK"})
+    return {"definitions": sorted(definitions), "needs": needs}
+
+
+def audit_elf_versions(binaries):
+    issues = []
+    checked = 0
+    for name, binary in sorted(binaries.items()):
+        for library, requirements in sorted(binary["versions"]["needs"].items()):
+            provider = binary["needed"].get(library)
+            if provider not in binaries:
+                issues.append({"file": name, "error": "missing ELF version provider", "dependency": library})
+                continue
+            available = set(binaries[provider]["versions"]["definitions"])
+            for requirement in requirements:
+                checked += 1
+                # GNU ld treats an absent weak version requirement as non-fatal.
+                if requirement["name"] not in available and not requirement["weak"]:
+                    issues.append({"file": name, "error": "missing ELF version definition",
+                                   "dependency": library, "provider": provider, "version": requirement["name"]})
+    return checked, issues
+
+
 def audit_rootfs_dependencies(archive_path, readelf):
     issues = []
     binaries = {}
@@ -1038,6 +1086,7 @@ def audit_rootfs_dependencies(archive_path, readelf):
                 continue
             dynamic = capture([readelf, "-d", elf_path])
             program = capture([readelf, "-l", elf_path])
+            versions = elf_versions(capture([readelf, "--version-info", elf_path]))
             needed = re.findall(r"\(NEEDED\).*\[([^]]+)\]", dynamic)
             interpreter = re.search(r"Requesting program interpreter:\s*([^]]+)\]", program)
             search = ["lib", "usr/lib", "usr/local/lib"]
@@ -1054,9 +1103,13 @@ def audit_rootfs_dependencies(archive_path, readelf):
                     resolved_dependencies[library] = resolved_path
             if interpreter and not resolve_archive_path(members, interpreter.group(1)):
                 issues.append({"file": name, "error": "missing ELF interpreter", "dependency": interpreter.group(1)})
-            binaries[name] = {"needed": resolved_dependencies, "interpreter": interpreter.group(1) if interpreter else None}
+            binaries[name] = {"needed": resolved_dependencies, "interpreter": interpreter.group(1) if interpreter else None,
+                              "versions": versions}
+    checked, version_issues = audit_elf_versions(binaries)
+    issues.extend(version_issues)
     return {"elf_count": len(binaries), "binaries": binaries, "issues": issues,
-            "scope": "ELF architecture/interpreter/NEEDED file resolution; not ABI symbol or hardware acceptance"}
+            "version_requirements_checked": checked,
+            "scope": "ARM/interpreter/NEEDED and GNU version definitions/requirements; not full symbol relocation/dlopen or hardware acceptance"}
 
 
 def build_integrated_rootfs():
