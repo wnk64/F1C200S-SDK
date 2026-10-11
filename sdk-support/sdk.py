@@ -705,6 +705,11 @@ def build_wfd_protocol(jobs):
     run(["make", "-B", "-j{}".format(jobs), "CC=" + prefix + "gcc",
          "wpa_supplicant", "wpa_cli", "wpa_passphrase"], directory, env)
     publish_apps("wfd-protocol", {name: directory / name for name in ("wpa_supplicant", "wpa_cli", "wpa_passphrase")}, prefix)
+    report_path = OUT / "images/wfd-protocol/build.json"
+    report = json.loads(report_path.read_text())
+    report["protocol_source"] = MANIFEST["protocol_source"]
+    report["input_config_sha256"] = digest(directory / ".config")
+    report_path.write_text(json.dumps(report, indent=2) + "\n")
 
 
 def build_bluetooth_audio(jobs):

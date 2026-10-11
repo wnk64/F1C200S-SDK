@@ -15,6 +15,37 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_protocol_stage_excludes_old_objects_and_other_components(self):
+        archive_path = self.root / "protocol.tar.gz"
+        with tarfile.open(str(archive_path), "w:gz") as archive:
+            for name in ("wpa_supplicant/Makefile", "wpa_supplicant/.config", "src/p2p/p2p.c", "src/p2p/p2p.o", "wpa_supplicant/wpa_supplicant"):
+                member = tarfile.TarInfo("protocol-tools/wpa/" + name)
+                member.size = 6
+                archive.addfile(member, io.BytesIO(b"source"))
+            member = tarfile.TarInfo("protocol-tools/old-driver/driver.c")
+            member.size = 6
+            archive.addfile(member, io.BytesIO(b"source"))
+        manifest = {"protocol_source": {"archive": "protocol.tar.gz", "sha256": sdk.digest(archive_path), "member_root": "protocol-tools/wpa"}}
+        with mock.patch.object(sdk, "MANIFEST", manifest):
+            target = sdk.stage_protocol_source()
+        self.assertTrue((target / "src/p2p/p2p.c").is_file())
+        self.assertFalse((target / "src/p2p/p2p.o").exists())
+        self.assertFalse((target / "wpa_supplicant/wpa_supplicant").exists())
+        self.assertFalse((target / "old-driver").exists())
+
+    def test_protocol_stage_rejects_escape_and_cleans_partial_export(self):
+        archive_path = self.root / "protocol.tar.gz"
+        with tarfile.open(str(archive_path), "w:gz") as archive:
+            member = tarfile.TarInfo("protocol-tools/wpa/../../escape.c")
+            member.size = 6
+            archive.addfile(member, io.BytesIO(b"source"))
+        manifest = {"protocol_source": {"archive": "protocol.tar.gz", "sha256": sdk.digest(archive_path), "member_root": "protocol-tools/wpa"}}
+        with mock.patch.object(sdk, "MANIFEST", manifest):
+            with self.assertRaises(RuntimeError):
+                sdk.stage_protocol_source()
+        self.assertFalse((sdk.OUT / "sources/wfd-protocol").exists())
+        self.assertFalse((sdk.OUT / "escape.c").exists())
+
     def test_kernel_config_parser_handles_empty_and_disabled_localversion(self):
         values = sdk.config_values('CONFIG_LOCALVERSION=""\n# CONFIG_LOCALVERSION_AUTO is not set\nBR2_TEST=y\n', prefix="CONFIG_")
         self.assertEqual(values, {"CONFIG_LOCALVERSION": '""', "CONFIG_LOCALVERSION_AUTO": "n"})

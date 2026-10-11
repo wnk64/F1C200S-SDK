@@ -52,3 +52,5 @@ Buildroot总包索引损坏也已修复；olddefconfig后必须仍选中基础�
 `./sdk build bluetooth-audio` 从完整BlueALSA源重编服务、aplay及两个ALSA插件，并从跟踪源重编自动声卡路由。依赖新rootfs的SBC/GLib/D-Bus/BlueZ，安装只进入生成目录，尚不代表板端服务或镜像集成完成。
 
 `./sdk build wireless-modules` 构建成功投屏版本的AIC loader/fdrv、小型RX预分配池、IP5209电源模块和RTL8723BS UART H5模块。使用隔离kernel及原Linaro7.2.1，严格要求5.7.1；AIC运行版和IP5209后续版分别锁定完整源码，不使用未接受的AIC接收路径候选。
+
+`./sdk build wfd-protocol` 从固定SHA256的完整协议归档选择WFD版wpa_supplicant源码，排除历史二进制/对象，并重新编译supplicant、cli和passphrase。保留原WFD/P2P/AP配置，报告记录归档及配置哈希。已主机实编通过，不代表最终运行镜像已完成。
