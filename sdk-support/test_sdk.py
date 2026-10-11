@@ -154,6 +154,10 @@ class OutputSafetyTests(unittest.TestCase):
         sdk.set_config(config, {"CONFIG_A": '"new"', "CONFIG_B": "y"})
         self.assertEqual(config.read_text(), 'CONFIG_C=y\nCONFIG_A="new"\nCONFIG_B=y\n')
 
+    def test_config_reader_preserves_literal_values_and_unset_symbols(self):
+        values = sdk.config_values('BR2_PACKAGE_A=y\n# BR2_PACKAGE_B is not set\nBR2_LITERAL="x=y # literal"\n')
+        self.assertEqual(values, {"BR2_PACKAGE_A": "y", "BR2_PACKAGE_B": "n", "BR2_LITERAL": '"x=y # literal"'})
+
     def test_project_stage_preserves_toolchain_and_uses_locked_archive(self):
         source = self.root / "LVGL/menu"
         source.mkdir(parents=True)

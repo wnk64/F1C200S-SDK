@@ -14,17 +14,33 @@
     "uboot": {
       "path": "UBOOT/u-boot",
       "commit": "fafaf45e96b92155d6b94aa10269d911f0ec3f1b",
+      "export_commit": "c5335a470bf15ef345bc8db886c3f58b10bdf85d",
       "config_sha256": "9b653b9f85a36130a88e19577a28969408bed6256bb96d90babea35de74bf874",
       "artifact": "u-boot-sunxi-with-spl.bin",
       "baseline_sha256": "9114f5f83ba816f0f9378f473c9aaf9141899a2c21aabc0a51ce23b4b204d290",
+      "expected_output_sha256": "71e34730de102099163f014c528ca0656bb1ef5c81fc2756f6a32477cd3cac04",
+      "build_metadata": {
+        "localversion": "-00008-gaf73846-dirty",
+        "source_date_epoch": 1787418595,
+        "timestamp_header": [
+          "#define U_BOOT_DATE \"Aug 22 2026\"",
+          "#define U_BOOT_TIME \"10:08:59\"",
+          "#define U_BOOT_TZ \"-0700\"",
+          "#define U_BOOT_DMI_DATE \"08/22/2026\"",
+          "#define U_BOOT_BUILD_DATE 0x20260822"
+        ]
+      },
       "required_files": ["Makefile", "board/sunxi/sii9022-i2c.c", "arch/arm/dts/suniv-f1c100s-licheepi-nano.dts"]
     },
     "rootfs": {
       "path": "ROOTFS/buildroot-2018.02.11",
-      "commit": "9465767a222f1f299d3800d20275ce4d99153b5d",
+      "commit": "913344087f66cafb70643759cf12c25dcef37e69",
       "config_sha256": "9b7f12245973997e63e4d18f2582e81de6291de771c03864c04a106ebe8c0455",
       "stage_path": "work/ROOTFS/buildroot-2018.02.11",
       "required_files": ["Makefile", "Config.in", "linux/Config.in", "linux/linux.mk", "package/pkg-generic.mk", "support/dependencies/dependencies.sh"],
+      "required_text": {
+        "package/Config.in": ["source \"package/busybox/Config.in\"", "source \"package/skeleton-init-common/Config.in\"", "source \"package/libcedarc/Config.in\"", "source \"package/libcedarx/Config.in\""]
+      },
       "excluded_submodules": {
         "board/licheepi/nano/rootfs_overlay": "bb8f186c26aa6eb2cd42cd09df005ece56c1b5ad"
       }
@@ -50,7 +66,6 @@
     "dtb_sha256": "8ca3cd42bc6c2ebea132d93e8bbe7027f863c66c5edad8540ff5284fc0b996ff"
   },
   "release_blockers": [
-    "The live SD U-Boot hash differs from the current workspace binary; historical source/config correspondence needs recovery.",
     "Current rootfs overlay and runtime application/module install mappings need integration.",
     "AIC source, Wi-Fi Direct supplicant and Bluetooth audio rebuild recipes need locking.",
     "Fresh Buildroot toolchain/rootfs and all applications need clean-build verification.",

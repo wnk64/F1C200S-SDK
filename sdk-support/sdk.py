@@ -7,7 +7,9 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import posixpath
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -19,6 +21,10 @@ OUT = ROOT / ".sdk-output"
 MARKER = ".f1c200s-sdk-output"
 TOKEN = "F1C200S generated SDK output v1\n"
 MANIFEST = json.loads((ROOT / "sdk-support/manifest.json").read_text())
+ROOTFS_REQUIRED_PACKAGES = [
+    "BR2_PACKAGE_BUSYBOX", "BR2_PACKAGE_SKELETON_INIT_COMMON", "BR2_PACKAGE_SKELETON_INIT_SYSV",
+    "BR2_PACKAGE_ALSA_LIB", "BR2_PACKAGE_DROPBEAR", "BR2_PACKAGE_BLUEZ5_UTILS", "BR2_PACKAGE_LIBCEDARC",
+]
 
 
 def digest(path):
@@ -215,6 +221,17 @@ def clean_component(name):
         shutil.rmtree(str(images))
 
 
+def config_values(text):
+    values = {}
+    for line in text.splitlines():
+        if line.startswith("BR2_") and "=" in line:
+            key, value = line.split("=", 1)
+            values[key] = value
+        elif line.startswith("# BR2_") and line.endswith(" is not set"):
+            values[line[2:-11]] = "n"
+    return values
+
+
 def set_config(path, values):
     lines = []
     for line in path.read_text().splitlines():
@@ -369,11 +386,21 @@ def build_rootfs(jobs, sources_only=False):
     env["BR2_DL_DIR"] = str(downloads)
     env["LC_ALL"] = "C"
     run(["make", "olddefconfig"], target, env)
+    selected = config_values((target / ".config").read_text())
+    for key in ROOTFS_REQUIRED_PACKAGES:
+        if selected.get(key) != "y":
+            raise RuntimeError("Required rootfs package disappeared after configuration: " + key)
     run(["make", "-j{}".format(jobs), "source" if sources_only else "all"], target, env)
     if not sources_only:
         artifact = target / "output/images/rootfs.tar"
         if not artifact.is_file():
             raise RuntimeError("Buildroot did not produce the base rootfs archive")
+        with tarfile.open(str(artifact)) as archive:
+            members = {posixpath.normpath(member.name): member for member in archive.getmembers()}
+        for required in ("bin/busybox", "sbin/init", "etc/inittab", "etc/passwd", "etc/shadow",
+                         "usr/sbin/dropbear", "usr/bin/aplay", "usr/libexec/bluetooth/bluetoothd"):
+            if required not in members:
+                raise RuntimeError("Required base rootfs file missing: " + required)
         compiler = target / "output/host/bin/arm-buildroot-linux-gnueabi-gcc"
         images = OUT / "images/rootfs-base"
         images.mkdir(parents=True, exist_ok=True)
@@ -399,7 +426,12 @@ def build_boot(name, jobs):
     env["LC_ALL"] = "C"
     env["KBUILD_BUILD_USER"] = "sdk"
     env["KBUILD_BUILD_HOST"] = "f1c200s"
-    args = ["make", "ARCH=arm", "CROSS_COMPILE=arm-linux-gnueabi-", "LOCALVERSION="]
+    metadata = spec.get("build_metadata", {})
+    localversion = "" if name == "kernel" else metadata.get("localversion", "")
+    args = ["make", "ARCH=arm", "CROSS_COMPILE=arm-linux-gnueabi-", "LOCALVERSION=" + localversion]
+    if metadata:
+        env["SOURCE_DATE_EPOCH"] = str(metadata["source_date_epoch"])
+        args.append("filechk_timestamp.h=printf '%s\\n' " + " ".join(shlex.quote(line) for line in metadata["timestamp_header"]))
     run(args + ["olddefconfig"], target, env)
     if name == "kernel":
         config = (target / ".config").read_text()
@@ -421,8 +453,12 @@ def build_boot(name, jobs):
         path = target / artifact
         if not path.is_file():
             raise RuntimeError("Build did not produce {}".format(path))
-        shutil.copy2(str(path), str(images / path.name))
         results[path.name] = digest(path)
+    if spec.get("expected_output_sha256") and results[Path(spec["artifact"]).name] != spec["expected_output_sha256"]:
+        raise RuntimeError("Rebuilt boot artifact differs from the verified live-board image")
+    for artifact in artifacts:
+        path = target / artifact
+        shutil.copy2(str(path), str(images / path.name))
     report = {"component": name, "source_commit": spec.get("export_commit", spec["commit"]),
               "compiler": capture([str(compiler_bin() / "arm-linux-gnueabi-gcc"), "--version"]),
               "sha256": results, "board_deployed": False, "cold_boots": 0}
