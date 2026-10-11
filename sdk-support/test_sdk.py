@@ -16,6 +16,37 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_runtime_script_relocation_is_narrow_and_requires_known_input(self):
+        content = b'#!/bin/sh\nPLAYER=/root/test/candidates/old/player\nexec "$PLAYER"\n'
+        result = sdk.relocate_runtime_text(content, {"/root/test/candidates/old/player": "/opt/f1/player"})
+        self.assertEqual(result, b'#!/bin/sh\nPLAYER=/opt/f1/player\nexec "$PLAYER"\n')
+        with self.assertRaises(RuntimeError):
+            sdk.relocate_runtime_text(content, {"missing": "new"})
+        with self.assertRaises(RuntimeError):
+            sdk.relocate_runtime_text(content, {})
+
+    def test_runtime_source_plan_checks_shell_and_preserves_source(self):
+        source_root = self.root / "source"
+        source_root.mkdir()
+        content = b'#!/bin/sh\nexec /root/test/candidates/old/player\n'
+        (source_root / "app.sh").write_bytes(content)
+        spec = {"origin": "project", "path": "app.sh", "targets": ["opt/app.sh"], "executable": True,
+                "replacements": {"/root/test/candidates/old/player": "/opt/f1/player"}}
+        with mock.patch.object(sdk.subprocess, "run") as run:
+            entries = sdk.runtime_source_plan({"sources": [spec]}, sdk.OUT / "runtime-payload", {"project": source_root}, set())
+        run.assert_called_once_with(["/bin/sh", "-n"], input=b'#!/bin/sh\nexec /opt/f1/player\n', check=True)
+        self.assertEqual((source_root / "app.sh").read_bytes(), content)
+        self.assertEqual(entries[0][3], sdk.digest(source_root / "app.sh"))
+
+    def test_runtime_resources_cannot_overwrite_compiled_artifact(self):
+        source_root = self.root / "source"
+        source_root.mkdir()
+        (source_root / "asset").write_bytes(b"asset")
+        target = sdk.OUT / "runtime-payload"
+        spec = {"origin": "project", "path": "asset", "targets": ["opt/app"]}
+        with self.assertRaises(RuntimeError):
+            sdk.runtime_source_plan({"sources": [spec]}, target, {"project": source_root}, {target / "opt/app"})
+
     def runtime_fixture(self):
         sdk.check_output(create=True)
         images = sdk.OUT / "images/example"

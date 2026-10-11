@@ -652,6 +652,50 @@ def build_miracast_sink(jobs):
     }, prefix)
 
 
+def runtime_destination(target, relative):
+    destination = target / relative
+    if Path(relative).is_absolute() or ".." in Path(relative).parts or not contained(destination, target):
+        raise RuntimeError("Unsafe runtime destination: " + relative)
+    if destination.is_symlink() or any(parent.is_symlink() for parent in destination.parents if parent == target or target in parent.parents):
+        raise RuntimeError("Symlink in runtime destination: " + relative)
+    return destination
+
+
+def relocate_runtime_text(content, replacements):
+    text = content.decode("utf-8")
+    for old, new in sorted(replacements.items()):
+        if not old or old not in text:
+            raise RuntimeError("Expected runtime relocation input missing: " + old)
+        text = text.replace(old, new)
+    if "/candidates/" in text:
+        raise RuntimeError("Historical candidate path remains in runtime script")
+    return text.encode("utf-8")
+
+
+def runtime_source_plan(layout, target, roots, destinations):
+    entries = []
+    for spec in layout.get("sources", []):
+        root = roots[spec["origin"]]
+        source = root / spec["path"]
+        if Path(spec["path"]).is_absolute() or ".." in Path(spec["path"]).parts or not contained(source, root) or source.is_symlink() or not source.is_file():
+            raise RuntimeError("Unsafe/missing runtime source: " + str(source))
+        if any(parent.is_symlink() for parent in source.parents if parent == root or root in parent.parents):
+            raise RuntimeError("Symlink in runtime source")
+        content = source.read_bytes()
+        source_hash = hashlib.sha256(content).hexdigest()
+        if spec.get("executable") or spec.get("replacements"):
+            content = relocate_runtime_text(content, spec.get("replacements", {}))
+        if spec.get("executable"):
+            subprocess.run(["/bin/sh", "-n"], input=content, check=True)
+        for relative in spec["targets"]:
+            destination = runtime_destination(target, relative)
+            if destination in destinations:
+                raise RuntimeError("Duplicate runtime destination: " + relative)
+            destinations.add(destination)
+            entries.append((spec, destination, content, source_hash))
+    return entries
+
+
 def runtime_payload_plan(layout, target):
     entries = []
     destinations = set()
@@ -661,11 +705,7 @@ def runtime_payload_plan(layout, target):
             raise RuntimeError("Unsafe artifact group")
         report = json.loads((images / "build.json").read_text())
         for name, relative in sorted(artifacts.items()):
-            destination = target / relative
-            if Path(relative).is_absolute() or ".." in Path(relative).parts or not contained(destination, target):
-                raise RuntimeError("Unsafe runtime destination: " + relative)
-            if destination.is_symlink() or any(parent.is_symlink() for parent in destination.parents if parent == target or target in parent.parents):
-                raise RuntimeError("Symlink in runtime destination: " + relative)
+            destination = runtime_destination(target, relative)
             if destination in destinations:
                 raise RuntimeError("Duplicate runtime destination: " + relative)
             destinations.add(destination)
@@ -691,6 +731,12 @@ def build_runtime_payload():
     layout_path = ROOT / "sdk-support/runtime-layout.json"
     layout = json.loads(layout_path.read_text())
     entries = runtime_payload_plan(layout, target)
+    roots = {}
+    if layout.get("sources"):
+        roots["project"] = stage_project_sources()
+        for origin in sorted({spec["origin"] for spec in layout["sources"]} - {"project"}):
+            _, roots[origin], _ = stage(origin)
+    sources = runtime_source_plan(layout, target, roots, {entry[1] for entry in entries})
     target.mkdir(parents=True, exist_ok=True)
     marker.write_text(TOKEN)
     files = {}
@@ -701,7 +747,18 @@ def build_runtime_payload():
         if digest(destination) != expected:
             raise RuntimeError("Installed runtime checksum mismatch")
         files[str(destination.relative_to(target))] = expected
+    provenance = {}
+    for spec, destination, content, source_hash in sources:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(content)
+        destination.chmod(0o755 if spec.get("executable") else 0o644)
+        relative = str(destination.relative_to(target))
+        files[relative] = digest(destination)
+        provenance[relative] = {"origin": spec["origin"], "source_path": spec["path"],
+                                "source_sha256": source_hash, "installed_sha256": files[relative],
+                                "replacements": spec.get("replacements", {})}
     report = {"layout_sha256": digest(layout_path), "files": files,
+              "resource_provenance": provenance,
               "scope": "compiled runtime payload; base rootfs/services/assets/image integration pending",
               "board_deployed": False}
     (OUT / "images/runtime-payload").mkdir(parents=True, exist_ok=True)
