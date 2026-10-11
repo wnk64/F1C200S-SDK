@@ -28,3 +28,7 @@ rootfs-sources 获取/校验基础 Buildroot 依赖；rootfs-base 在隔离目�
 `./sdk clean --component rootfs` 只清基础系统的生成目录，保留其他已编译组件；默认 `./sdk clean` 仍清全部 SDK 生成数据。分组件清理同样检查输出所有权与原提交，拒绝未标记目录。
 
 `python3 sdk-support/audit-buildroot.py` 对比官方精确2018.02.11发行包和现有源码，发行包放在 Buildroot 的 dl 缓存内，SHA256锁定。审计不覆盖定制文件。该工具已用于补回原目录缺失的9个 linux/集成文件；13个现有定制文件保持原样。
+
+`python3 sdk-support/reproduce-uboot.py --source c5335a4` 用完整历史源码、原配置和板端测得的构建版本/时间重编 U-Boot，仅比较隔离产物与板端引导区 SHA256，不写 SD 卡。不同则失败，不认作对应原版。此历史核实必须在其他 SDK 构建结束后运行，共用构建/清理锁。
+
+boot.cmd 来自当前板端启动脚本的文字内容，保留已用的内核/DTB地址、root分区和CMA20M参数。脚本中的旧HDMI参数也先原样保留，不代表实际RGB屏分辨率；最终DTB必须使用已核实的480×800厂商屏参源码。
