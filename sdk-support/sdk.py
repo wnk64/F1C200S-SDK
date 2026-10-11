@@ -191,6 +191,12 @@ def stage(name):
             extract_archive(archive, target)
         if "config_sha256" in spec:
             shutil.copy2(str(config), str(target / ".config"))
+        if spec.get("normalize_crlf"):
+            for path in target.rglob("*"):
+                if path.is_file() and not path.is_symlink() and path.suffix in (".am", ".ac", ".m4", ".sh", ".c", ".cpp", ".h", ".in", ".mk"):
+                    content = path.read_bytes()
+                    if b"\r\n" in content:
+                        path.write_bytes(content.replace(b"\r\n", b"\n"))
         stamp.write_text(commit + "\n")
     except BaseException:
         shutil.rmtree(str(target))
@@ -526,6 +532,7 @@ def build_lan(jobs):
 def build_rootfs(jobs, sources_only=False):
     original, target, spec = stage("rootfs")
     _, cedarc, _ = stage("libcedarc")
+    _, cedarx, _ = stage("libcedarx")
     # The legacy overlay is deliberately not part of this base-rootfs recipe.
     # Current board files are integrated separately, never collected from old payloads.
     set_config(target / ".config", {
@@ -536,8 +543,10 @@ def build_rootfs(jobs, sources_only=False):
         "BR2_PACKAGE_OVERRIDE_FILE": '"$(CONFIG_DIR)/local.mk"',
         "BR2_WGET": '"wget --passive-ftp -nd --timeout=30 --tries=1"',
         "BR2_PACKAGE_LIBDRM": "y",
+        "BR2_PACKAGE_LIBCEDARX": "y",
+        "BR2_PACKAGE_FDK_AAC": "y",
     })
-    (target / "local.mk").write_text("LIBCEDARC_OVERRIDE_SRCDIR = {}\n".format(cedarc))
+    (target / "local.mk").write_text("LIBCEDARC_OVERRIDE_SRCDIR = {}\nLIBCEDARX_OVERRIDE_SRCDIR = {}\n".format(cedarc, cedarx))
     downloads = original / "dl"
     if not contained(downloads, ROOT) or downloads.is_symlink():
         raise RuntimeError("Downloads must reside inside SDK")

@@ -49,6 +49,19 @@
       "path": "SOFTWARE/libcedarc",
       "stage_path": "work/SOFTWARE/libcedarc",
       "commit": "e4246be521203adb2d93d52482239044a7f9b6fe"
+    },
+    "libcedarx": {
+      "path": "SOFTWARE/legacy-LicheePi_Nano/third_party/libcedarx_rhodesepass",
+      "stage_path": "work/SOFTWARE/libcedarx",
+      "commit": "df8763b903ebf17be0491a806a3fff594dd9ab64",
+      "required_files": ["configure.ac", "Makefile.am", "libcore/Makefile.am", "cdx_config.h"],
+      "normalize_crlf": true
+    },
+    "wiliwili": {
+      "path": "LVGL/wiliwili_lvgl",
+      "stage_path": "work/LVGL/wiliwili_lvgl",
+      "commit": "02ee015abfa787e5430d84cf3cf8ce90525add93",
+      "required_files": ["board_linux/Makefile", "board_linux/build-curl.sh", "board_linux/platform_linux.cpp"]
     }
   },
   "project_sources": {
