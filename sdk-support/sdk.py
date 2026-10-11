@@ -652,6 +652,39 @@ def build_miracast_sink(jobs):
     }, prefix)
 
 
+def build_runtime_tools(jobs):
+    work, _, prefix, env = app_environment()
+    network = work / "SCRCPT/network-and-audio-source"
+    sources = {
+        "f1-rtc-time-ui": network / "rtc_time_20261003/f1-rtc-time.c",
+        "f1-ip-config": network / "static_ip_20261004/f1-ip-config.c",
+    }
+    generated = OUT / "runtime-tools-build"
+    generated.mkdir(parents=True, exist_ok=True)
+    outputs = {}
+    for name, source in sources.items():
+        if not source.is_file():
+            raise RuntimeError("Missing runtime tool source: " + str(source))
+        output = generated / name
+        run([prefix + "gcc", "-Os", "-march=armv5te", "-std=gnu99", "-Wall", "-Wextra", "-Werror",
+             source, "-o", output], env=env)
+        run(["gcc", "-Os", "-std=gnu99", "-Wall", "-Wextra", "-Werror", source,
+             "-o", generated / (name + ".host")], env=env)
+        outputs[name] = output
+    run([generated / "f1-rtc-time-ui.host", "--selftest"], env=env)
+    run([generated / "f1-ip-config.host", "validate", "static", "10.0.0.234/24", "10.0.0.1", "10.0.0.1"], env=env)
+    invalid = [
+        ["static", "10.0.0.234/33", "10.0.0.1", "10.0.0.1"],
+        ["static", "10.0.0.234/24", "192.168.1.1", "10.0.0.1"],
+        ["static", "not-an-ip/24", "10.0.0.1", "10.0.0.1"],
+    ]
+    for arguments in invalid:
+        result = subprocess.run([str(generated / "f1-ip-config.host"), "validate"] + arguments, env=env)
+        if result.returncode != 3:
+            raise RuntimeError("IP validation failed to reject invalid configuration")
+    publish_apps("runtime-tools", outputs, prefix)
+
+
 def stage_protocol_source():
     spec = MANIFEST["protocol_source"]
     archive_path = ROOT / spec["archive"]
@@ -886,7 +919,7 @@ def main():
     inspect = sub.add_parser("doctor")
     inspect.add_argument("--release", action="store_true")
     build = sub.add_parser("build")
-    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio", "wireless-modules", "wfd-protocol"], default="all", nargs="?")
+    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio", "wireless-modules", "wfd-protocol", "runtime-tools"], default="all", nargs="?")
     build.add_argument("-j", "--jobs", type=int, default=8)
     clean = sub.add_parser("clean")
     clean.add_argument("--component", choices=sorted(MANIFEST["components"]))
@@ -944,6 +977,9 @@ def main():
             return 0
         if args.component == "wfd-protocol":
             build_wfd_protocol(args.jobs)
+            return 0
+        if args.component == "runtime-tools":
+            build_runtime_tools(args.jobs)
             return 0
         build_boot(args.component, args.jobs)
         return 0
