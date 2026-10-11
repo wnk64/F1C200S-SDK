@@ -3,6 +3,12 @@
   "release_ready": false,
   "kernel_release": "5.7.1",
   "components": {
+    "miracast-sink": {
+      "path": "SOFTWARE/miracast-sink",
+      "stage_path": "work/SOFTWARE/miracast-sink",
+      "commit": "ab5c7635cf0753dbb43a6b1a5a6ba8e5456787ee",
+      "required_files": ["Makefile.sink", "miracast_sink_dump.c", "wfd_audio.c", "wfd_lpcm.c", "wfd_video.c", "wfd_rx.h", "wfd_loss.h"]
+    },
     "kernel": {
       "path": "KERNEL/linux-5.7.1",
       "commit": "b3d8ed3f8ea093c870e441b7e3020120d5556082",

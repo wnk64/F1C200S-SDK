@@ -43,4 +43,8 @@ Buildroot总包索引损坏也已修复；olddefconfig后必须仍选中基础�
 
 新增独立目标：`./sdk build ons` 构建完整无SDL的GBK引擎整数版及目录浏览器，Ogg/Vorbis/bzip2/Tremor依赖均由本地跟踪源重编，引擎快照必须逐文件匹配已有校验清单；`./sdk build retro-cores` 构建GBA/PS1/MD三个ARMv5 libretro核心，未包含游戏资源。以上目标已主机实编通过，尚未部署回归。
 
-`./sdk build lan` 构建网页传输界面/HTTP服务和DLNA renderer，仅在应用打开后启动服务的策略由后续运行脚本整合，构建不代表服务常驻。该目标正在首次实编验证。
+`./sdk build lan` 构建网页传输界面/HTTP服务和DLNA renderer，仅在应用打开后启动服务的策略由后续运行脚本整合，构建不代表服务常驻。该目标已主机实编通过，尚未实机验收。
+
+`./sdk build media-backends` 已实编通过Cedar硬解播放器、无SDL MPlayer、wiliwili界面及网络播放后端。构建仅在生成目录执行，未部署板子。
+
+`./sdk build miracast-sink` 从锁定的完整接收器Git源码重编FIFO/音频接收器，使用SDK新Buildroot工具链及ALSA，不复制历史二进制。它尚不包含AIC模块、WFD协议工具与启动服务整合。

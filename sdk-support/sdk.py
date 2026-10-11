@@ -594,6 +594,16 @@ def build_media_backends(jobs):
                                    "cedar-net-player": wili / "board_linux/build-arm/cedar-net-player"}, prefix)
 
 
+def build_miracast_sink(jobs):
+    _, host, prefix, env = app_environment()
+    _, source, _ = stage("miracast-sink")
+    run(["make", "-f", "Makefile.sink", "-B", "-j{}".format(jobs),
+         "CROSS_COMPILE=" + prefix, "TARGET=miracast_sink_dump.lowest.brarm"], source, env)
+    publish_apps("miracast-sink", {
+        "miracast_sink_dump.lowest.brarm": source / "miracast_sink_dump.lowest.brarm"
+    }, prefix)
+
+
 def build_rootfs(jobs, sources_only=False):
     original, target, spec = stage("rootfs")
     _, cedarc, _ = stage("libcedarc")
@@ -736,7 +746,7 @@ def main():
     inspect = sub.add_parser("doctor")
     inspect.add_argument("--release", action="store_true")
     build = sub.add_parser("build")
-    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends"], default="all", nargs="?")
+    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink"], default="all", nargs="?")
     build.add_argument("-j", "--jobs", type=int, default=8)
     clean = sub.add_parser("clean")
     clean.add_argument("--component", choices=sorted(MANIFEST["components"]))
@@ -782,6 +792,9 @@ def main():
             return 0
         if args.component == "media-backends":
             build_media_backends(args.jobs)
+            return 0
+        if args.component == "miracast-sink":
+            build_miracast_sink(args.jobs)
             return 0
         build_boot(args.component, args.jobs)
         return 0

@@ -253,6 +253,20 @@ class OutputSafetyTests(unittest.TestCase):
                 sdk.stage_project_sources()
         self.assertEqual((generated / "source.c").read_text(), "preserve")
 
+    def test_sink_build_uses_locked_source_and_new_toolchain(self):
+        source = self.root / "sink"
+        host = self.root / "host"
+        prefix = str(host / "bin/arm-buildroot-linux-gnueabi-")
+        env = {"LC_ALL": "C"}
+        with mock.patch.object(sdk, "app_environment", return_value=(self.root, host, prefix, env)), mock.patch.object(sdk, "stage", return_value=(source, source, {})) as stage, mock.patch.object(sdk, "run") as run, mock.patch.object(sdk, "publish_apps") as publish:
+            sdk.build_miracast_sink(2)
+        stage.assert_called_once_with("miracast-sink")
+        command = run.call_args[0][0]
+        self.assertIn("-B", command)
+        self.assertIn("CROSS_COMPILE=" + prefix, command)
+        self.assertEqual(run.call_args[0][1:], (source, env))
+        publish.assert_called_once_with("miracast-sink", {"miracast_sink_dump.lowest.brarm": source / "miracast_sink_dump.lowest.brarm"}, prefix)
+
     def test_stage_rejects_code_change_without_deleting_previous_build(self):
         source = self.root / "active-source"
         source.mkdir()
