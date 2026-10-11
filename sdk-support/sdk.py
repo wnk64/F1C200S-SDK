@@ -282,8 +282,25 @@ def stage_project_sources():
     stamps.mkdir(exist_ok=True)
     stamp = stamps / "project-sources.json"
     if stamp.exists():
-        if stamp.is_symlink() or json.loads(stamp.read_text()) != spec:
+        if stamp.is_symlink():
             raise RuntimeError("Project source lock changed; clean SDK output before restaging")
+        previous = json.loads(stamp.read_text())
+        if previous != spec:
+            if previous["paths"] != spec["paths"] or previous["commit"] != spec.get("source_additions_from"):
+                raise RuntimeError("Unreviewed project source migration")
+            changed = set(capture(["git", "-c", "core.quotepath=false", "diff", "--name-only", previous["commit"], spec["commit"], "--"] + spec["paths"], ROOT).splitlines())
+            added = set(capture(["git", "-c", "core.quotepath=false", "diff", "--diff-filter=A", "--name-only", previous["commit"], spec["commit"], "--"] + spec["paths"], ROOT).splitlines())
+            if not changed or changed != added or changed != set(spec.get("source_additions", [])):
+                raise RuntimeError("Project migration exceeds reviewed missing source additions")
+            for relative in changed:
+                destination = work / relative
+                if not contained(destination, work) or destination.exists() or destination.is_symlink():
+                    raise RuntimeError("Refusing to overwrite existing staged source: " + relative)
+            with tempfile.TemporaryFile() as archive:
+                subprocess.run(["git", "archive", spec["commit"]] + sorted(changed), cwd=str(ROOT), stdout=archive, check=True)
+                archive.seek(0)
+                extract_archive(archive, work)
+            stamp.write_text(json.dumps(spec, indent=2) + "\n")
         return work
     for relative in spec["paths"]:
         if (work / relative).exists() or (work / relative).is_symlink():

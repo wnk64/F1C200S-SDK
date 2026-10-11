@@ -74,7 +74,20 @@
     }
   },
   "project_sources": {
-    "commit": "8b521e2a476c1f2cff9f0876862ad39310a7ab8a",
+    "commit": "2f1d6274cd1fb2da418910eeb585437560aeca67",
+    "source_additions_from": "8b521e2a476c1f2cff9f0876862ad39310a7ab8a",
+    "source_additions": [
+      "SOFTWARE/mplayer-cedar/ffmpeg/compat/avisynth/avs/config.h",
+      "SOFTWARE/mplayer-cedar/ffmpeg/libavcodec/version.h",
+      "SOFTWARE/mplayer-cedar/ffmpeg/libavdevice/version.h",
+      "SOFTWARE/mplayer-cedar/ffmpeg/libavfilter/version.h",
+      "SOFTWARE/mplayer-cedar/ffmpeg/libavformat/version.h",
+      "SOFTWARE/mplayer-cedar/ffmpeg/libavresample/version.h",
+      "SOFTWARE/mplayer-cedar/ffmpeg/libavutil/version.h",
+      "SOFTWARE/mplayer-cedar/ffmpeg/libpostproc/version.h",
+      "SOFTWARE/mplayer-cedar/ffmpeg/libswresample/version.h",
+      "SOFTWARE/mplayer-cedar/ffmpeg/libswscale/version.h"
+    ],
     "paths": [
       "LVGL/menu", "LVGL/touch", "LVGL/media_player", "LVGL/reader",
       "LVGL/ons_native", "LVGL/sfc_native", "LVGL/retro_native",
