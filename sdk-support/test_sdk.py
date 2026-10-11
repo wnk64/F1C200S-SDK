@@ -16,6 +16,18 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_dhcp_config_generation_preserves_original_and_is_repeatable(self):
+        source = self.root / "package/busybox/busybox.config"
+        source.parent.mkdir(parents=True)
+        original = b'CONFIG_SH_IS_ASH=y\n# CONFIG_UDHCPD is not set\n'
+        source.write_bytes(original)
+        self.assertTrue(sdk.prepare_busybox_config(self.root))
+        self.assertFalse(sdk.prepare_busybox_config(self.root))
+        self.assertEqual(source.read_bytes(), original)
+        generated = sdk.config_values((self.root / "sdk-busybox.config").read_text(), prefix="CONFIG_")
+        self.assertEqual(generated["CONFIG_UDHCPD"], "y")
+        self.assertEqual(generated["CONFIG_SH_IS_ASH"], "y")
+
     def test_runtime_plan_aliases_share_verified_artifact(self):
         target, layout = self.runtime_fixture()
         layout["artifacts"]["example"]["app"] = ["opt/app", "opt/app-compatible"]

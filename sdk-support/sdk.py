@@ -961,10 +961,20 @@ def build_bluetooth_audio(jobs):
     }, prefix)
 
 
+def prepare_busybox_config(target):
+    source = target / "package/busybox/busybox.config"
+    output = target / "sdk-busybox.config"
+    previous = output.read_bytes() if output.is_file() else None
+    shutil.copy2(str(source), str(output))
+    set_config(output, {"CONFIG_UDHCPD": "y"})
+    return previous != output.read_bytes()
+
+
 def build_rootfs(jobs, sources_only=False):
     original, target, spec = stage("rootfs")
     _, cedarc, _ = stage("libcedarc")
     _, cedarx, _ = stage("libcedarx")
+    busybox_changed = prepare_busybox_config(target)
     # The legacy overlay is deliberately not part of this base-rootfs recipe.
     # Current board files are integrated separately, never collected from old payloads.
     set_config(target / ".config", {
@@ -973,6 +983,7 @@ def build_rootfs(jobs, sources_only=False):
         "BR2_ROOTFS_POST_FAKEROOT_SCRIPT": '""',
         "BR2_ROOTFS_POST_IMAGE_SCRIPT": '""',
         "BR2_PACKAGE_OVERRIDE_FILE": '"$(CONFIG_DIR)/local.mk"',
+        "BR2_PACKAGE_BUSYBOX_CONFIG": '"$(CONFIG_DIR)/sdk-busybox.config"',
         "BR2_WGET": '"wget --passive-ftp -nd --timeout=30 --tries=1"',
         "BR2_PACKAGE_LIBDRM": "y",
         "BR2_PACKAGE_LIBCEDARX": "y",
@@ -992,6 +1003,8 @@ def build_rootfs(jobs, sources_only=False):
     for key in ROOTFS_REQUIRED_PACKAGES:
         if selected.get(key) != "y":
             raise RuntimeError("Required rootfs package disappeared after configuration: " + key)
+    if not sources_only and busybox_changed and (target / "output/build/busybox-1.27.2/.stamp_configured").is_file():
+        run(["make", "busybox-reconfigure"], target, env)
     run(["make", "-j{}".format(jobs), "source" if sources_only else "all"], target, env)
     if not sources_only:
         artifact = target / "output/images/rootfs.tar"
@@ -1000,7 +1013,7 @@ def build_rootfs(jobs, sources_only=False):
         with tarfile.open(str(artifact)) as archive:
             members = {posixpath.normpath(member.name): member for member in archive.getmembers()}
         for required in ("bin/busybox", "sbin/init", "etc/inittab", "etc/passwd", "etc/shadow",
-                         "usr/sbin/dropbear", "usr/bin/aplay", "usr/libexec/bluetooth/bluetoothd"):
+                         "usr/sbin/dropbear", "usr/sbin/udhcpd", "usr/bin/aplay", "usr/libexec/bluetooth/bluetoothd"):
             if required not in members:
                 raise RuntimeError("Required base rootfs file missing: " + required)
         compiler = target / "output/host/bin/arm-buildroot-linux-gnueabi-gcc"
@@ -1008,6 +1021,7 @@ def build_rootfs(jobs, sources_only=False):
         images.mkdir(parents=True, exist_ok=True)
         report = {"source_commit": spec["commit"], "input_config_sha256": spec["config_sha256"],
                   "effective_config_sha256": digest(target / ".config"),
+                  "busybox_config_sha256": digest(target / "sdk-busybox.config"),
                   "rootfs_tar_sha256": digest(artifact), "rootfs_tar_bytes": artifact.stat().st_size,
                   "compiler": capture([compiler, "--version"]),
                   "scope": "base system only; runtime integration pending", "board_deployed": False}
