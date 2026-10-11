@@ -772,7 +772,9 @@ def runtime_payload_plan(layout, target):
         if not contained(images, OUT) or images.is_symlink():
             raise RuntimeError("Unsafe artifact group")
         report = json.loads((images / "build.json").read_text())
-        for name, relative in sorted(artifacts.items()):
+        targets = [(name, relative) for name, paths in artifacts.items()
+                   for relative in (paths if isinstance(paths, list) else [paths])]
+        for name, relative in sorted(targets):
             destination = runtime_destination(target, relative)
             if destination in destinations:
                 raise RuntimeError("Duplicate runtime destination: " + relative)

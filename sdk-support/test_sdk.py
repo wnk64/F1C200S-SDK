@@ -16,6 +16,15 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_runtime_plan_aliases_share_verified_artifact(self):
+        target, layout = self.runtime_fixture()
+        layout["artifacts"]["example"]["app"] = ["opt/app", "opt/app-compatible"]
+        plan = sdk.runtime_payload_plan(layout, target)
+        self.assertEqual(len(plan), 2)
+        self.assertEqual(plan[0][0], plan[1][0])
+        self.assertEqual(plan[0][2], plan[1][2])
+        self.assertEqual({entry[1] for entry in plan}, {target / "opt/app", target / "opt/app-compatible"})
+
     def test_runtime_plan_includes_complete_kernel_module_report(self):
         target, layout = self.runtime_fixture()
         images = sdk.OUT / "images/kernel-runtime"
