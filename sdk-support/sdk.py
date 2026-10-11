@@ -652,6 +652,60 @@ def build_miracast_sink(jobs):
     }, prefix)
 
 
+def stage_protocol_source():
+    spec = MANIFEST["protocol_source"]
+    archive_path = ROOT / spec["archive"]
+    if not contained(archive_path, ROOT) or archive_path.is_symlink() or digest(archive_path) != spec["sha256"]:
+        raise RuntimeError("Protocol source archive checksum/path mismatch")
+    check_output(create=True)
+    target = OUT / "sources/wfd-protocol"
+    stamp = target / ".sdk-source-commit"
+    if target.exists():
+        if target.is_symlink() or stamp.is_symlink() or not stamp.is_file() or stamp.read_text().strip() != spec["sha256"]:
+            raise RuntimeError("Unowned or changed protocol stage")
+        return target
+    target.mkdir(parents=True)
+    try:
+        with tarfile.open(str(archive_path)) as archive:
+            root = spec["member_root"] + "/"
+            for member in archive.getmembers():
+                if not member.name.startswith(root):
+                    continue
+                relative = member.name[len(root):]
+                if not relative or member.isdir():
+                    continue
+                destination = target / relative
+                if not contained(destination, target) or ".." in Path(relative).parts or not member.isfile():
+                    raise RuntimeError("Unsafe protocol archive member: " + member.name)
+                if Path(relative).suffix in (".o", ".d", ".a", ".so") or Path(relative).name in ("wpa_supplicant", "wpa_cli", "wpa_passphrase"):
+                    continue
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                with archive.extractfile(member) as stream, destination.open("wb") as output:
+                    shutil.copyfileobj(stream, output)
+        for relative in ("wpa_supplicant/Makefile", "wpa_supplicant/.config", "src/p2p/p2p.c"):
+            if not (target / relative).is_file():
+                raise RuntimeError("Protocol source missing: " + relative)
+        stamp.write_text(spec["sha256"] + "\n")
+    except BaseException:
+        shutil.rmtree(str(target))
+        raise
+    return target
+
+
+def build_wfd_protocol(jobs):
+    _, host, prefix, env = app_environment()
+    source = stage_protocol_source()
+    directory = source / "wpa_supplicant"
+    sysroot = host / "arm-buildroot-linux-gnueabi/sysroot"
+    env.update({"PKG_CONFIG_SYSROOT_DIR": str(sysroot),
+                "PKG_CONFIG_LIBDIR": str(sysroot / "usr/lib/pkgconfig"),
+                "PKG_CONFIG": str(host / "bin/pkg-config")})
+    run(["make", "-B", "-j{}".format(jobs), "CC=" + prefix + "gcc",
+         "CFLAGS=-Os -march=armv5te -I" + str(sysroot / "usr/include/libnl3"),
+         "LDFLAGS=-L" + str(sysroot / "usr/lib"), "wpa_supplicant", "wpa_cli", "wpa_passphrase"], directory, env)
+    publish_apps("wfd-protocol", {name: directory / name for name in ("wpa_supplicant", "wpa_cli", "wpa_passphrase")}, prefix)
+
+
 def build_bluetooth_audio(jobs):
     work, host, prefix, env = app_environment()
     _, source, _ = stage("bluealsa")
@@ -826,7 +880,7 @@ def main():
     inspect = sub.add_parser("doctor")
     inspect.add_argument("--release", action="store_true")
     build = sub.add_parser("build")
-    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio", "wireless-modules"], default="all", nargs="?")
+    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio", "wireless-modules", "wfd-protocol"], default="all", nargs="?")
     build.add_argument("-j", "--jobs", type=int, default=8)
     clean = sub.add_parser("clean")
     clean.add_argument("--component", choices=sorted(MANIFEST["components"]))
@@ -881,6 +935,9 @@ def main():
             return 0
         if args.component == "wireless-modules":
             build_wireless_modules(args.jobs)
+            return 0
+        if args.component == "wfd-protocol":
+            build_wfd_protocol(args.jobs)
             return 0
         build_boot(args.component, args.jobs)
         return 0

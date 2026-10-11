@@ -1,5 +1,10 @@
 {
   "schema": 1,
+  "protocol_source": {
+    "archive": "SCRCPT/miracast-source-runtime/snapshot-20261002/sources/protocol-tools.tar.gz",
+    "sha256": "274cd479e49be7488a87242c702e653de82e29590093b99d226b7307a48bef4d",
+    "member_root": "protocol-tools/wpa_supplicant_2_4_aic_wfd"
+  },
   "release_ready": false,
   "kernel_release": "5.7.1",
   "components": {
