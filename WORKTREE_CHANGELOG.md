@@ -36,7 +36,7 @@ Source import commit931c3e9a91ff152db92ae6f82108bca838d41ba8 adds exactly9 files
 Build: SDK fresh configuration/source-acquisition retry pending after source-lock update. No board deployment or cold-boot test. This establishes source completeness, not final image acceptance.
 
 ## 2026-10-11 / Planned / Repair overwritten target package index
-Evidence: package/Config.in is13 lines defining onlyCedarX, replacing the official2017-line target package index. Original.config still contains BusyBox/skeleton/ALSA/SSH package selections; olddefconfig drops them because their symbols are absent. The5MiB target lacks passwd/shadow; stock skeleton source files exist and are tracked/exported correctly.
+Evidence: package/Config.in is13 lines containing onlyRTL8723DS/libnl/hostapd fragments, replacing the official2017-line target package index. Original.config still contains BusyBox/skeleton/ALSA/SSH package selections; olddefconfig drops them because their symbols are absent. The5MiB target lacks passwd/shadow; stock skeleton source files exist and are tracked/exported correctly.
 Files: package/Config.in restored from the exact verified2018.02.11 upstream source, plus explicit libcedarc/libcedarx Config.in includes. Preserve all other customized files and current.config/output/overlay changes.
 Hypothesis: full package-index restoration preserves intended original package selections and enables skeleton installation/rootfs image generation.
 Build: isolated SDK only. Reuse already built identical toolchain after verifying toolchain-related Kconfig values remain unchanged; rerun original9b7f1224 config with the repaired index. No original output cleanup.
