@@ -62,6 +62,15 @@
       "stage_path": "work/LVGL/wiliwili_lvgl",
       "commit": "02ee015abfa787e5430d84cf3cf8ce90525add93",
       "required_files": ["board_linux/Makefile", "board_linux/build-curl.sh", "board_linux/platform_linux.cpp"]
+    },
+    "cedar-player": {
+      "path": "SOFTWARE/cedar-player",
+      "stage_path": "work/SOFTWARE/cedar-player",
+      "commit": "a1f4615ae9192a776a34f48a7a6cd41f01f5d5a4",
+      "export_commit": "5685c636bc9bd81b529376911caf1da121d038aa",
+      "required_files": ["player-src/main.c", "player-src/render/mediaplayer.c", "player-src/driver/drm_warpper.c"],
+      "preserved_artifact_changes": ["player-src/cedar_drm_player", "player-src/main.o", "player-src/driver/drm_warpper.o", "player-src/render/mediaplayer.o"],
+      "exclude_export_files": ["player-src/cedar_drm_player", "player-src/main.o", "player-src/driver/drm_warpper.o", "player-src/render/mediaplayer.o", "player-src/utils/log.o", "player-src/utils/misc.o", "player-src/utils/spsc_queue.o"]
     }
   },
   "project_sources": {

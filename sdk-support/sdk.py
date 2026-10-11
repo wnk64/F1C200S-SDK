@@ -84,7 +84,7 @@ def validate_source(name):
         entry = capture(["git", "ls-files", "--stage", "--", submodule], path)
         if entry != "160000 {} 0\t{}".format(commit, submodule):
             raise RuntimeError("Excluded legacy submodule reference changed: {}".format(submodule))
-    if changed - set(excluded):
+    if changed - set(excluded) - set(spec.get("preserved_artifact_changes", [])):
         raise RuntimeError("Tracked source differs from locked commit: {}".format(name))
     if "config_sha256" in spec and digest(path / ".config") != spec["config_sha256"]:
         raise RuntimeError("Configuration hash mismatch: {}".format(name))
@@ -189,6 +189,14 @@ def stage(name):
                            stdout=archive, check=True)
             archive.seek(0)
             extract_archive(archive, target)
+        for relative in spec.get("exclude_export_files", []):
+            path = target / relative
+            if not contained(path, target) or path.is_symlink():
+                raise RuntimeError("Unsafe excluded generated artifact")
+            if path.exists():
+                if not path.is_file():
+                    raise RuntimeError("Excluded artifact is not a file")
+                path.unlink()
         if "config_sha256" in spec:
             shutil.copy2(str(config), str(target / ".config"))
         if spec.get("normalize_crlf"):
@@ -529,6 +537,32 @@ def build_lan(jobs):
     publish_apps("lan", {"lan-ui": directory / "lan-ui", "gmediarender": directory / "vendor/gmrender/src/gmediarender"}, prefix)
 
 
+def build_media_backends(jobs):
+    work, host, prefix, env = app_environment()
+    _, player, _ = stage("cedar-player")
+    _, wili, _ = stage("wiliwili")
+    sysroot = Path(capture([prefix + "gcc", "--print-sysroot"]))
+    target = work / "ROOTFS/buildroot-2018.02.11/output/target"
+    for name in ("libcdx_parser.so", "libcdx_stream.so", "libcdx_base.so", "libcdx_common.so", "libfdk-aac.so"):
+        if not (target / "usr/lib" / name).is_file():
+            raise RuntimeError("Build rootfs with CedarX/AAC first: " + name)
+    source = player / "player-src"
+    cflags = "--sysroot={} -Os -Wall -Wextra -Wno-unused-parameter -D_GNU_SOURCE -DHAVE_CEDARX=1 -I. -I{} -I{} -I{} -MMD -MP".format(
+        sysroot, sysroot / "usr/include", sysroot / "usr/include/drm", work / "SOFTWARE/libcedarx")
+    run(["make", "-j{}".format(jobs), "CROSS_COMPILE=" + prefix, "SYSROOT=" + str(sysroot),
+         "TARGET_DIR=" + str(target), "CFLAGS=" + cflags, "cedar_drm_player"], source, env)
+    env["JOBS"] = str(jobs)
+    run(["sh", "build-nosdl.sh"], work / "SOFTWARE/mplayer-cedar", env)
+    env["SDK"] = str(host)
+    run(["sh", "build-curl.sh"], wili / "board_linux", env)
+    run(["make", "-j{}".format(jobs), "SDK=" + str(host), "PLAYER_SRC=" + str(source),
+         "build-arm/wiliwili-lvgl", "net-player"], wili / "board_linux", env)
+    publish_apps("media-backends", {"cedar_drm_player": source / "cedar_drm_player",
+                                   "mplayer-native": work / "SOFTWARE/mplayer-cedar/mplayer",
+                                   "wiliwili-lvgl": wili / "board_linux/build-arm/wiliwili-lvgl",
+                                   "cedar-net-player": wili / "board_linux/build-arm/cedar-net-player"}, prefix)
+
+
 def build_rootfs(jobs, sources_only=False):
     original, target, spec = stage("rootfs")
     _, cedarc, _ = stage("libcedarc")
@@ -669,7 +703,7 @@ def main():
     inspect = sub.add_parser("doctor")
     inspect.add_argument("--release", action="store_true")
     build = sub.add_parser("build")
-    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan"], default="all", nargs="?")
+    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends"], default="all", nargs="?")
     build.add_argument("-j", "--jobs", type=int, default=8)
     clean = sub.add_parser("clean")
     clean.add_argument("--component", choices=sorted(MANIFEST["components"]))
@@ -712,6 +746,9 @@ def main():
             return 0
         if args.component == "lan":
             build_lan(args.jobs)
+            return 0
+        if args.component == "media-backends":
+            build_media_backends(args.jobs)
             return 0
         build_boot(args.component, args.jobs)
         return 0
