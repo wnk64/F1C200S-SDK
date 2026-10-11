@@ -51,9 +51,9 @@ def main():
             raise RuntimeError("Source repository is not at the reviewed new commit")
         if sdk.capture(["git", "diff", "--name-only", "HEAD", "--", "package/Config.in"], original):
             raise RuntimeError("Package index has uncommitted changes")
-        changed = set(sdk.capture(["git", "diff", "--name-only", old_commit, args.commit], original).splitlines())
+        changed = set(sdk.capture(["git", "-c", "core.quotepath=false", "diff", "--name-only", old_commit, args.commit], original).splitlines())
         if not changed or changed - ALLOWED:
-            raise RuntimeError("Source changes exceed the reviewed package-index/record repair")
+            raise RuntimeError("Source changes exceed the reviewed package-index/record repair: " + repr(sorted(changed)))
         index = target / "package/Config.in"
         old_index = index.read_bytes()
         old_config = (target / ".config").read_text()

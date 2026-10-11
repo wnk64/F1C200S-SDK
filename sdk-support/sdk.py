@@ -71,7 +71,7 @@ def validate_source(name):
         for text in required:
             if text not in content:
                 raise RuntimeError("Required source index entry missing in {}: {}".format(relative, text))
-    changed = set(capture(["git", "diff", "--name-only", "HEAD", "--"], path).splitlines())
+    changed = set(capture(["git", "-c", "core.quotepath=false", "diff", "--name-only", "HEAD", "--"], path).splitlines())
     excluded = spec.get("excluded_submodules", {})
     for submodule, commit in excluded.items():
         entry = capture(["git", "ls-files", "--stage", "--", submodule], path)
@@ -165,7 +165,7 @@ def stage(name):
         if previous != commit:
             if not re.fullmatch("[0-9a-f]{40}", previous):
                 raise RuntimeError("Invalid staged source stamp")
-            changed = capture(["git", "diff", "--name-only", previous, commit], source).splitlines()
+            changed = capture(["git", "-c", "core.quotepath=false", "diff", "--name-only", previous, commit], source).splitlines()
             if set(changed) - {"WORKTREE_CHANGELOG.md", "变更记录.md"}:
                 raise RuntimeError("Staged code changed; clean this component before rebuilding")
             if changed:
@@ -236,7 +236,7 @@ def stage_project_sources():
         if not contained(path, ROOT) or path.is_symlink() or not path.is_dir():
             raise RuntimeError("Invalid project source directory: " + relative)
         capture(["git", "cat-file", "-e", spec["commit"] + ":" + relative], ROOT)
-    changed = set(capture(["git", "diff", "--name-only", spec["commit"], "--"] + spec["paths"], ROOT).splitlines())
+    changed = set(capture(["git", "-c", "core.quotepath=false", "diff", "--name-only", spec["commit"], "--"] + spec["paths"], ROOT).splitlines())
     if changed - set(spec.get("unused_artifact_changes", [])):
         raise RuntimeError("Project source changed since locked snapshot: " + ", ".join(sorted(changed)))
     check_output(create=True)
