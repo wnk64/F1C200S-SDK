@@ -367,6 +367,116 @@ def build_app_ui(jobs):
     print(json.dumps(report, indent=2), flush=True)
 
 
+def app_environment():
+    work = stage_project_sources()
+    host = work / "ROOTFS/buildroot-2018.02.11/output/host"
+    prefix = str(host / "bin/arm-buildroot-linux-gnueabi-")
+    if not Path(prefix + "gcc").is_file():
+        raise RuntimeError("Build the isolated rootfs/toolchain first")
+    env = os.environ.copy()
+    env["PATH"] = str(host / "bin") + os.pathsep + env.get("PATH", "")
+    env["LC_ALL"] = "C"
+    return work, host, prefix, env
+
+
+def publish_apps(group, files, prefix):
+    images = OUT / "images" / group
+    images.mkdir(parents=True, exist_ok=True)
+    results = {}
+    for name, path in sorted(files.items()):
+        path = Path(path)
+        if not path.is_file() or not contained(path, OUT):
+            raise RuntimeError("Missing or invalid application artifact: " + str(path))
+        header = capture([prefix + "readelf", "-h", path])
+        if "Machine:" not in header or "ARM" not in header:
+            raise RuntimeError("Application is not an ARM ELF: " + str(path))
+        dependencies = capture([prefix + "readelf", "-d", path])
+        if "SDL" in dependencies:
+            raise RuntimeError("Unexpected SDL dependency: " + str(path))
+        run([prefix + "strip", path])
+        shutil.copy2(str(path), str(images / name))
+        results[name] = {"sha256": digest(path), "bytes": path.stat().st_size,
+                         "dynamic_dependencies": dependencies}
+    report = {"source_commit": MANIFEST["project_sources"]["commit"],
+              "artifacts": results, "board_deployed": False}
+    (images / "build.json").write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps(report, indent=2), flush=True)
+
+
+def relocate_ons_baseline(directory):
+    baseline = directory / "source-baseline.sha256"
+    locked = baseline.read_text(encoding="ascii").splitlines()
+    lines = []
+    for line in locked:
+        expected, filename = line.split(None, 1)
+        candidate = directory / "vendor/ONScripter-GBK" / Path(filename).name
+        if not contained(candidate, directory / "vendor/ONScripter-GBK") or candidate.is_symlink():
+            raise RuntimeError("Unsafe ONS baseline source")
+        if digest(candidate) != expected:
+            raise RuntimeError("Vendored ONS baseline differs: " + candidate.name)
+        lines.append(expected + "  vendor/ONScripter-GBK/" + candidate.name)
+    baseline.write_text("\n".join(lines) + "\n", encoding="ascii")
+
+
+def build_ons(jobs):
+    work, host, prefix, env = app_environment()
+    directory = work / "LVGL/ons_native"
+    relocate_ons_baseline(directory)
+    ext = directory / "build/extlib"
+    ext.mkdir(parents=True, exist_ok=True)
+    lib = ext / "lib"
+    include = ext / "include"
+    lib.mkdir(exist_ok=True)
+    include.mkdir(exist_ok=True)
+    common = ["make", "-j{}".format(jobs), "CC=" + prefix + "gcc", "CXX=" + prefix + "g++",
+              "AR=" + prefix + "ar", "RANLIB=" + prefix + "ranlib"]
+    bzip = directory / "vendor/extlib-src/bzip2-1.0.8"
+    run(common + ["CFLAGS=-O2 -ffunction-sections -fdata-sections -D_FILE_OFFSET_BITS=64", "libbz2.a"], bzip, env)
+    shutil.copy2(str(bzip / "libbz2.a"), str(lib / "libbz2.a"))
+    shutil.copy2(str(bzip / "bzlib.h"), str(include / "bzlib.h"))
+    for name in ("libogg-1.3.5", "libvorbis-1.3.7"):
+        source = directory / "vendor/extlib-src" / name
+        build = directory / "build" / name
+        build.mkdir(exist_ok=True)
+        library_env = env.copy()
+        library_env.update({"CC": prefix + "gcc", "AR": prefix + "ar", "RANLIB": prefix + "ranlib",
+                            "CFLAGS": "-O2 -ffunction-sections -fdata-sections", "CPPFLAGS": "-I" + str(include),
+                            "LDFLAGS": "-L" + str(lib), "PKG_CONFIG_LIBDIR": str(lib / "pkgconfig")})
+        if not (build / "Makefile").is_file():
+            run([source / "configure", "--host=arm-buildroot-linux-gnueabi", "--disable-shared", "--enable-static",
+                 "--prefix=" + str(ext)], build, library_env)
+        run(["make", "-j{}".format(jobs)], build, library_env)
+        run(["make", "install"], build, library_env)
+    variables = ["ROOT=" + str(work), "HOST=" + str(host), "ENGINE=" + str(directory / "vendor/ONScripter-GBK"),
+                 "EXT=" + str(ext)]
+    run(common + variables + ["-f", "Makefile.tremor", "ons-lvgl-tremor"], directory, env)
+    run(common + variables + ["-f", "Makefile.browser", "ons-rom-browser"], directory, env)
+    publish_apps("ons", {"ons-lvgl-tremor": directory / "ons-lvgl-tremor", "ons-rom-browser": directory / "ons-rom-browser"}, prefix)
+
+
+def build_retro_cores(jobs):
+    work, host, prefix, env = app_environment()
+    directory = work / "LVGL/retro_native"
+    env["SOURCE_DATE_EPOCH"] = "1791590400"
+    common = ["make", "-j{}".format(jobs), "platform=miyoo", "CC=" + prefix + "gcc",
+              "CXX=" + prefix + "g++", "AR=" + prefix + "ar"]
+    gpsp = directory / "vendor/gpsp"
+    pcsx = directory / "vendor/pcsx"
+    pico = directory / "vendor/pico"
+    run(common + ["GIT_VERSION=5819380c", "SHARED=-shared -Wl,--version-script=link.T", "MMAP_JIT_CACHE=1"], gpsp, env)
+    run(common + ["-f", "Makefile.libretro", "GIT_VERSION=acfca1d", "WANT_ZLIB=0", "HAVE_CHD=0",
+                  "HAVE_PHYSICAL_CDROM=0", "USE_ASYNC_CDROM=0", "USE_ASYNC_GPU=0", "USE_ASYNC_SPU=0", "NDRC_THREAD=0"], pcsx, env)
+    cyclone = pico / "cpu/cyclone"
+    generator = directory / "build/cyclone-gen"
+    generator.parent.mkdir(exist_ok=True)
+    run(["g++", "-O2", "-DHAVE_ARMv6=0", ' -DCONFIG_FILE="../cyclone_config.h"'.strip()] +
+        sorted(cyclone.glob("*.cpp")) + [cyclone / "Disa/Disa.c", "-o", generator], env=env)
+    run([generator], cyclone, env)
+    run(common + ["-f", "Makefile.libretro", "GIT_REVISION=-26ecb2b", "SHARED=-shared", "LIBM=-lm", "use_libchdr=0"], pico, env)
+    publish_apps("retro-cores", {"gba.so": gpsp / "gpsp_libretro.so", "ps1.so": pcsx / "pcsx_rearmed_libretro.so",
+                                "md.so": pico / "picodrive_libretro.so"}, prefix)
+
+
 def build_rootfs(jobs, sources_only=False):
     original, target, spec = stage("rootfs")
     _, cedarc, _ = stage("libcedarc")
@@ -504,7 +614,7 @@ def main():
     inspect = sub.add_parser("doctor")
     inspect.add_argument("--release", action="store_true")
     build = sub.add_parser("build")
-    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui"], default="all", nargs="?")
+    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores"], default="all", nargs="?")
     build.add_argument("-j", "--jobs", type=int, default=8)
     clean = sub.add_parser("clean")
     clean.add_argument("--component", choices=sorted(MANIFEST["components"]))
@@ -538,6 +648,12 @@ def main():
             return 0
         if args.component == "apps-ui":
             build_app_ui(args.jobs)
+            return 0
+        if args.component == "ons":
+            build_ons(args.jobs)
+            return 0
+        if args.component == "retro-cores":
+            build_retro_cores(args.jobs)
             return 0
         build_boot(args.component, args.jobs)
         return 0
