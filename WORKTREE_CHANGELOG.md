@@ -528,3 +528,13 @@ SDK tests20 safety/config/staging/metadata cases; actual result recorded in task
 Complete base rootfs build passed; required init/BusyBox/account/SSH/ALSA/BT archive contents verified. First app build found missing libdrm selection hidden by old output residue; declared BR2_PACKAGE_LIBDRM=y only in generated SDK config and required-package checks. Rebuilt base archive61982720bytes SHA25668f6a59f4cda5e3797959ca06ac90932c56777d554e43dd67591e85f60e8509f, effective.config SHA256f7a83a2a3d3adbb6485c8e4d9e8107e43500a6bc8cda8191e507701f4cfecee1.
 ./sdk build apps-ui -j2 passed all13 declared binaries: menu/helpers, mediaUI/browser, recorder, SFC/browser, retro frontend/browser, reader/browser; MuPDF fully rebuilt from tracked source. Exact hashes in.sdk-output/images/apps-ui/build.json. No original artifact/toolchain dependency, no board deployment or runtime acceptance claimed.
 Remaining full goal: ONS/wiliwili/media backend/emulator cores, AIC/WFD/BTaudio/peripherals, startup+runtime layout and assets, SD image assembly, independent clean/rebuild and hardware acceptance. release_ready remainsfalse.
+
+## 2026-10-11 / pending / Remaining source-only runtime builds
+Hypothesis: add the source-locked Miracast receiver to the isolated SDK, without importing old executables or changing the board.
+Files: sdk-support/sdk.py, manifest.json, test_sdk.py, README.md, changes-20261011.md.
+Commit: cf0a4f3; source SOFTWARE/miracast-sink ab5c7635cf0753dbb43a6b1a5a6ba8e5456787ee.
+Build: ./sdk build miracast-sink -j2; generated Buildroot GCC6.4; ARM ELF34532bytes SHA2561082d105f74a04275970f36644a1504a496abcc2b31c4f51c223e48d1342ecd1. No SDL; NEEDED ALSA/pthread/libc. Report images/miracast-sink/build.json.
+Tests: SDK24 tests passed, including fresh-toolchain/force-build receiver recipe.
+Previous build verification: media-backends report confirms all4 executables built, ARM/noSDL. ONS/retro/LAN reports retained. None is a full image or runtime acceptance claim.
+Deploy: none. Rollback: revert SDK-only integration commits; original build/runtime artifacts unchanged.
+Decision: full goal still active; wireless protocol/BT audio/peripherals/runtime/image/independent rebuild/cold-boot acceptance pending.
