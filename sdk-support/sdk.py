@@ -429,6 +429,7 @@ def publish_apps(group, files, prefix):
         results[name] = {"sha256": digest(path), "bytes": path.stat().st_size,
                          "dynamic_dependencies": dependencies}
     report = {"source_commit": MANIFEST["project_sources"]["commit"],
+              "source_components": {name: spec.get("export_commit", spec["commit"]) for name, spec in MANIFEST["components"].items()},
               "artifacts": results, "board_deployed": False}
     (images / "build.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2), flush=True)
@@ -582,6 +583,8 @@ def build_media_backends(jobs):
         raise RuntimeError("Unrecognized generated MPlayer DRM include configuration")
     run(["sh", "build-nosdl.sh"], mplayer, env)
     env["SDK"] = str(host)
+    configure = wili / "board_linux/vendor/curl-8.16.0/configure"
+    configure.chmod(configure.stat().st_mode | 0o111)
     run(["sh", "build-curl.sh"], wili / "board_linux", env)
     run(["make", "-j{}".format(jobs), "SDK=" + str(host), "PLAYER_SRC=" + str(source),
          "build-arm/wiliwili-lvgl", "net-player"], wili / "board_linux", env)
