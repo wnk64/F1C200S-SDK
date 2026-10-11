@@ -570,3 +570,14 @@ Result: supplicant1020584bytes SHA2565bd65e3088766a30d40f0be22f9566958f445fe18fe
 Commits: initial ddede0b, verified source export/provenance ec55335;31 tests passed. No running build remains.
 Deploy: none. Rollback: revert SDK-only commits, original source and board runtime unchanged.
 Decision: protocol source build passed; DHCP/runtime/image/portable clean rebuild and cold-boot acceptance pending.
+
+## 2026-10-11 / pending / Runtime tools and installation layout
+Hypothesis: rebuild missing menu backend tools and install all compiled components with explicit paths/checksums before assembling the final rootfs.
+Files: sdk-support/sdk.py, runtime-layout.json, test_sdk.py, README.md, changes-20261011.md.
+Commits:08a0b27 runtime-tools;cc2033c runtime payload.
+Build:./sdk build runtime-tools -j2, generated GCC6.4; RTC9748bytes SHA2564436975e60e4e7efbd229ce1db928113b5bb21be526389603381d0ff1d0e29ec; IP9812bytes33af6a8b70de98a322926e3b1fb7a37a8e91ced8c74d04bdc7d1f644ea9f5408. ARM/noSDL checked.
+Tests: host-built same-source RTC selftest passed timezone/NTP/manual date; IP validate accepted valid config and rejected3 invalid configs. No configure/apply/sync/RTC write or host network mutation.
+Integration:./sdk build runtime-payload -j2 installed43 compiled artifacts/modules using report hash checks. Formal paths /opt/f1/apps, existing /opt/f1-time and /opt/f1-network, compatibility WPA /root/aic_miracast. Report images/runtime-payload/build.json records43 installed hashes.
+Safety:35 tests passed including tampered artifact, duplicate destination, path escape and internal symlink-parent rejection. Unknown payload output cannot be overwritten.
+Deploy:none; no board/SD changes. Rollback:revert SDK-only commits, active source/build/runtime baselines preserved.
+Decision:compiled payload integration passed; fonts/firmware/services/shared libraries/base rootfs/SD image/portable clean rebuild/physical cold boots still pending. No complete firmware claim.
