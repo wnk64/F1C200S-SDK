@@ -1217,6 +1217,26 @@ def build_bluetooth_audio(jobs):
     }, prefix)
 
 
+def build_image_tools(jobs):
+    original, target, spec = stage("rootfs")
+    env = os.environ.copy()
+    env["BR2_DL_DIR"] = str(original / "dl")
+    env["LC_ALL"] = "C"
+    run(["make", "-j{}".format(jobs), "host-e2fsprogs"], target, env)
+    host = target / "output/host"
+    tools = {}
+    for name in ("mke2fs", "e2fsck", "debugfs"):
+        path = host / "sbin" / name
+        if not path.is_file():
+            raise RuntimeError("Missing source-built image tool: " + name)
+        tools[name] = {"path": str(path.relative_to(OUT)), "sha256": digest(path)}
+    images = OUT / "images/image-tools"
+    images.mkdir(parents=True, exist_ok=True)
+    report = {"buildroot_commit": spec["commit"], "tools": tools, "board_deployed": False}
+    (images / "build.json").write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps(report, indent=2), flush=True)
+
+
 def prepare_busybox_config(target):
     source = target / "package/busybox/busybox.config"
     output = target / "sdk-busybox.config"
@@ -1373,7 +1393,7 @@ def main():
     inspect = sub.add_parser("doctor")
     inspect.add_argument("--release", action="store_true")
     build = sub.add_parser("build")
-    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio", "wireless-modules", "wfd-protocol", "runtime-tools", "runtime-payload", "kernel-runtime", "rootfs-integrated"], default="all", nargs="?")
+    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio", "wireless-modules", "wfd-protocol", "runtime-tools", "runtime-payload", "kernel-runtime", "rootfs-integrated", "image-tools"], default="all", nargs="?")
     build.add_argument("-j", "--jobs", type=int, default=8)
     clean = sub.add_parser("clean")
     clean.add_argument("--component", choices=sorted(MANIFEST["components"]))
@@ -1443,6 +1463,9 @@ def main():
             return 0
         if args.component == "rootfs-integrated":
             build_integrated_rootfs()
+            return 0
+        if args.component == "image-tools":
+            build_image_tools(args.jobs)
             return 0
         build_boot(args.component, args.jobs)
         return 0
