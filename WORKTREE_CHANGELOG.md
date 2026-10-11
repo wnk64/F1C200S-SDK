@@ -546,5 +546,6 @@ Source: BlueALSA82fdaea18130bf7b0c83a5e2566ddd4249901c82 and project2f1d627 auto
 Build: ./sdk build bluetooth-audio -j2 using generated BuildrootGCC6.4; autoreconf/configure --host=arm-buildroot-linux-gnueabi --prefix=/usr --disable-debug; make install DESTDIR inside generated source only.
 Result: bluealsa/bluealsa-aplay/PCM+CTL ALSA plugins/f1-audio-route all ARM/noSDL. SHA256 and sizes in images/bluetooth-audio/build.json. Initial src/bluealsa libtool wrapper rejected by ELF gate; publish corrected to installed real binaries, no weakened checks.
 Tests: previous24 SDK tests passed; installed-ELF/DESTDIR/sysroot regression added, result to be recorded after run.
+Verified:25 tests passed after installed-ELF regression. Commits281727e/ad13bd4/0576873. Clean-test output concerns temporary fixtures only, generated SDK component builds preserved.
 Deploy: none. Rollback: revert SDK-only commits, no original tree or board runtime rollback needed.
 Decision: source build passed, runtime/image/cold-boot acceptance pending; full objective unchanged.
