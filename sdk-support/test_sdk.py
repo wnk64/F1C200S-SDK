@@ -34,6 +34,24 @@ class OutputSafetyTests(unittest.TestCase):
         sdk.check_output()
         self.assertEqual((sdk.OUT / sdk.MARKER).read_text(), sdk.TOKEN)
 
+    def test_clean_removes_only_owned_output(self):
+        source = self.root / "source.c"
+        source.write_text("preserve")
+        sdk.check_output(create=True)
+        (sdk.OUT / "generated.o").write_text("generated")
+        with mock.patch("sys.argv", ["sdk", "clean"]):
+            self.assertEqual(sdk.main(), 0)
+        self.assertFalse(sdk.OUT.exists())
+        self.assertEqual(source.read_text(), "preserve")
+
+    def test_clean_unknown_directory_does_not_delete(self):
+        sdk.OUT.mkdir()
+        (sdk.OUT / "source.c").write_text("preserve")
+        with mock.patch("sys.argv", ["sdk", "clean"]):
+            with self.assertRaises(RuntimeError):
+                sdk.main()
+        self.assertTrue((sdk.OUT / "source.c").exists())
+
     def test_unknown_directory_is_preserved(self):
         sdk.OUT.mkdir()
         sentinel = sdk.OUT / "source.c"
@@ -99,6 +117,12 @@ class OutputSafetyTests(unittest.TestCase):
         target.mkdir()
         sdk.extract_archive(self.archive(member), target)
         self.assertTrue((target / "source.c").is_file())
+
+    def test_config_updates_remove_duplicate_and_unset_lines(self):
+        config = self.root / ".config"
+        config.write_text('CONFIG_A="old"\n# CONFIG_B is not set\nCONFIG_A="duplicate"\nCONFIG_C=y\n')
+        sdk.set_config(config, {"CONFIG_A": '"new"', "CONFIG_B": "y"})
+        self.assertEqual(config.read_text(), 'CONFIG_C=y\nCONFIG_A="new"\nCONFIG_B=y\n')
 
 
 if __name__ == "__main__":

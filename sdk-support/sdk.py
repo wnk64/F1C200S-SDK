@@ -61,9 +61,15 @@ def validate_source(name):
         raise RuntimeError("Missing complete component repository: {}".format(name))
     if capture(["git", "rev-parse", "HEAD"], path) != spec["commit"]:
         raise RuntimeError("Unreviewed source commit: {}; review manifest before updating".format(name))
-    if capture(["git", "diff", "--name-only", "HEAD", "--"], path):
+    changed = set(capture(["git", "diff", "--name-only", "HEAD", "--"], path).splitlines())
+    excluded = spec.get("excluded_submodules", {})
+    for submodule, commit in excluded.items():
+        entry = capture(["git", "ls-files", "--stage", "--", submodule], path)
+        if entry != "160000 {} 0\t{}".format(commit, submodule):
+            raise RuntimeError("Excluded legacy submodule reference changed: {}".format(submodule))
+    if changed - set(excluded):
         raise RuntimeError("Tracked source differs from locked commit: {}".format(name))
-    if digest(path / ".config") != spec["config_sha256"]:
+    if "config_sha256" in spec and digest(path / ".config") != spec["config_sha256"]:
         raise RuntimeError("Configuration hash mismatch: {}".format(name))
     if "baseline_sha256" in spec:
         if digest(path / spec["artifact"]) != spec["baseline_sha256"]:
@@ -132,8 +138,13 @@ def extract_archive(archive, target):
 
 def stage(name):
     source, spec = validate_source(name)
+    config = ROOT / "sdk-support/configs" / (name + ".config")
+    if "config_sha256" in spec and digest(config) != spec["config_sha256"]:
+        raise RuntimeError("SDK configuration copy mismatch: {}".format(name))
     check_output(create=True)
-    target = OUT / "sources" / name
+    target = OUT / spec.get("stage_path", "sources/" + name)
+    if not contained(target, OUT):
+        raise RuntimeError("Invalid stage path for {}".format(name))
     stamp = target / ".sdk-source-commit"
     if target.exists():
         if target.is_symlink() or not stamp.is_file() or stamp.read_text().strip() != spec["commit"]:
@@ -146,12 +157,50 @@ def stage(name):
                            stdout=archive, check=True)
             archive.seek(0)
             extract_archive(archive, target)
-        shutil.copy2(str(ROOT / "sdk-support/configs" / (name + ".config")), str(target / ".config"))
+        if "config_sha256" in spec:
+            shutil.copy2(str(config), str(target / ".config"))
         stamp.write_text(spec["commit"] + "\n")
     except BaseException:
         shutil.rmtree(str(target))
         raise
     return source, target, spec
+
+
+def set_config(path, values):
+    lines = []
+    for line in path.read_text().splitlines():
+        key = line.split("=", 1)[0]
+        if line.startswith("# ") and line.endswith(" is not set"):
+            key = line[2:-11]
+        if key not in values:
+            lines.append(line)
+    lines.extend(key + "=" + value for key, value in sorted(values.items()))
+    path.write_text("\n".join(lines) + "\n")
+
+
+def build_rootfs(jobs, sources_only=False):
+    original, target, spec = stage("rootfs")
+    _, cedarc, _ = stage("libcedarc")
+    # The legacy overlay is deliberately not part of this base-rootfs recipe.
+    # Current board files are integrated separately, never collected from old payloads.
+    set_config(target / ".config", {
+        "BR2_ROOTFS_OVERLAY": '""',
+        "BR2_ROOTFS_POST_BUILD_SCRIPT": '""',
+        "BR2_ROOTFS_POST_FAKEROOT_SCRIPT": '""',
+        "BR2_ROOTFS_POST_IMAGE_SCRIPT": '""',
+        "BR2_PACKAGE_OVERRIDE_FILE": '"$(CONFIG_DIR)/local.mk"',
+    })
+    (target / "local.mk").write_text("LIBCEDARC_OVERRIDE_SRCDIR = {}\n".format(cedarc))
+    downloads = original / "dl"
+    if not contained(downloads, ROOT) or downloads.is_symlink():
+        raise RuntimeError("Downloads must reside inside SDK")
+    env = os.environ.copy()
+    env["BR2_DL_DIR"] = str(downloads)
+    env["LC_ALL"] = "C"
+    run(["make", "olddefconfig"], target, env)
+    run(["make", "-j{}".format(jobs), "source" if sources_only else "all"], target, env)
+    print("Base rootfs {} complete; runtime integration is still pending".format(
+        "source acquisition" if sources_only else "build"), flush=True)
 
 
 def build_boot(name, jobs):
@@ -202,7 +251,8 @@ def doctor(release=False):
         try:
             validate_source(name)
             config = ROOT / "sdk-support/configs" / (name + ".config")
-            if digest(config) != MANIFEST["components"][name]["config_sha256"]:
+            expected = MANIFEST["components"][name].get("config_sha256")
+            if expected and digest(config) != expected:
                 raise RuntimeError("SDK configuration copy mismatch: {}".format(name))
             print("OK source/config: {}".format(name))
         except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
@@ -230,7 +280,7 @@ def main():
     inspect = sub.add_parser("doctor")
     inspect.add_argument("--release", action="store_true")
     build = sub.add_parser("build")
-    build.add_argument("component", choices=["all", "kernel", "uboot"], default="all", nargs="?")
+    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base"], default="all", nargs="?")
     build.add_argument("-j", "--jobs", type=int, default=8)
     sub.add_parser("clean")
     args = parser.parse_args()
@@ -248,7 +298,12 @@ def main():
         if args.jobs < 1 or args.jobs > 64:
             raise RuntimeError("jobs must be between 1 and 64")
         if args.component == "all":
-            return doctor(release=True)
+            if doctor(release=True):
+                return 1
+            raise RuntimeError("Full SD image recipe has not been integrated yet")
+        if args.component in ("rootfs-sources", "rootfs-base"):
+            build_rootfs(args.jobs, sources_only=args.component == "rootfs-sources")
+            return 0
         build_boot(args.component, args.jobs)
         return 0
 

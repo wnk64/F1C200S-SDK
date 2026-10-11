@@ -499,3 +499,13 @@ Rollback at board candidates/newboard_panel_20260930/rollback (old DTB/startup/m
 计划/文件/回退详见SCRCPT/cast-and-menu-source/cast-touch-exit-20261004.md。a26d456新增独立cast-wait-touch（原始FT6236 I2C方向，中心x140..339/y260..539、2秒三次按下释放，长按/滑动不算），cast-app管理生命周期；0505381/3942b56直接WPA STA-FIRST检查P2P关联及sinkPID/exe，手机开始握手或连接时释放检测，不触发退出。第一次空STA响应误判修正后测试重做。不是PBC/协议/驱动修改，不保留LVGL。
 
 原GCC6.4增量构建、host及ARM手势自测通过；实际未连接投屏启动到ready、显式模拟三击→cleanup→rc0→菜单SSH恢复，final没有watch/player/sink/手势检测器遗留。helper PSS115KiB/private60KiB。59c225c菜单cast入口切独立cast-app-touch.sh，旧cast-app.sh保留。SCP哈希helper0ec48d5c6f7da49ded0a585f1e92c825be2f00713a77aefd355816a49d9fe816、脚本31fe30b11011f8a527beb3eb511ee1a0fa8b373dc76ebe4e54f63ba85f99f097、apps001ce6f4f9134d8c2b60f23f70da5500494923691ec9ab2276dd24c0e919c99e一致。kernel/驱动/视频/音频/其他菜单入口不改。真实三次触摸、真实连接下不退出、三冷完整回归尚未完成，不标stable。测试变量正式默认未设置，临时包装和运行日志清理。
+
+## 2026-10-11 / pending / Isolated full SDK integration
+Hypothesis: locked source exports and an owned output directory can support clean rebuilds without changing active source/build/runtime baselines.
+Files: sdk; sdk-support/{sdk.py,test_sdk.py,manifest.json,README.md,configs,changes-20261011.md}.
+Commits: c0e1f72 initial entry; b7ad1e1 Python API compatibility; 092afc7 verified Python3.5 compatibility.
+Build: original Linaro7.2.1; make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- LOCALVERSION= -j8 in generated source export only. Active kernel b3d8ed3/#250 zImage SHA256 20e69f109abd3d8d95c73620c01287a82c17b10a5fbdb55020f0a419a5dfa4c9 retained.
+Tests: initial10 output/archive/locking safety tests passed. Fresh kernel/U-Boot builds started; results pending. Rootfs preflight correctly identifies dirty legacy overlay submodule, not a new SDK change.
+Dependencies: kernel+modules+DTB+U-Boot; Buildroot toolchain/libs; AIC/WFD; BS/BT/audio; LVGL/menu/apps/emulators; boot/runtime scripts; SD partition/image layout. Integration and full regression still pending.
+Deploy: none; board observed read-only over SSH, active casting not stopped. SD partition starts2048/34816/1048576; p1 size32768 sectors, p2 size1013760 sectors. No SD writes.
+Decision: SDK integration in progress; no complete-image or stable-baseline claim. Rollback: remove/revert SDK-only commits; active sources/configs/artifacts unchanged. Existing build outputs are not deleted by SDK clean.
