@@ -1647,6 +1647,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command")
     inspect = sub.add_parser("doctor")
+    sub.add_parser("package", help="Export complete source, toolchain and dependencies to .sdk-output/portable-sdk")
     inspect.add_argument("--release", action="store_true")
     build = sub.add_parser("build")
     build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio", "wireless-modules", "wfd-protocol", "runtime-tools", "runtime-payload", "kernel-runtime", "rootfs-integrated", "image-tools", "sd-image"], default="all", nargs="?")
@@ -1657,6 +1658,10 @@ def main():
     if not args.command:
         parser.error("a command is required")
     with locked():
+        if args.command == "package":
+            from package_sdk import build_package
+            build_package(sys.modules[__name__])
+            return 0
         if args.command == "doctor":
             return doctor(args.release)
         if args.command == "clean":

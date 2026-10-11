@@ -645,3 +645,11 @@ Protected:all image applications and dynamic libraries; no hardware deployment. 
 Rollback:d9b2bba SDK recipe/tests; existing original component repositories and board remain unchanged.
 Portability:TOOLCHAIN directory absent, kernel compiler still external /opt Linaro7.2.1; must package compiler before portable acceptance. Full objective active,cold_boots0.
 Result:fb5c20f,57 unit tests passed; rootfs-integrated301 ARM ELFs and840 GNU version requirements checked,issues0. sd-image assembly exit0,all offline filesystem/region checks passed,new image SHA25643006d9ac611b7f5f17d897e178e83b6610e913d92c6a4a0a72999e660e19374,size1073741824bytes. Old full-build report remains historical evidence for d9b2bba/76a4b720 image,not evidence for a complete rebuild of the new recipe. No board writes. Full symbol relocation/runtime checks remain pending; no claim of total ABI validation. Temporary wrappers removed after collecting results; reports retained. Decision:offline check passed,unaccepted candidate,full goal active.
+
+## 2026-10-11 / Planned / Portable complete-source SDK export
+Base:2a71e34 SDK,all component commits/configs locked by manifest.
+Hypothesis:export full self-contained Git repositories,baseline preflight material,Linaro7.2.1 and downloaded source dependencies into a fresh managed directory,then test independent clean/build without original generated outputs.
+Files:sdk-support/package_sdk.py,sdk.py,test_sdk.py,README.md,changes-20261011.md and this log.
+Protected:original repositories,dirty files,build outputs and candidate image unchanged;no board deployment or media formatting. No new development worktree;only exported delivery copy.
+Checks:reject existing export destination/external symlinks,verify copied files,Git source locks and no alternates;unset compiler override and run exported doctor. Preserve source licenses. Git-history privacy/public redistribution review remains pending.
+Rollback:2a71e34 SDK;only marked generated export is disposable. Triple-cold-boot acceptance remains0,full objective active.

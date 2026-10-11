@@ -10,12 +10,68 @@ import tempfile
 import unittest
 from unittest import mock
 
+package_spec = importlib.util.spec_from_file_location("package_sdk", str(Path(__file__).with_name("package_sdk.py")))
+package = importlib.util.module_from_spec(package_spec)
+package_spec.loader.exec_module(package)
+
 spec = importlib.util.spec_from_file_location("f1sdk", str(Path(__file__).with_name("sdk.py")))
 sdk = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_export_stub_cleanup_refuses_untracked_or_git_directory(self):
+        root = self.root / "export"
+        component = root / "component"
+        component.mkdir(parents=True)
+        (component / "tracked.c").write_bytes(b"source")
+        with mock.patch.object(sdk, "capture", return_value=""):
+            with self.assertRaises(RuntimeError):
+                package.remove_export_stub(root, component, sdk)
+        self.assertTrue(component.exists())
+        (component / ".git").mkdir()
+        with self.assertRaises(RuntimeError):
+            package.remove_export_stub(root, component, sdk)
+        (component / ".git").rmdir()
+        with mock.patch.object(sdk, "capture", return_value="component/tracked.c"):
+            package.remove_export_stub(root, component, sdk)
+        self.assertFalse(component.exists())
+
+    def test_dependency_copy_verifies_content_links_and_modes(self):
+        source = self.root / "dependencies"
+        source.mkdir()
+        (source / "compiler").write_bytes(b"compiler")
+        (source / "compiler").chmod(0o755)
+        (source / "alias").symlink_to("compiler")
+        destination = self.root / "copied"
+        inventory = package.copy_tree(source, destination, sdk)
+        self.assertEqual(inventory["alias"], {"symlink": "compiler"})
+        self.assertEqual(inventory["compiler"]["mode"], 0o755)
+        self.assertEqual((destination / "compiler").read_bytes(), b"compiler")
+        with self.assertRaises(RuntimeError):
+            package.copy_tree(source, destination, sdk)
+
+    def test_dependency_copy_rejects_external_and_broken_links(self):
+        source = self.root / "dependencies"
+        source.mkdir()
+        link = source / "escape"
+        link.symlink_to("../outside")
+        with self.assertRaises(RuntimeError):
+            package.tree_inventory(source, sdk)
+        link.unlink()
+        link.symlink_to("missing")
+        with self.assertRaises(RuntimeError):
+            package.tree_inventory(source, sdk)
+
+    def test_baseline_copy_refuses_different_tracked_file(self):
+        source = self.root / "baseline"
+        target = self.root / "target"
+        source.write_bytes(b"baseline")
+        target.write_bytes(b"different")
+        with self.assertRaises(RuntimeError):
+            package.copy_baseline(source, target, sdk)
+        self.assertEqual(target.read_bytes(), b"different")
+
     def test_elf_version_parser_separates_definitions_parents_and_needs(self):
         text = """Version definition section '.gnu.version_d' contains 2 entries:
   0x001c: Rev: 1 Flags: none Index: 2 Cnt: 2 Name: GLIBC_2.4
