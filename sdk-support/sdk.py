@@ -699,10 +699,11 @@ def build_wfd_protocol(jobs):
     sysroot = host / "arm-buildroot-linux-gnueabi/sysroot"
     env.update({"PKG_CONFIG_SYSROOT_DIR": str(sysroot),
                 "PKG_CONFIG_LIBDIR": str(sysroot / "usr/lib/pkgconfig"),
-                "PKG_CONFIG": str(host / "bin/pkg-config")})
+                "PKG_CONFIG": str(host / "bin/pkg-config"),
+                "CFLAGS": "-Os -march=armv5te -I" + str(sysroot / "usr/include/libnl3"),
+                "LDFLAGS": "-L" + str(sysroot / "usr/lib")})
     run(["make", "-B", "-j{}".format(jobs), "CC=" + prefix + "gcc",
-         "CFLAGS=-Os -march=armv5te -I" + str(sysroot / "usr/include/libnl3"),
-         "LDFLAGS=-L" + str(sysroot / "usr/lib"), "wpa_supplicant", "wpa_cli", "wpa_passphrase"], directory, env)
+         "wpa_supplicant", "wpa_cli", "wpa_passphrase"], directory, env)
     publish_apps("wfd-protocol", {name: directory / name for name in ("wpa_supplicant", "wpa_cli", "wpa_passphrase")}, prefix)
 
 
