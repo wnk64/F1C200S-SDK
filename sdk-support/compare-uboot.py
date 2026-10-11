@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import struct
+import datetime
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / ".sdk-output/provenance"
@@ -33,6 +34,11 @@ def main():
         raise RuntimeError("Live SD reference hash/size/header mismatch")
     report = {"reference_sha256": sha(reference), "reference_spl_length": struct.unpack_from("<I", reference, 16)[0],
               "reference_spl_md5": hashlib.md5(reference[:32768]).hexdigest(), "candidates": {}}
+    if struct.unpack_from(">I", reference, 32768)[0] != 0x27051956:
+        raise RuntimeError("Unexpected main U-Boot legacy image header")
+    epoch = struct.unpack_from(">I", reference, 32776)[0]
+    report["legacy_header_timestamp_epoch"] = epoch
+    report["legacy_header_timestamp_utc"] = datetime.datetime.utcfromtimestamp(epoch).isoformat() + "Z"
     for source in ("af73846", "c5335a4"):
         path = OUT / ("uboot-" + source) / "u-boot-sunxi-with-spl.bin"
         candidate = path.read_bytes()
@@ -41,6 +47,7 @@ def main():
             "sha256": sha(candidate), "bytes": len(candidate),
             "spl_sha256": sha(candidate[:32768]), "spl_matches": candidate[:32768] == reference[:32768],
             "main_matches": candidate[32768:] == reference[32768:],
+            "main_payload_matches": candidate[32832:] == reference[32832:],
             "difference_regions": len(differences), "different_bytes": sum(end - start for start, end in differences),
             "first_regions": differences[:30], "last_regions": differences[-10:],
         }
