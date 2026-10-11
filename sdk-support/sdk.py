@@ -377,6 +377,7 @@ def build_rootfs(jobs, sources_only=False):
         "BR2_ROOTFS_POST_FAKEROOT_SCRIPT": '""',
         "BR2_ROOTFS_POST_IMAGE_SCRIPT": '""',
         "BR2_PACKAGE_OVERRIDE_FILE": '"$(CONFIG_DIR)/local.mk"',
+        "BR2_WGET": '"wget --passive-ftp -nd --timeout=30 --tries=1"',
     })
     (target / "local.mk").write_text("LIBCEDARC_OVERRIDE_SRCDIR = {}\n".format(cedarc))
     downloads = original / "dl"
