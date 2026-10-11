@@ -16,6 +16,24 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_runtime_relocation_handles_nested_paths_longest_first(self):
+        content = b'LOADER=$BASE/old/loader.ko\nFW=$BASE/old\n'
+        result = sdk.relocate_runtime_text(content, {"$BASE/old": "/firmware", "$BASE/old/loader.ko": "/modules/loader.ko"})
+        self.assertEqual(result, b'LOADER=/modules/loader.ko\nFW=/firmware\n')
+
+    def test_runtime_checksums_use_current_preceding_installed_content(self):
+        source_root = self.root / "source"
+        source_root.mkdir()
+        old_hash = "a" * 32
+        (source_root / "app.sh").write_text("#!/bin/sh\ncheck /opt/tool " + old_hash + "\n")
+        spec = {"origin": "project", "path": "app.sh", "targets": ["opt/app.sh"],
+                "checks": {old_hash: "opt/tool"}}
+        entries = sdk.runtime_source_plan({"sources": [spec]}, sdk.OUT / "runtime-payload", {"project": source_root}, set(), {"opt/tool": b"new executable"})
+        self.assertIn(sdk.hashlib.md5(b"new executable").hexdigest().encode("ascii"), entries[0][2])
+        self.assertNotIn(old_hash.encode("ascii"), entries[0][2])
+        with self.assertRaises(RuntimeError):
+            sdk.runtime_source_plan({"sources": [spec]}, sdk.OUT / "runtime-payload", {"project": source_root}, set())
+
     def test_rootfs_dependency_audit_reports_missing_library(self):
         archive_path = self.root / "rootfs.tar"
         with tarfile.open(str(archive_path), "w") as archive:

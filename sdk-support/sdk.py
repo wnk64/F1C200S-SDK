@@ -726,7 +726,7 @@ def runtime_destination(target, relative):
 
 def relocate_runtime_text(content, replacements):
     text = content.decode("utf-8")
-    for old, new in sorted(replacements.items()):
+    for old, new in sorted(replacements.items(), key=lambda item: (-len(item[0]), item[0])):
         if not old or old not in text:
             raise RuntimeError("Expected runtime relocation input missing: " + old)
         text = text.replace(old, new)
@@ -735,19 +735,29 @@ def relocate_runtime_text(content, replacements):
     return text.encode("utf-8")
 
 
-def runtime_source_plan(layout, target, roots, destinations):
+def runtime_source_plan(layout, target, roots, destinations, known_content=None):
     entries = []
+    known_content = dict(known_content or {})
     for spec in layout.get("sources", []):
         root = roots[spec["origin"]]
         source = root / spec["path"]
-        if Path(spec["path"]).is_absolute() or ".." in Path(spec["path"]).parts or not contained(source, root) or source.is_symlink() or not source.is_file():
+        if Path(spec["path"]).is_absolute() or ".." in Path(spec["path"]).parts or not contained(source, root):
             raise RuntimeError("Unsafe/missing runtime source: " + str(source))
-        if any(parent.is_symlink() for parent in source.parents if parent == root or root in parent.parents):
-            raise RuntimeError("Symlink in runtime source")
-        content = source.read_bytes()
+        if spec["origin"] == "project-git":
+            content = subprocess.check_output(["git", "show", MANIFEST["project_sources"]["commit"] + ":" + spec["path"]], cwd=str(ROOT))
+        else:
+            if source.is_symlink() or not source.is_file() or any(parent.is_symlink() for parent in source.parents if parent == root or root in parent.parents):
+                raise RuntimeError("Unsafe/missing runtime source: " + str(source))
+            content = source.read_bytes()
         source_hash = hashlib.sha256(content).hexdigest()
         if spec.get("executable") or spec.get("replacements"):
             content = relocate_runtime_text(content, spec.get("replacements", {}))
+        for old_hash, relative in sorted(spec.get("checks", {}).items()):
+            if not re.fullmatch("[0-9a-f]{32}", old_hash) or relative not in known_content:
+                raise RuntimeError("Missing/invalid cast checksum input: " + relative)
+            if old_hash.encode("ascii") not in content:
+                raise RuntimeError("Expected legacy checksum missing: " + old_hash)
+            content = content.replace(old_hash.encode("ascii"), hashlib.md5(known_content[relative]).hexdigest().encode("ascii"))
         if spec.get("executable"):
             subprocess.run(["/bin/sh", "-n"], input=content, check=True)
         for relative in spec["targets"]:
@@ -756,6 +766,7 @@ def runtime_source_plan(layout, target, roots, destinations):
                 raise RuntimeError("Duplicate runtime destination: " + relative)
             destinations.add(destination)
             entries.append((spec, destination, content, source_hash))
+            known_content[relative] = content
     return entries
 
 
@@ -807,6 +818,9 @@ def build_runtime_payload():
     if layout.get("sources"):
         roots["project"] = stage_project_sources()
         for origin in sorted({spec["origin"] for spec in layout["sources"]} - {"project"}):
+            if origin == "project-git":
+                roots[origin] = ROOT
+                continue
             if origin == "sdk":
                 roots[origin] = ROOT / "sdk-support"
                 for spec in (spec for spec in layout["sources"] if spec["origin"] == "sdk"):
@@ -816,7 +830,8 @@ def build_runtime_payload():
                         raise RuntimeError("SDK runtime source has uncommitted changes: " + relative)
                 continue
             _, roots[origin], _ = stage(origin)
-    sources = runtime_source_plan(layout, target, roots, {entry[1] for entry in entries})
+    known_content = {str(destination.relative_to(target)): source.read_bytes() for source, destination, expected in entries}
+    sources = runtime_source_plan(layout, target, roots, {entry[1] for entry in entries}, known_content)
     target.mkdir(parents=True, exist_ok=True)
     marker.write_text(TOKEN)
     files = {}
@@ -837,6 +852,7 @@ def build_runtime_payload():
         provenance[relative] = {"origin": spec["origin"], "source_path": spec["path"],
                                 "source_sha256": source_hash, "installed_sha256": files[relative],
                                 "replacements": spec.get("replacements", {})}
+        provenance[relative]["checksum_inputs"] = spec.get("checks", {})
     report = {"layout_sha256": digest(layout_path), "files": files,
               "resource_provenance": provenance,
               "scope": "compiled runtime payload with partial resources/services; base rootfs/full startup/libraries/image integration pending",
