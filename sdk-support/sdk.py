@@ -239,13 +239,13 @@ def clean_component(name):
         shutil.rmtree(str(images))
 
 
-def config_values(text):
+def config_values(text, prefix="BR2_"):
     values = {}
     for line in text.splitlines():
-        if line.startswith("BR2_") and "=" in line:
+        if line.startswith(prefix) and "=" in line:
             key, value = line.split("=", 1)
             values[key] = value
-        elif line.startswith("# BR2_") and line.endswith(" is not set"):
+        elif line.startswith("# " + prefix) and line.endswith(" is not set"):
             values[line[2:-11]] = "n"
     return values
 
@@ -371,7 +371,7 @@ def build_wireless_modules(jobs):
     for required in (".config", "vmlinux", "System.map", "arch/arm/boot/zImage", "Module.symvers"):
         if not (kernel / required).is_file():
             raise RuntimeError("Build the isolated kernel first: " + required)
-    values = config_values((kernel / ".config").read_text())
+    values = config_values((kernel / ".config").read_text(), prefix="CONFIG_")
     if values.get("CONFIG_LOCALVERSION") != '""' or values.get("CONFIG_LOCALVERSION_AUTO") == "y":
         raise RuntimeError("Kernel localversion must remain empty and automatic suffixes disabled")
     env = os.environ.copy()
