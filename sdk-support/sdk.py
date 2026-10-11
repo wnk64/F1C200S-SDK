@@ -847,6 +847,26 @@ def audit_cast_checks(payload):
     return checked
 
 
+def audit_boot_modules(payload):
+    script = payload / "etc/init.d/S12board-hardware"
+    listed = capture(["/bin/sh", script, "--list-modules"])
+    modules = {}
+    for line in listed.splitlines():
+        name, relative = line.split("|", 1)
+        path = runtime_destination(payload, "lib/modules/" + MANIFEST["kernel_release"] + "/" + relative)
+        if not path.is_file():
+            raise RuntimeError("Boot module missing: " + relative)
+        vermagic = capture(["modinfo", "-F", "vermagic", path])
+        if not vermagic.startswith(MANIFEST["kernel_release"] + " "):
+            raise RuntimeError("Boot module release mismatch")
+        if capture(["modinfo", "-F", "name", path]) != name:
+            raise RuntimeError("Boot module identity mismatch")
+        modules[relative] = {"sha256": digest(path), "vermagic": vermagic}
+    if len(modules) != 4:
+        raise RuntimeError("Boot module plan incomplete")
+    return modules
+
+
 def build_runtime_payload():
     check_output(create=True)
     target = OUT / "runtime-payload"
@@ -901,6 +921,8 @@ def build_runtime_payload():
               "board_deployed": False}
     if "opt/f1/apps/cast/start-cast-default-audio.sh" in files:
         report["cast_preflight_checks"] = audit_cast_checks(target)
+    if "etc/init.d/S12board-hardware" in files:
+        report["boot_modules"] = audit_boot_modules(target)
     (OUT / "images/runtime-payload").mkdir(parents=True, exist_ok=True)
     (OUT / "images/runtime-payload/build.json").write_text(json.dumps(report, indent=2) + "\n")
     print("Installed {} source-built runtime artifacts".format(len(files)), flush=True)

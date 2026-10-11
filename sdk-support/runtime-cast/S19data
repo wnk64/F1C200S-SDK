@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+PART=/dev/mmcblk0p3
+DATA=/root/roms
+case "${1:-start}" in
+start)
+    mkdir -p "$DATA"
+    mounted=$(awk -v target="$DATA" '$2 == target { print $1 }' /proc/mounts)
+    if [ -n "$mounted" ]; then
+        [ "$mounted" = "$PART" ] || { echo 'Unexpected data mount source' >&2; exit 1; }
+    else
+        [ -b "$PART" ] || { echo 'Data partition is missing; no partitioning or formatting attempted' >&2; exit 1; }
+        mount -t vfat -o rw,noatime,uid=0,gid=0,fmask=0022,dmask=0022,shortname=mixed,utf8=1 "$PART" "$DATA"
+    fi
+    for directory in gba ps1 md sfc ons video music documents pictures recordings uploads; do
+        mkdir -p "$DATA/$directory"
+    done
+    ;;
+stop)
+    if awk -v source="$PART" -v target="$DATA" '$1 == source && $2 == target { found=1 } END { exit !found }' /proc/mounts; then
+        umount "$DATA"
+    fi
+    ;;
+*) echo 'Usage: S19data {start|stop}' >&2; exit 1 ;;
+esac

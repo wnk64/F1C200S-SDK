@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+modules() {
+    printf '%s\n' \
+        'phy_generic|kernel/drivers/usb/phy/phy-generic.ko' \
+        'sunxi|kernel/drivers/usb/musb/sunxi.ko' \
+        'sunxi_ion_core|kernel/drivers/staging/media/sunxi/cedar/ion/sunxi_ion_core.ko' \
+        'cedar_ve|kernel/drivers/staging/media/sunxi/cedar/ve/cedar_ve.ko'
+}
+case "${1:-start}" in
+--list-modules) modules ;;
+start)
+    [ "$(uname -r)" = 5.7.1 ] || { echo 'Board hardware requires kernel5.7.1' >&2; exit 1; }
+    modules | while IFS='|' read -r name relative; do
+        [ -d "/sys/module/$name" ] || insmod "/lib/modules/5.7.1/$relative"
+    done
+    ;;
+stop) : ;;
+*) echo 'Usage: S12board-hardware {start|stop|--list-modules}' >&2; exit 1 ;;
+esac

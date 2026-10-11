@@ -2,6 +2,12 @@
   "schema": 1,
   "kernel_modules": true,
   "sources": [
+    {"origin":"sdk","path":"runtime-cast/S12board-hardware","targets":["etc/init.d/S12board-hardware"],"executable":true},
+    {"origin":"sdk","path":"runtime-cast/S19data","targets":["etc/init.d/S19data"],"executable":true},
+    {"origin":"project","path":"DRIVER/board-power-20261004/S14board-power","targets":["etc/init.d/S14board-power"],"executable":true,"replacements":{"/root/aic_miracast/candidates/board_power_20261004/f1_board_power.ko":"/lib/modules/5.7.1/extra/f1_board_power.ko"}},
+    {"origin":"project","path":"DRIVER/panel-and-board/S15tk032f8004-panel","targets":["etc/init.d/S15tk032f8004-panel"],"executable":true,"replacements":{"/root/aic_miracast/candidates/newboard_panel_20260930/tk032f8004_panel.ko":"/lib/modules/5.7.1/extra/tk032f8004_panel.ko"}},
+    {"origin":"project","path":"DRIVER/bluetooth-hid-20261010/S34bluetooth-hid","targets":["etc/init.d/S34bluetooth-hid"],"executable":true,"replacements":{"/root/roms/candidates/bluetooth_hid_20261010":"/lib/modules/5.7.1/extra"}},
+    {"origin":"aic-peripherals","path":"drivers/aic8800/peripherals/ip5209_20260930/S47ip5209-power","targets":["etc/init.d/S47ip5209-power"],"executable":true,"replacements":{"/root/aic_miracast/candidates/ip5209_voltage_4200_20260930/ip5209_power.ko":"/lib/modules/5.7.1/extra/ip5209_power.ko"},"checks":{"660b80d1ef8be261ec49437406291ec7":"lib/modules/5.7.1/extra/ip5209_power.ko"}},
     {"origin":"sdk","path":"runtime-cast/cast-dhcp.sh","targets":["opt/f1/apps/cast/cast-dhcp.sh"],"executable":true},
     {"origin":"sdk","path":"runtime-cast/dhcp-ack.awk","targets":["opt/f1/apps/cast/dhcp-ack.awk"]},
     {"origin":"sdk","path":"runtime-cast/udhcpd.conf","targets":["opt/f1/apps/cast/udhcpd.conf"]},

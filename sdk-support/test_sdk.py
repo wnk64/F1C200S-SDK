@@ -16,6 +16,18 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_boot_module_plan_is_read_only_and_dependency_ordered(self):
+        script = Path(__file__).parent / "runtime-cast/S12board-hardware"
+        result = subprocess.check_output(["/bin/sh", str(script), "--list-modules"]).decode("ascii")
+        names = [line.split("|", 1)[0] for line in result.splitlines()]
+        self.assertEqual(names, ["phy_generic", "sunxi", "sunxi_ion_core", "cedar_ve"])
+        self.assertNotIn("aic", result)
+        subprocess.run(["/bin/sh", "-n", str(script)], check=True)
+        data_script = Path(__file__).parent / "runtime-cast/S19data"
+        subprocess.run(["/bin/sh", "-n", str(data_script)], check=True)
+        self.assertNotIn("mkfs", data_script.read_text())
+        self.assertNotIn("fdisk", data_script.read_text())
+
     def test_cast_touch_relocation_requires_exact_identity(self):
         source = self.root / "touch.c"
         source.write_text('return strcmp(exe, "/root/aic_miracast/candidates/audio_reopen_20261002/sink-audio-reopen");')
