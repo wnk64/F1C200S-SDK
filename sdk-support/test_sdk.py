@@ -184,6 +184,38 @@ class OutputSafetyTests(unittest.TestCase):
             sdk.relocate_ons_baseline(directory)
         self.assertEqual(baseline.read_text(), original)
 
+    def test_project_source_addition_preserves_existing_outputs(self):
+        import json
+        source = self.root / "APP"
+        source.mkdir()
+        sdk.check_output(create=True)
+        work = sdk.OUT / "work"
+        (work / "APP").mkdir(parents=True)
+        (work / "APP/compiled.o").write_text("preserve")
+        stamps = sdk.OUT / "stamps"
+        stamps.mkdir()
+        previous = {"commit": "a" * 40, "paths": ["APP"]}
+        new = {"commit": "b" * 40, "paths": ["APP"], "source_additions_from": "a" * 40,
+               "source_additions": ["APP/version.h"]}
+        (stamps / "project-sources.json").write_text(json.dumps(previous))
+        def git_capture(args, cwd=None):
+            if "--show-toplevel" in args:
+                return str(self.root)
+            if "diff" in args and "a" * 40 in args:
+                return "APP/version.h"
+            return ""
+        def git_archive(args, cwd=None, stdout=None, check=None):
+            with tarfile.open(fileobj=stdout, mode="w") as archive:
+                item = tarfile.TarInfo("APP/version.h")
+                data = b"preserved source header"
+                item.size = len(data)
+                archive.addfile(item, io.BytesIO(data))
+        with mock.patch.object(sdk, "MANIFEST", {"project_sources": new}), mock.patch.object(sdk, "capture", side_effect=git_capture), mock.patch.object(sdk.subprocess, "run", side_effect=git_archive):
+            sdk.stage_project_sources()
+        self.assertEqual((work / "APP/version.h").read_text(), "preserved source header")
+        self.assertEqual((work / "APP/compiled.o").read_text(), "preserve")
+        self.assertEqual(json.loads((stamps / "project-sources.json").read_text()), new)
+
     def test_project_stage_preserves_toolchain_and_uses_locked_archive(self):
         source = self.root / "LVGL/menu"
         source.mkdir(parents=True)

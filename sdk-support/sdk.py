@@ -569,7 +569,18 @@ def build_media_backends(jobs):
     run(["make", "-j{}".format(jobs), "CROSS_COMPILE=" + prefix, "SYSROOT=" + str(sysroot),
          "TARGET_DIR=" + str(target), "CFLAGS=" + cflags, "cedar_drm_player"], source, env)
     env["JOBS"] = str(jobs)
-    run(["sh", "build-nosdl.sh"], work / "SOFTWARE/mplayer-cedar", env)
+    mplayer = work / "SOFTWARE/mplayer-cedar"
+    makefile = mplayer / "Makefile"
+    old_include = "CFLAGS += -I/home/wnk/LicheePi_Nano/buildroot-2018.02.11/output/host/arm-buildroot-linux-gnueabi/sysroot/usr/include/drm"
+    new_include = "CFLAGS += -I" + str(sysroot / "usr/include/drm")
+    content = makefile.read_text()
+    if old_include in content:
+        if content.count(old_include) != 1:
+            raise RuntimeError("Unexpected MPlayer DRM include configuration")
+        makefile.write_text(content.replace(old_include, new_include))
+    elif new_include not in content:
+        raise RuntimeError("Unrecognized generated MPlayer DRM include configuration")
+    run(["sh", "build-nosdl.sh"], mplayer, env)
     env["SDK"] = str(host)
     run(["sh", "build-curl.sh"], wili / "board_linux", env)
     run(["make", "-j{}".format(jobs), "SDK=" + str(host), "PLAYER_SRC=" + str(source),
@@ -596,6 +607,7 @@ def build_rootfs(jobs, sources_only=False):
         "BR2_PACKAGE_LIBDRM": "y",
         "BR2_PACKAGE_LIBCEDARX": "y",
         "BR2_PACKAGE_FDK_AAC": "y",
+        "BR2_PACKAGE_FAAD2": "y",
     })
     (target / "local.mk").write_text("LIBCEDARC_OVERRIDE_SRCDIR = {}\nLIBCEDARX_OVERRIDE_SRCDIR = {}\n".format(cedarc, cedarx))
     downloads = original / "dl"
