@@ -16,6 +16,36 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_cast_touch_relocation_requires_exact_identity(self):
+        source = self.root / "touch.c"
+        source.write_text('return strcmp(exe, "/root/aic_miracast/candidates/audio_reopen_20261002/sink-audio-reopen");')
+        sdk.relocate_cast_touch(source)
+        self.assertIn('"/opt/f1/apps/cast/miracast_sink_dump.lowest"', source.read_text())
+        sdk.relocate_cast_touch(source)
+        source.write_text("unexpected")
+        with self.assertRaises(RuntimeError):
+            sdk.relocate_cast_touch(source)
+
+    def test_cast_checksum_audit_rejects_tampered_target(self):
+        payload = self.root / "payload"
+        directory = payload / "opt/f1/apps/cast"
+        directory.mkdir(parents=True)
+        content = b"new executable"
+        expected = sdk.hashlib.md5(content).hexdigest()
+        lines = []
+        for index in range(13):
+            name = "tool{}".format(index)
+            (directory / name).write_bytes(content)
+            lines.append('check "$SELF/{}" {}'.format(name, expected))
+        (directory / "start-cast-default-audio.sh").write_text("\n".join(lines))
+        loader = payload / "root/aic_miracast/load-aic-for-miracast.sh"
+        loader.parent.mkdir(parents=True)
+        loader.write_text("#!/bin/sh\n")
+        self.assertEqual(len(sdk.audit_cast_checks(payload)), 13)
+        (directory / "tool0").write_bytes(b"tampered")
+        with self.assertRaises(RuntimeError):
+            sdk.audit_cast_checks(payload)
+
     def test_runtime_relocation_handles_nested_paths_longest_first(self):
         content = b'LOADER=$BASE/old/loader.ko\nFW=$BASE/old\n'
         result = sdk.relocate_runtime_text(content, {"$BASE/old": "/firmware", "$BASE/old/loader.ko": "/modules/loader.ko"})

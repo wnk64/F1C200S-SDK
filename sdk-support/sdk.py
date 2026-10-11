@@ -453,8 +453,19 @@ def build_wireless_modules(jobs):
     print(json.dumps(report, indent=2), flush=True)
 
 
+def relocate_cast_touch(source):
+    old = '"/root/aic_miracast/candidates/audio_reopen_20261002/sink-audio-reopen"'
+    new = '"/opt/f1/apps/cast/miracast_sink_dump.lowest"'
+    content = source.read_text()
+    if content.count(old) == 1 and new not in content:
+        source.write_text(content.replace(old, new))
+    elif content.count(new) != 1 or old in content:
+        raise RuntimeError("Unrecognized cast touch sink identity")
+
+
 def build_app_ui(jobs):
     work = stage_project_sources()
+    relocate_cast_touch(work / "LVGL/menu/cast-wait-touch.c")
     host = work / "ROOTFS/buildroot-2018.02.11/output/host"
     prefix = host / "bin/arm-buildroot-linux-gnueabi-"
     if not Path(str(prefix) + "gcc").is_file():
@@ -484,6 +495,7 @@ def build_app_ui(jobs):
             shutil.copy2(str(path), str(images / target))
             results[target] = digest(path)
     report = {"source_commit": MANIFEST["project_sources"]["commit"], "sha256": results,
+              "cast_touch_source_sha256": digest(work / "LVGL/menu/cast-wait-touch.c"),
               "board_deployed": False, "scope": "UI/frontend subset, not all applications"}
     (images / "build.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2), flush=True)
@@ -805,6 +817,36 @@ def runtime_payload_plan(layout, target):
     return entries
 
 
+def audit_cast_checks(payload):
+    variables = {
+        "SELF": "/opt/f1/apps/cast", "P": "/root/aic_miracast", "CLI": "/root/aic_miracast/wpa24_aic_wfd_cli",
+        "PLAYER": "/opt/f1/apps/cast/cedar_drm_player", "SINK": "/opt/f1/apps/cast/miracast_sink_dump.lowest",
+        "LOADER": "/lib/modules/5.7.1/extra/aic_load_fw.ko", "FDRV": "/lib/modules/5.7.1/extra/aic8800_fdrv.ko",
+        "FW_DIR": "/vendor/etc/firmware/aic8800D80", "R": "/opt/f1/apps/cast",
+    }
+    checked = {}
+    for relative in ("opt/f1/apps/cast/start-cast-default-audio.sh", "root/aic_miracast/load-aic-for-miracast.sh"):
+        path = payload / relative
+        if not path.is_file():
+            raise RuntimeError("Missing integrated cast launcher: " + relative)
+        for line in path.read_text().splitlines():
+            if not line.strip().startswith("check "):
+                continue
+            args = shlex.split(line)
+            if len(args) != 3 or not re.fullmatch("[0-9a-f]{32}", args[2]):
+                raise RuntimeError("Unrecognized cast checksum statement")
+            name = re.sub(r"\$([A-Z_]+)", lambda match: variables[match.group(1)], args[1])
+            if not name.startswith("/"):
+                raise RuntimeError("Nonabsolute cast checksum target")
+            target = runtime_destination(payload, name[1:])
+            if not target.is_file() or hashlib.md5(target.read_bytes()).hexdigest() != args[2]:
+                raise RuntimeError("Integrated cast checksum failed: " + name)
+            checked[name] = args[2]
+    if len(checked) < 13:
+        raise RuntimeError("Cast preflight checksum coverage unexpectedly incomplete")
+    return checked
+
+
 def build_runtime_payload():
     check_output(create=True)
     target = OUT / "runtime-payload"
@@ -857,6 +899,8 @@ def build_runtime_payload():
               "resource_provenance": provenance,
               "scope": "compiled runtime payload with partial resources/services; base rootfs/full startup/libraries/image integration pending",
               "board_deployed": False}
+    if "opt/f1/apps/cast/start-cast-default-audio.sh" in files:
+        report["cast_preflight_checks"] = audit_cast_checks(target)
     (OUT / "images/runtime-payload").mkdir(parents=True, exist_ok=True)
     (OUT / "images/runtime-payload/build.json").write_text(json.dumps(report, indent=2) + "\n")
     print("Installed {} source-built runtime artifacts".format(len(files)), flush=True)
