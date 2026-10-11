@@ -593,3 +593,14 @@ Commit:6200adb initial resource integration; subsequent service/result commit re
 Verified:5de1bb0 headphone service/documentation,83 installed files and38 tests passed. Resource provenance40 targets plus43 compiled artifact targets. Report retained; all build processes terminal.
 Deploy:none, services not run; board/kernel/DTS/source/build baselines preserved. Rollback:revert SDK-only commits.
 Decision:resources and initial services integrated, not a complete rootfs/SD image. Full menu/WLAN/cast/wiliwili startup, remaining dependencies, clean portable rebuild and physical acceptance still pending.
+
+## 2026-10-11 / pending / Kernel runtime modules and startup integration
+Hypothesis: replace remaining hardcoded backend references and install full matching kernel module set plus normal WLAN/BT/menu/wiliwili startup files.
+Files:sdk-support/sdk.py, test_sdk.py, runtime-layout.json, README.md, changes-20261011.md.
+DLNA:generated output_cedar.c unique backend literal relocated only; original source retained. LAN rebuilt, gmediarender185884bytes SHA256f46c13e97cc4745af228ffb7dfaab72a4bf54cf6028cb0761d5ef00c3b066c2e; binary includes /opt/f1/apps/media/mplayer-native and no /candidates/. Source-transform SHA in images/lan/build.json.
+Modules:b5d740b exports17 modules from complete configured kernel modules.order; each5.7.1. Generic hci_uart explicitly superseded by already rebuilt external H5. Kernel source/config/zImage hashes and modules recorded in images/kernel-runtime/build.json. No kernel source/config/build baseline changed.
+Services:install copies of S17normalWLAN/S18SSH/S48Bluetooth and loaders point to exact kernel/extra module paths; AIC not added to normal boot/WLAN. Credential-free WPA template only.
+Menu:dc842c3 installs S90/supervisor/12-entry app list and wiliwili launchers/CA/font. Helper-ip compatibility name uses same verified fresh helper. Menu heap-release/app-return lifecycle retained.
+Tests:41 passed; shell syntax checks for install scripts; exact/idempotent/reject-unknown DLNA transform, dynamic module report/release checks, same-hash helper aliases verified.
+Result:114 runtime files installed, reports retained. No deployment, service execution or SD writes. Full cast launcher/hardware boot/libs/base rootfs/SD image/portable rebuild/cold-boot acceptance pending.
+Rollback:revert SDK-only integration commits; original sources/outputs and board runtime preserved.

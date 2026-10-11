@@ -58,3 +58,7 @@ Buildroot总包索引损坏也已修复；olddefconfig后必须仍选中基础�
 `./sdk build runtime-tools` 重编菜单使用的RTC/SNTP与静态IP工具，并运行同源码主机只读自测，不调用网络配置或授时写入功能。
 
 `./sdk build runtime-payload` 按runtime-layout.json将重编程序/模块安装至生成runtime-payload目录，安装前逐个核对构建报告哈希，拒绝未知目录/重复目标/路径及符号链接逃逸。另从锁定源码安装字体、RTL/AIC固件、应用脚本和首批RTC/耳机/自动声卡路由服务；安装副本的路径替换必须匹配且通过shell语法检查，保存原始及安装哈希。此目标是最终rootfs集成的一步，完整启动链、共享库、基础系统及分区镜像仍待完成，不是可烧录镜像。
+
+`./sdk build kernel-runtime` 按已编隔离kernel的modules.order导出全部配置模块，要求严格5.7.1，保存源/config/zImage/模块哈希。通用hci_uart由wireless-modules的外置H5替代；先构建wireless-modules再执行此目标。runtime-payload同时安装该完整模块集、普通WLAN/SSH/蓝牙加载服务、菜单与wiliwili启动文件。菜单调用的connections-helper-ip安装为同一重编helper的兼容名称，不复制历史程序。
+
+LAN后端在生成源码副本中定点改为/opt/f1/apps/media/mplayer-native，编译后必须在二进制内找到该路径且无候选路径；原开发源码不修改。当前运行文件114项，不代表最终rootfs/固件完成，完整投屏启动链、硬件加载、共享库与SD镜像仍待整合。
