@@ -29,7 +29,7 @@ def digest(path):
 
 
 def capture(args, cwd=None, env=None):
-    return subprocess.check_output(args, cwd=cwd, env=env, text=True).strip()
+    return subprocess.check_output(args, cwd=cwd, env=env, universal_newlines=True).strip()
 
 
 def run(args, cwd=None, env=None):
@@ -221,7 +221,7 @@ def doctor(release=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    sub = parser.add_subparsers(dest="command", required=True)
+    sub = parser.add_subparsers(dest="command")
     inspect = sub.add_parser("doctor")
     inspect.add_argument("--release", action="store_true")
     build = sub.add_parser("build")
@@ -229,6 +229,8 @@ def main():
     build.add_argument("-j", "--jobs", type=int, default=8)
     sub.add_parser("clean")
     args = parser.parse_args()
+    if not args.command:
+        parser.error("a command is required")
     with locked():
         if args.command == "doctor":
             return doctor(args.release)

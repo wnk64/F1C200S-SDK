@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-spec = importlib.util.spec_from_file_location("f1sdk", Path(__file__).with_name("sdk.py"))
+spec = importlib.util.spec_from_file_location("f1sdk", str(Path(__file__).with_name("sdk.py")))
 sdk = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(sdk)
 
@@ -67,7 +67,7 @@ class OutputSafetyTests(unittest.TestCase):
     def test_lock_excludes_second_process(self):
         with sdk.locked():
             code = "import fcntl,os,sys; f=os.open(sys.argv[1],os.O_RDONLY); fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB)"
-            result = subprocess.run(["python3", "-c", code, str(self.root)], capture_output=True)
+            result = subprocess.run(["python3", "-c", code, str(self.root)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             self.assertNotEqual(result.returncode, 0)
 
     def archive(self, member):
