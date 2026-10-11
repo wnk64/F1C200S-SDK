@@ -15,6 +15,51 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_kernel_config_parser_handles_empty_and_disabled_localversion(self):
+        values = sdk.config_values('CONFIG_LOCALVERSION=""\n# CONFIG_LOCALVERSION_AUTO is not set\nBR2_TEST=y\n', prefix="CONFIG_")
+        self.assertEqual(values, {"CONFIG_LOCALVERSION": '""', "CONFIG_LOCALVERSION_AUTO": "n"})
+
+    def test_source_metadata_allowlist_never_allows_driver_changes(self):
+        source = self.root / "driver"
+        source.mkdir()
+        spec = {"commit": "a" * 40, "preserved_metadata_changes": ["WORKTREE_CHANGELOG.md"]}
+        def git_capture(args, cwd=None):
+            if "--show-toplevel" in args:
+                return str(source)
+            if "rev-parse" in args:
+                return spec["commit"]
+            return "WORKTREE_CHANGELOG.md\ndriver.c"
+        with mock.patch.object(sdk, "component", return_value=(source, spec)), mock.patch.object(sdk, "capture", side_effect=git_capture):
+            with self.assertRaises(RuntimeError):
+                sdk.validate_source("driver")
+
+    def test_source_metadata_allowlist_accepts_preserved_change_record(self):
+        source = self.root / "driver"
+        source.mkdir()
+        spec = {"commit": "a" * 40, "preserved_metadata_changes": ["WORKTREE_CHANGELOG.md"]}
+        def git_capture(args, cwd=None):
+            if "--show-toplevel" in args:
+                return str(source)
+            if "rev-parse" in args:
+                return spec["commit"]
+            return "WORKTREE_CHANGELOG.md"
+        with mock.patch.object(sdk, "component", return_value=(source, spec)), mock.patch.object(sdk, "capture", side_effect=git_capture):
+            self.assertEqual(sdk.validate_source("driver"), (source, spec))
+
+    def test_source_metadata_allowlist_rejects_arbitrary_source_name(self):
+        source = self.root / "driver"
+        source.mkdir()
+        spec = {"commit": "a" * 40, "preserved_metadata_changes": ["driver.c"]}
+        def git_capture(args, cwd=None):
+            if "--show-toplevel" in args:
+                return str(source)
+            if "rev-parse" in args:
+                return spec["commit"]
+            return "driver.c"
+        with mock.patch.object(sdk, "component", return_value=(source, spec)), mock.patch.object(sdk, "capture", side_effect=git_capture):
+            with self.assertRaises(RuntimeError):
+                sdk.validate_source("driver")
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name).resolve()

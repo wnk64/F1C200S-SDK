@@ -549,3 +549,14 @@ Tests: previous24 SDK tests passed; installed-ELF/DESTDIR/sysroot regression add
 Verified:25 tests passed after installed-ELF regression. Commits281727e/ad13bd4/0576873. Clean-test output concerns temporary fixtures only, generated SDK component builds preserved.
 Deploy: none. Rollback: revert SDK-only commits, no original tree or board runtime rollback needed.
 Decision: source build passed, runtime/image/cold-boot acceptance pending; full objective unchanged.
+
+## 2026-10-11 / pending / Wireless and IP5209 module source builds
+Hypothesis: preserve accepted AIC source separately from later peripheral development and build all external runtime modules against the isolated exact-release kernel.
+Files: sdk-support/sdk.py, manifest.json, README.md, test_sdk.py, changes-20261011.md.
+Source: AIC export53bec9ea327282707ceb9996f1607b51f117728b, IP5209 source4c5338d85e21bef04dd8a2b42b4e8bcfe67d4e20; H5 project2f1d627. Existing AIC root changelog preserved; all actual source changes still rejected.
+Build: ./sdk build wireless-modules -j2 using original Linaro7.2.1, ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- LOCALVERSION=; AIC CONFIG_PREALLOC_RX_SKB=y CONFIG_F1C200S_PREALLOC_RX_SMALL=y.
+Result: all4 modules built and vermagic5.7.1 mod_unload ARMv5 p2v8. Report images/wireless-modules/build.json records source commits/hashes. Original kernel/config/DTB/module outputs and board unchanged.
+First preflight: config parser recognized BR2 only; corrected parameterized parser recognizes CONFIG_ and empty/disabled LOCALVERSION, no kernel config change or relaxed check.
+Tests: kernel parser and metadata allowlist regression added. Full runtime/cold-boot checks not performed.
+Deploy: none. Rollback: revert SDK-only commits.
+Decision: source compilation passed; protocol tooling, formal runtime layout, image construction, independent rebuild and physical acceptance remain pending.
