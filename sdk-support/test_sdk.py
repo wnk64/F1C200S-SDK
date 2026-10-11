@@ -158,6 +158,32 @@ class OutputSafetyTests(unittest.TestCase):
         values = sdk.config_values('BR2_PACKAGE_A=y\n# BR2_PACKAGE_B is not set\nBR2_LITERAL="x=y # literal"\n')
         self.assertEqual(values, {"BR2_PACKAGE_A": "y", "BR2_PACKAGE_B": "n", "BR2_LITERAL": '"x=y # literal"'})
 
+    def test_ons_baseline_relocation_keeps_checksum_contract(self):
+        directory = self.root / "ons"
+        engine = directory / "vendor/ONScripter-GBK"
+        engine.mkdir(parents=True)
+        source = engine / "ScriptHandler.cpp"
+        source.write_text("locked source")
+        expected = sdk.digest(source)
+        baseline = directory / "source-baseline.sha256"
+        baseline.write_text(expected + "  ../../old/ScriptHandler.cpp\n")
+        sdk.relocate_ons_baseline(directory)
+        self.assertEqual(baseline.read_text(), expected + "  vendor/ONScripter-GBK/ScriptHandler.cpp\n")
+        sdk.relocate_ons_baseline(directory)
+        self.assertEqual(source.read_text(), "locked source")
+
+    def test_ons_baseline_rejects_mismatched_snapshot(self):
+        directory = self.root / "ons"
+        engine = directory / "vendor/ONScripter-GBK"
+        engine.mkdir(parents=True)
+        (engine / "ScriptHandler.cpp").write_text("different")
+        baseline = directory / "source-baseline.sha256"
+        original = "a" * 64 + "  ../../old/ScriptHandler.cpp\n"
+        baseline.write_text(original)
+        with self.assertRaises(RuntimeError):
+            sdk.relocate_ons_baseline(directory)
+        self.assertEqual(baseline.read_text(), original)
+
     def test_project_stage_preserves_toolchain_and_uses_locked_archive(self):
         source = self.root / "LVGL/menu"
         source.mkdir(parents=True)

@@ -469,12 +469,58 @@ def build_retro_cores(jobs):
     cyclone = pico / "cpu/cyclone"
     generator = directory / "build/cyclone-gen"
     generator.parent.mkdir(exist_ok=True)
-    run(["g++", "-O2", "-DHAVE_ARMv6=0", ' -DCONFIG_FILE="../cyclone_config.h"'.strip()] +
+    run(["g++", "-O2", "-DHAVE_ARMv6=0", '-DCONFIG_FILE="../cyclone_config.h"'] +
         sorted(cyclone.glob("*.cpp")) + [cyclone / "Disa/Disa.c", "-o", generator], env=env)
     run([generator], cyclone, env)
     run(common + ["-f", "Makefile.libretro", "GIT_REVISION=-26ecb2b", "SHARED=-shared", "LIBM=-lm", "use_libchdr=0"], pico, env)
     publish_apps("retro-cores", {"gba.so": gpsp / "gpsp_libretro.so", "ps1.so": pcsx / "pcsx_rearmed_libretro.so",
                                 "md.so": pico / "picodrive_libretro.so"}, prefix)
+
+
+def build_lan(jobs):
+    work, host, prefix, env = app_environment()
+    directory = work / "SOFTWARE/lan-apps"
+    library = directory / "stage"
+    sysroot = Path(capture([prefix + "gcc", "--print-sysroot"]))
+    env["CC"] = prefix + "gcc"
+    env["CFLAGS"] = "-Os"
+    for relative in ("vendor/pupnp", "vendor/gmrender"):
+        source = directory / relative
+        for path in source.rglob("*"):
+            if path.is_file() and not path.is_symlink() and path.suffix in (".am", ".ac", ".m4", ".sh", ".c", ".h", ".in"):
+                content = path.read_bytes()
+                if b"\r\n" in content:
+                    path.write_bytes(content.replace(b"\r\n", b"\n"))
+        run(["autoreconf", "-fi"], source, env)
+        configure = ["./configure", "--host=arm-buildroot-linux-gnueabi", "--prefix=" + str(library)]
+        if relative.endswith("pupnp"):
+            configure += ["--disable-samples", "--disable-shared", "--enable-static", "--disable-ipv6"]
+        else:
+            configure += ["--datadir=/opt/f1/apps/lan/data", "--without-gstreamer"]
+            env.update({"PKG_CONFIG_LIBDIR": str(library / "lib/pkgconfig") + ":" + str(sysroot / "usr/lib/pkgconfig"),
+                        "PKG_CONFIG_SYSROOT_DIR": str(sysroot),
+                        "GLIB_CFLAGS": "-I{} -I{}".format(sysroot / "usr/include/glib-2.0", sysroot / "usr/lib/glib-2.0/include"),
+                        "GLIB_LIBS": "-lgthread-2.0 -lglib-2.0",
+                        "LIBUPNP_CFLAGS": "-I" + str(library / "include/upnp"),
+                        "LIBUPNP_LIBS": "{} {} -lpthread".format(library / "lib/libupnp.a", library / "lib/libixml.a")})
+        run(configure, source, env)
+        run(["make", "-j{}".format(jobs)], source, env)
+        if relative.endswith("pupnp"):
+            run(["make", "install"], source, env)
+    build = directory / "build"
+    build.mkdir(exist_ok=True)
+    cc = prefix + "gcc"
+    run([cc, "-Os", "-std=gnu99", "-D_GNU_SOURCE", "-DNO_SSL", "-DNO_CGI", "-DNO_WEBSOCKET",
+         "-DUSE_STACK_SIZE=131072", "-Ivendor/civetweb/include", "-c", "vendor/civetweb/src/civetweb.c",
+         "-o", "build/civetweb.o"], directory, env)
+    menu = work / "LVGL/menu"
+    run(["make", "-j{}".format(jobs), "CC=" + cc, "f1-menu"], menu, env)
+    run([cc, "-Os", "-std=gnu99", "-Wall", "-Wextra", "-DLV_CONF_INCLUDE_SIMPLE", "-Ivendor/civetweb/include",
+         "-I" + str(menu), "-I" + str(work / "LVGL/touch"), "-I" + str(work / "LVGL/touch/lvgl"),
+         "-c", "lan_ui.c", "-o", "build/lan_ui.o"], directory, env)
+    run([cc, "-o", "lan-ui", "build/lan_ui.o", "build/civetweb.o", menu / "platform.o", menu / "menu_font_stream.o"] +
+        sorted((menu / "build/lvgl").rglob("*.o")) + ["-lm", "-lpthread", "-ldl"], directory, env)
+    publish_apps("lan", {"lan-ui": directory / "lan-ui", "gmediarender": directory / "vendor/gmrender/src/gmediarender"}, prefix)
 
 
 def build_rootfs(jobs, sources_only=False):
@@ -614,7 +660,7 @@ def main():
     inspect = sub.add_parser("doctor")
     inspect.add_argument("--release", action="store_true")
     build = sub.add_parser("build")
-    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores"], default="all", nargs="?")
+    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan"], default="all", nargs="?")
     build.add_argument("-j", "--jobs", type=int, default=8)
     clean = sub.add_parser("clean")
     clean.add_argument("--component", choices=sorted(MANIFEST["components"]))
@@ -654,6 +700,9 @@ def main():
             return 0
         if args.component == "retro-cores":
             build_retro_cores(args.jobs)
+            return 0
+        if args.component == "lan":
+            build_lan(args.jobs)
             return 0
         build_boot(args.component, args.jobs)
         return 0
