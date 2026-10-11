@@ -3,6 +3,12 @@
   "release_ready": false,
   "kernel_release": "5.7.1",
   "components": {
+    "bluealsa": {
+      "path": "SOFTWARE/legacy-LicheePi_Nano/third_party/bluealsa-f1c200s/bluez-alsa",
+      "stage_path": "work/SOFTWARE/bluealsa",
+      "commit": "82fdaea18130bf7b0c83a5e2566ddd4249901c82",
+      "required_files": ["configure.ac", "Makefile.am", "src/bluealsa.c", "src/asound/bluealsa-pcm.c", "src/asound/Makefile.am"]
+    },
     "miracast-sink": {
       "path": "SOFTWARE/miracast-sink",
       "stage_path": "work/SOFTWARE/miracast-sink",

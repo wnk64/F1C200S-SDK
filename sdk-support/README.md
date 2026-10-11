@@ -48,3 +48,5 @@ Buildroot总包索引损坏也已修复；olddefconfig后必须仍选中基础�
 `./sdk build media-backends` 已实编通过Cedar硬解播放器、无SDL MPlayer、wiliwili界面及网络播放后端。构建仅在生成目录执行，未部署板子。
 
 `./sdk build miracast-sink` 从锁定的完整接收器Git源码重编FIFO/音频接收器，使用SDK新Buildroot工具链及ALSA，不复制历史二进制。它尚不包含AIC模块、WFD协议工具与启动服务整合。
+
+`./sdk build bluetooth-audio` 从完整BlueALSA源重编服务、aplay及两个ALSA插件，并从跟踪源重编自动声卡路由。依赖新rootfs的SBC/GLib/D-Bus/BlueZ，安装只进入生成目录，尚不代表板端服务或镜像集成完成。

@@ -604,6 +604,38 @@ def build_miracast_sink(jobs):
     }, prefix)
 
 
+def build_bluetooth_audio(jobs):
+    work, host, prefix, env = app_environment()
+    _, source, _ = stage("bluealsa")
+    sysroot = host / "arm-buildroot-linux-gnueabi/sysroot"
+    env.update({"CC": prefix + "gcc", "AR": prefix + "ar", "RANLIB": prefix + "ranlib",
+                "PKG_CONFIG": str(host / "bin/pkg-config"),
+                "PKG_CONFIG_SYSROOT_DIR": str(sysroot),
+                "PKG_CONFIG_LIBDIR": str(sysroot / "usr/lib/pkgconfig"),
+                "CFLAGS": "-Os -march=armv5te"})
+    if not (source / "configure").is_file():
+        run(["autoreconf", "-fi"], source, env)
+    run(["/bin/sh", "configure", "--host=arm-buildroot-linux-gnueabi", "--prefix=/usr",
+         "--disable-debug", "--with-dbusconfdir=/etc/dbus-1/system.d",
+         "--with-alsaplugindir=/usr/lib/alsa-lib", "--with-alsaconfdir=/usr/share/alsa/alsa.conf.d"], source, env)
+    run(["make", "-j{}".format(jobs)], source, env)
+    install = source / "sdk-install"
+    run(["make", "install", "DESTDIR=" + str(install)], source, env)
+    route = work / "SCRCPT/network-and-audio-source/audio_route_20260930"
+    flags = shlex.split(capture([host / "bin/pkg-config", "--cflags", "--libs", "dbus-1"], env=env))
+    output = route / "f1-audio-route"
+    run([prefix + "gcc", "-std=gnu99", "-Wall", "-Wextra", "-Os", "-march=armv5te",
+         "-I", route, route / "audio-route.c", route / "shared/dbus-client.c"] + flags +
+        ["-lbluetooth", "-o", output], route, env)
+    publish_apps("bluetooth-audio", {
+        "bluealsa": source / "src/bluealsa",
+        "bluealsa-aplay": source / "utils/bluealsa-aplay",
+        "libasound_module_pcm_bluealsa.so": install / "usr/lib/alsa-lib/libasound_module_pcm_bluealsa.so",
+        "libasound_module_ctl_bluealsa.so": install / "usr/lib/alsa-lib/libasound_module_ctl_bluealsa.so",
+        "f1-audio-route": output,
+    }, prefix)
+
+
 def build_rootfs(jobs, sources_only=False):
     original, target, spec = stage("rootfs")
     _, cedarc, _ = stage("libcedarc")
@@ -746,7 +778,7 @@ def main():
     inspect = sub.add_parser("doctor")
     inspect.add_argument("--release", action="store_true")
     build = sub.add_parser("build")
-    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink"], default="all", nargs="?")
+    build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio"], default="all", nargs="?")
     build.add_argument("-j", "--jobs", type=int, default=8)
     clean = sub.add_parser("clean")
     clean.add_argument("--component", choices=sorted(MANIFEST["components"]))
@@ -795,6 +827,9 @@ def main():
             return 0
         if args.component == "miracast-sink":
             build_miracast_sink(args.jobs)
+            return 0
+        if args.component == "bluetooth-audio":
+            build_bluetooth_audio(args.jobs)
             return 0
         build_boot(args.component, args.jobs)
         return 0
