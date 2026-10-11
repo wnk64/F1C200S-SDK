@@ -16,6 +16,22 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_rootfs_link_resolution_handles_absolute_relative_and_loops(self):
+        library = tarfile.TarInfo("lib/libc-real.so")
+        absolute = tarfile.TarInfo("usr/lib/libc.so")
+        absolute.type = tarfile.SYMTYPE
+        absolute.linkname = "/lib/libc-real.so"
+        relative = tarfile.TarInfo("lib/libc.so")
+        relative.type = tarfile.SYMTYPE
+        relative.linkname = "libc-real.so"
+        members = {item.name: item for item in (library, absolute, relative)}
+        self.assertEqual(sdk.resolve_archive_path(members, "usr/lib/libc.so"), "lib/libc-real.so")
+        self.assertEqual(sdk.resolve_archive_path(members, "lib/libc.so"), "lib/libc-real.so")
+        self.assertIsNone(sdk.resolve_archive_path(members, "lib/missing.so"))
+        relative.linkname = "libc.so"
+        with self.assertRaises(RuntimeError):
+            sdk.resolve_archive_path(members, "lib/libc.so")
+
     def test_rootfs_merge_preserves_special_nodes_and_installs_root_files(self):
         base = self.root / "base.tar"
         payload = self.root / "payload"

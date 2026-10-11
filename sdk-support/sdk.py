@@ -914,6 +914,68 @@ def merge_rootfs_archive(base_path, payload, files, output_path):
     return sorted(excluded & set(members))
 
 
+def resolve_archive_path(members, name):
+    name = posixpath.normpath(name).lstrip("/")
+    for unused in range(40):
+        parts = name.split("/")
+        restarted = False
+        for index in range(len(parts)):
+            prefix = "/".join(parts[:index + 1])
+            member = members.get(prefix)
+            if member and (member.issym() or member.islnk()):
+                link = member.linkname
+                parent = "" if member.islnk() or link.startswith("/") else posixpath.dirname(prefix)
+                name = posixpath.normpath(posixpath.join(parent, link.lstrip("/"), *parts[index + 1:]))
+                if name == ".." or name.startswith("../"):
+                    raise RuntimeError("Rootfs link escapes root")
+                restarted = True
+                break
+        if not restarted:
+            return name if name in members and members[name].isfile() else None
+    raise RuntimeError("Rootfs symlink loop: " + name)
+
+
+def audit_rootfs_dependencies(archive_path, readelf):
+    issues = []
+    binaries = {}
+    with tarfile.open(str(archive_path)) as archive, tempfile.TemporaryDirectory() as temporary:
+        members = {archive_name(member.name): member for member in archive.getmembers()}
+        elf_path = Path(temporary) / "elf"
+        for name, member in sorted(members.items()):
+            if not member.isfile():
+                continue
+            with archive.extractfile(member) as stream:
+                magic = stream.read(4)
+                if magic != b"\x7fELF":
+                    continue
+                elf_path.write_bytes(magic + stream.read())
+            header = capture([readelf, "-h", elf_path])
+            if not re.search(r"Machine:\s+ARM\s*$", header, re.MULTILINE):
+                issues.append({"file": name, "error": "non-ARM ELF"})
+                continue
+            dynamic = capture([readelf, "-d", elf_path])
+            program = capture([readelf, "-l", elf_path])
+            needed = re.findall(r"\(NEEDED\).*\[([^]]+)\]", dynamic)
+            interpreter = re.search(r"Requesting program interpreter:\s*([^]]+)\]", program)
+            search = ["lib", "usr/lib", "usr/local/lib"]
+            for paths in re.findall(r"\((?:RUNPATH|RPATH)\).*\[([^]]+)\]", dynamic):
+                for path in paths.split(":"):
+                    search.append(path.replace("${ORIGIN}", posixpath.dirname(name)).replace("$ORIGIN", posixpath.dirname(name)).lstrip("/"))
+            resolved_dependencies = {}
+            for library in needed:
+                resolved_path = next((resolved_archive_path(members, posixpath.join(directory, library))
+                                      for directory in search if resolved_archive_path(members, posixpath.join(directory, library))), None)
+                if not resolved_path:
+                    issues.append({"file": name, "error": "missing shared library", "dependency": library})
+                else:
+                    resolved_dependencies[library] = resolved_path
+            if interpreter and not resolve_archive_path(members, interpreter.group(1)):
+                issues.append({"file": name, "error": "missing ELF interpreter", "dependency": interpreter.group(1)})
+            binaries[name] = {"needed": resolved_dependencies, "interpreter": interpreter.group(1) if interpreter else None}
+    return {"elf_count": len(binaries), "binaries": binaries, "issues": issues,
+            "scope": "ELF architecture/interpreter/NEEDED file resolution; not ABI symbol or hardware acceptance"}
+
+
 def build_integrated_rootfs():
     check_output(create=True)
     base_report = json.loads((OUT / "images/rootfs-base/build.json").read_text())
@@ -929,6 +991,11 @@ def build_integrated_rootfs():
     output = images / "rootfs.tar"
     try:
         excluded = merge_rootfs_archive(base, OUT / "runtime-payload", runtime_report["files"], temporary)
+        work, _, prefix, _ = app_environment()
+        dependencies = audit_rootfs_dependencies(temporary, prefix + "readelf")
+        (images / "dependencies.json").write_text(json.dumps(dependencies, indent=2) + "\n")
+        if dependencies["issues"]:
+            raise RuntimeError("Rootfs dependency audit failed; see images/rootfs-integrated/dependencies.json")
         os.replace(str(temporary), str(output))
     finally:
         if temporary.exists():
@@ -936,6 +1003,7 @@ def build_integrated_rootfs():
     report = {"base_rootfs_sha256": digest(base), "runtime_report_sha256": digest(OUT / "images/runtime-payload/build.json"),
               "rootfs_tar_sha256": digest(output), "rootfs_tar_bytes": output.stat().st_size,
               "excluded_services": excluded, "runtime_files": len(runtime_report["files"]),
+              "dependency_report_sha256": digest(images / "dependencies.json"), "elf_count": dependencies["elf_count"],
               "scope": "assembled rootfs candidate; full startup/dependency/image/hardware validation pending",
               "board_deployed": False}
     (images / "build.json").write_text(json.dumps(report, indent=2) + "\n")
