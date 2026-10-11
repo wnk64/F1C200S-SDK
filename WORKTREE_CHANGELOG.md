@@ -581,3 +581,15 @@ Integration:./sdk build runtime-payload -j2 installed43 compiled artifacts/modul
 Safety:35 tests passed including tampered artifact, duplicate destination, path escape and internal symlink-parent rejection. Unknown payload output cannot be overwritten.
 Deploy:none; no board/SD changes. Rollback:revert SDK-only commits, active source/build/runtime baselines preserved.
 Decision:compiled payload integration passed; fonts/firmware/services/shared libraries/base rootfs/SD image/portable clean rebuild/physical cold boots still pending. No complete firmware claim.
+
+## 2026-10-11 / pending / Runtime assets and initial services
+Hypothesis: install locked source resources and narrowly relocated service/app scripts without importing historical rootfs binaries or candidate paths.
+Files:sdk-support/sdk.py, runtime-layout.json, test_sdk.py, README.md, changes-20261011.md.
+Source:project2f1d627, AIC53bec9e firmware export, BlueALSA82fdaea freshly installed config. Original trees/files unchanged.
+Integration:runtime-payload includes CJK font for8 apps, Takao font/license, RTL8723BS WiFi/BT firmware/license,7 AIC firmware files,9 app launchers, DLNA icons, RTC/headphone/audio-route services, ALSA/D-Bus configs.
+Relocation:MEDIA/ONS backend and BlueALSA/audio-route executable paths only in install copies; known input required, candidate paths rejected, shell -n checks passed, source+installed hashes recorded.
+Results:38 SDK tests passed, initial82 files installed; subsequent headphone service adds1. Actual installed fmac MD5=01acfbebdfb15755e3fe853e7bc95c7d matches established cast firmware. Installed scripts have no /candidates/ residue.
+Commit:6200adb initial resource integration; subsequent service/result commit recorded in Chinese SDK log.
+Verified:5de1bb0 headphone service/documentation,83 installed files and38 tests passed. Resource provenance40 targets plus43 compiled artifact targets. Report retained; all build processes terminal.
+Deploy:none, services not run; board/kernel/DTS/source/build baselines preserved. Rollback:revert SDK-only commits.
+Decision:resources and initial services integrated, not a complete rootfs/SD image. Full menu/WLAN/cast/wiliwili startup, remaining dependencies, clean portable rebuild and physical acceptance still pending.
