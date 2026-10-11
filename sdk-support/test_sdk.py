@@ -253,6 +253,22 @@ class OutputSafetyTests(unittest.TestCase):
                 sdk.stage_project_sources()
         self.assertEqual((generated / "source.c").read_text(), "preserve")
 
+    def test_bluetooth_audio_publishes_installed_elf_not_libtool_wrapper(self):
+        source = self.root / "bluealsa"
+        source.mkdir()
+        (source / "configure").write_text("generated")
+        host = self.root / "host"
+        prefix = str(host / "bin/arm-buildroot-linux-gnueabi-")
+        env = {}
+        with mock.patch.object(sdk, "app_environment", return_value=(self.root, host, prefix, env)), mock.patch.object(sdk, "stage", return_value=(source, source, {})), mock.patch.object(sdk, "capture", return_value="-ldbus-1"), mock.patch.object(sdk, "run") as run, mock.patch.object(sdk, "publish_apps") as publish:
+            sdk.build_bluetooth_audio(2)
+        files = publish.call_args[0][1]
+        self.assertEqual(files["bluealsa"], source / "sdk-install/usr/bin/bluealsa")
+        self.assertEqual(files["bluealsa-aplay"], source / "sdk-install/usr/bin/bluealsa-aplay")
+        self.assertIn(["make", "install", "DESTDIR=" + str(source / "sdk-install")], [call[0][0] for call in run.call_args_list])
+        self.assertEqual(env["CC"], prefix + "gcc")
+        self.assertEqual(env["PKG_CONFIG_SYSROOT_DIR"], str(host / "arm-buildroot-linux-gnueabi/sysroot"))
+
     def test_sink_build_uses_locked_source_and_new_toolchain(self):
         source = self.root / "sink"
         host = self.root / "host"

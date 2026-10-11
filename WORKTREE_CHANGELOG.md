@@ -538,3 +538,13 @@ Tests: SDK24 tests passed, including fresh-toolchain/force-build receiver recipe
 Previous build verification: media-backends report confirms all4 executables built, ARM/noSDL. ONS/retro/LAN reports retained. None is a full image or runtime acceptance claim.
 Deploy: none. Rollback: revert SDK-only integration commits; original build/runtime artifacts unchanged.
 Decision: full goal still active; wireless protocol/BT audio/peripherals/runtime/image/independent rebuild/cold-boot acceptance pending.
+
+## 2026-10-11 / pending / BlueALSA and automatic route source rebuild
+Hypothesis: source-locked BlueALSA plus base SBC/GLib/DBus/BlueZ builds can replace archived runtime executables in final image integration.
+Files: sdk-support/sdk.py, manifest.json, README.md, test_sdk.py, changes-20261011.md.
+Source: BlueALSA82fdaea18130bf7b0c83a5e2566ddd4249901c82 and project2f1d627 automatic route sources. Original sources/configs/artifacts preserved.
+Build: ./sdk build bluetooth-audio -j2 using generated BuildrootGCC6.4; autoreconf/configure --host=arm-buildroot-linux-gnueabi --prefix=/usr --disable-debug; make install DESTDIR inside generated source only.
+Result: bluealsa/bluealsa-aplay/PCM+CTL ALSA plugins/f1-audio-route all ARM/noSDL. SHA256 and sizes in images/bluetooth-audio/build.json. Initial src/bluealsa libtool wrapper rejected by ELF gate; publish corrected to installed real binaries, no weakened checks.
+Tests: previous24 SDK tests passed; installed-ELF/DESTDIR/sysroot regression added, result to be recorded after run.
+Deploy: none. Rollback: revert SDK-only commits, no original tree or board runtime rollback needed.
+Decision: source build passed, runtime/image/cold-boot acceptance pending; full objective unchanged.
