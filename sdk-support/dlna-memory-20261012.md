@@ -23,3 +23,5 @@ SDK：`/home/wnk/Desktop/F1c200S_SOFT`，2767bff。板端5.7.1；gmediarender SH
 01ac414已提交候选，72项测试通过，包含实际fork/setsid/模拟主进程SIGKILL/缓存后代回收的host测试。LAN构建退出0，gmediarender38e4019287a091581ce5e0ba6cb6eba166fbfdf250096eb2eae6550c4ab91afe；launcher bcf2acd8...；helper5b642023...。原source、播放器、kernel未改。SDK原sdk.py因Windows传输模式变化误设为可执行，后续恢复原644。
 
 恢复AIC首次失败：原cast-app.sh仅凭/tmp会话目录存在选session，但卸载后wlan1不存在，报告existing GO5745 unavailable。只在SDK生成入口的精确替换中增加接口存在条件，接口缺失选择cold；原源脚本/播放器/驱动不修改。需验证再初始化+三击退出、再次进入DLNA释放闲置AIC；不在失败状态上宣称回归通过。
+
+100abec生成入口已修正，73项测试通过。用户明确允许回滚备份和部署；板端原renderer/dlna-app/cast-app分别保存在原路径加.pre-dlna-oom，hash30af359d.../0e71e20b.../beada998...，候选renderer38e40192...、cast入口2ef1781e...核验后部署，MPlayer18ee6853...未变。再次恢复时原cold流程正确拒绝覆盖旧/tmp会话目录；补充helper在确认无活跃cast、停止已核验后代后，只清理枚举的生成会话文件/空目录和已确认FIFO，未知文件保留并报错，拒绝symlink。不改原cold安全保护。需要重新验证释放→cold恢复→再次DLNA全过程。

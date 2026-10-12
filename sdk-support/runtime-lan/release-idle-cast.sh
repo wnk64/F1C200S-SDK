@@ -2,6 +2,7 @@
 set -eu
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
 R=/tmp/manual_miracast_20260920
+[ ! -L "$R" ] || { echo 'Cast runtime must not be a symlink' >&2; exit 1; }
 command_of() { tr '\000' ' ' < "/proc/$1/cmdline" 2>/dev/null || true; }
 pid_from() {
     [ -r "$R/$1" ] || return 1
@@ -18,7 +19,6 @@ for file in player.pid sink.pid rtsp-watch.pid; do
             exit 1 ;;
     esac
 done
-[ -d /sys/module/aic8800_fdrv ] || exit 0
 # Only descendants of verified cast helpers are eligible for termination.
 terminate_tree() (
     root=$1
@@ -35,6 +35,20 @@ for file in dhcp.pid pbc-watch.pid wpa.pid; do
             terminate_tree "$pid" ;;
     esac
 done
-sleep 1
-rmmod aic8800_fdrv
+if [ -d /sys/module/aic8800_fdrv ]; then
+    sleep 1
+    rmmod aic8800_fdrv
+fi
+# Retire only the known generated session files; preserve unknown contents.
+if [ -d "$R" ]; then
+    for name in dhcp.log dhcp.pid go-status.log pbc-action.log pbc-watch.pid pbc-watch.sh pbc-watch.stdout player-frame-gap.log player.pid rtsp-watch.log rtsp-watch.pid rtsp-watch.sh sink.log sink.pid watch-handoff-launch.log wpa.conf wpa.log wpa.pid; do
+        rm -f "$R/$name"
+    done
+    [ ! -d "$R/wpa_ctrl" ] || rmdir "$R/wpa_ctrl"
+    rmdir "$R"
+fi
+if [ -e /tmp/aic_h264_live.fifo ]; then
+    [ ! -L /tmp/aic_h264_live.fifo ] && [ -p /tmp/aic_h264_live.fifo ] || exit 1
+    rm -f /tmp/aic_h264_live.fifo
+fi
 echo 'DLNA: idle AIC cast resources released; BS Wi-Fi/SSH unchanged'
