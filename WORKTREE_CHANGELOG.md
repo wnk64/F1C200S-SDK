@@ -15,6 +15,11 @@ Tests:reader text/gesture/LRC/reply parser passed;PNG1200x900 fits480x360;PDF/EP
 Deploy plan:SSH/SCP only,verify source and remote SHA256b527b412dd9608efe20cff67b95687529f5ca8923ec55fe6e7a33899392553cc;no existing target overwrite.
 Decision:pending;web upload/download/auth/security tests and regenerated image required. Diagnostic timeout command absent;use disposable bounded watchdog,not an application defect.
 
+## 2026-10-13 / Planned / Uniform application lifecycle release
+Base:5a3088c SDK;kernel/MPlayer/emulator source unchanged. User requires immediate app-exclusive release before returning to menu,not cleanup deferred to next app.
+Files:sdk-support/runtime-menu, runtime tool build/layout/test,generated wiliwili parent whitelist and private TMPDIR mappings. Subreaper/session runner reaps all descendants including setsid/double-fork,then uniform exit hook releases idle cast resources before UI restarts. Shared BS/SSH/BT/RTC/display/touch infrastructure and persistent user files preserved.
+Tests/rollback:see sdk-support/app-lifecycle-20261013.md;exact retained portable-sdk artifacts must match board before deployment. Host orphan/crash/cancel/private-temp tests and real-board handoff/reentry required. Three cold boots0;candidate pending.
+
 ## 2026-10-07 / pending / menu Wi-Fi bounded recovery
 Sourcee717fc7; exact files and evidence in SCRCPT/network-and-audio-source/wifi_control_20261007/WORKTREE_CHANGELOG.md. Menu/helper/S17recovery candidate deploys only userspace, preserves kernel/driverbinary/BT/AIC/DTB. Fresh reject/AP/cooldown/manual safeguards, target relookup, IP confirmation, explicitUI failures. Same GCC6.4build/gatesPASS and three actual manualreconnect/staticIPv4PASS. SSH10.0.0.234/menu healthy. True driverstall and3coldboots0/full protected regressions pending, not permanent/stable claim. No temporary helper scripts/backups, serialCOM11released.
 

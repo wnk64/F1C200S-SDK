@@ -28,6 +28,46 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_uniform_app_runner_reaps_escaped_children_and_private_runtime(self):
+        support = Path(__file__).with_name("runtime-menu")
+        runner, fixture = self.root / "runner", self.root / "fixture"
+        for source, output in (("f1_app_runner.c", runner), ("test_fixture.c", fixture)):
+            subprocess.run(["cc", "-Os", "-Wall", "-Wextra", "-Werror", str(support / source),
+                            "-o", str(output)], check=True)
+        protected = self.root / "protected"
+        protected.write_text("keep")
+        unrelated = subprocess.Popen(["sleep", "15"])
+        try:
+            for mode, expected in (("normal", 0), ("crash", 137), ("wait", 143)):
+                record = self.root / (mode + ".txt")
+                process = subprocess.Popen([str(runner), str(fixture), mode, str(record)])
+                if mode == "wait":
+                    import time
+                    deadline = time.monotonic() + 3
+                    while not record.exists() or len(record.read_text().splitlines()) < 3:
+                        if time.monotonic() > deadline: self.fail("fixture startup timeout")
+                        time.sleep(0.01)
+                    process.terminate()
+                self.assertEqual(process.wait(timeout=6), expected)
+                lines = record.read_text().splitlines()
+                self.assertFalse(Path(lines[0]).exists())
+                for pid in lines[1:]: self.assertFalse(Path("/proc/" + pid).exists())
+                self.assertIsNone(unrelated.poll())
+                self.assertEqual(protected.read_text(), "keep")
+            self.assertEqual(subprocess.run([str(runner), "/no-such-f1-app"], timeout=6).returncode, 127)
+        finally:
+            unrelated.terminate(); unrelated.wait()
+        for name in ("menu-supervisor.sh", "app-release.sh"):
+            subprocess.run(["sh", "-n", str(support / name)], check=True)
+
+    def test_uniform_exit_hook_and_wiliwili_runner_parent_contract(self):
+        layout = json.loads(Path(__file__).with_name("runtime-layout.json").read_text())
+        supervisor = next(e for e in layout["sources"] if "opt/f1/apps/menu/menu-supervisor.sh" in e["targets"])
+        self.assertEqual(supervisor["origin"], "sdk")
+        wili = next(e for e in layout["sources"] if "opt/f1/apps/wiliwili/launch-net-with-menu.sh" in e["targets"])
+        self.assertIn("f1-app-runner", wili["replacements"]["grep -q 'menu-supervisor.sh'"])
+        self.assertEqual(layout["artifacts"]["runtime-tools"]["f1-app-runner"], "opt/f1/apps/menu/f1-app-runner")
+
     def test_cast_entry_reinitializes_when_idle_radio_was_released(self):
         layout = json.loads(Path(__file__).with_name("runtime-layout.json").read_text())
         entry = next(item for item in layout["sources"] if "opt/f1/apps/cast/cast-app.sh" in item["targets"])

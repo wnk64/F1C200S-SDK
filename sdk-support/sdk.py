@@ -1163,6 +1163,7 @@ def build_runtime_tools(jobs):
     sources = {
         "f1-rtc-time-ui": network / "rtc_time_20261003/f1-rtc-time.c",
         "f1-ip-config": network / "static_ip_20261004/f1-ip-config.c",
+        "f1-app-runner": ROOT / "sdk-support/runtime-menu/f1_app_runner.c",
     }
     generated = OUT / "runtime-tools-build"
     generated.mkdir(parents=True, exist_ok=True)
