@@ -1449,6 +1449,7 @@ def build_rootfs(jobs, sources_only=False):
     _, cedarc, _ = stage("libcedarc")
     _, cedarx, _ = stage("libcedarx")
     busybox_changed = prepare_busybox_config(target)
+    previous_config = config_values((target / ".config").read_text())
     # The legacy overlay is deliberately not part of this base-rootfs recipe.
     # Current board files are integrated separately, never collected from old payloads.
     set_config(target / ".config", {
@@ -1465,6 +1466,7 @@ def build_rootfs(jobs, sources_only=False):
         "BR2_PACKAGE_FAAD2": "y",
         "BR2_PACKAGE_LIBMAD": "y",
         "BR2_PACKAGE_BLUEZ5_UTILS_DEPRECATED": "y",
+        "BR2_PACKAGE_BLUEZ5_UTILS_CLIENT": "y",
     })
     (target / "local.mk").write_text("LIBCEDARC_OVERRIDE_SRCDIR = {}\nLIBCEDARX_OVERRIDE_SRCDIR = {}\n".format(cedarc, cedarx))
     downloads = original / "dl"
@@ -1478,6 +1480,11 @@ def build_rootfs(jobs, sources_only=False):
     for key in ROOTFS_REQUIRED_PACKAGES:
         if selected.get(key) != "y":
             raise RuntimeError("Required rootfs package disappeared after configuration: " + key)
+    bluez_options = ("BR2_PACKAGE_BLUEZ5_UTILS_CLIENT", "BR2_PACKAGE_BLUEZ5_UTILS_DEPRECATED")
+    if any(selected.get(key) != "y" for key in bluez_options):
+        raise RuntimeError("Required BlueZ client/legacy tools disappeared after configuration")
+    if not sources_only and any(previous_config.get(key) != selected.get(key) for key in bluez_options) and (target / "output/build/bluez5_utils-5.48/.stamp_configured").is_file():
+        run(["make", "-j{}".format(jobs), "bluez5_utils-reconfigure"], target, env)
     if not sources_only and busybox_changed and (target / "output/build/busybox-1.27.2/.stamp_configured").is_file():
         run(["make", "busybox-reconfigure"], target, env)
     run(["make", "-j{}".format(jobs), "source" if sources_only else "all"], target, env)
