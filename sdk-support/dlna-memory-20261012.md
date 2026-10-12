@@ -33,3 +33,5 @@ SDK：`/home/wnk/Desktop/F1c200S_SOFT`，2767bff。板端5.7.1；gmediarender SH
 用原手机同一Bilibili长视频直接网络播放（不是下载到板子）：进度3→8秒，暂停固定9秒；定位30秒后进度36→39秒；主播放器12877模拟SIGKILL后，缓存12879一并消失，UPnP状态STOPPED；重新播放进度3秒；停止后无任何MPlayer遗留。原解析器的Invalid UE golomb/VUI警告仍存在，但此输入实际解码推进、音视频控制通过；没有声称解析器源码已修复或警告消除。需要用户实看画面/听感与三次物理冷启动，冷启动计数仍0。
 
 进一步重复测试在重播前重新SetAVTransportURI清零位置，避免沿用旧位置而误判重播成功。helper增加/proc存在检查，只消除过期PID诊断噪声，不改回收范围。最终镜像待重新生成；保留独立初始镜像与全部Git源。不把上述单次/软件层回归当稳定发布。
+
+c632782两次完整视频回归通过；第二轮重播明确从新URI0秒推进2秒，暂停8秒固定，定位后30→38秒，模拟OOM主13034/cache13037均消失。菜单恢复、BS ping/SSH正常，MemAvailable35016KiB，Slab9324KiB。初步镜像e3a813e4...已生成。最后检查发现cast DHCP旧wrapper12436/server12449仍存活（PID文件已失效），补充只匹配精确wlan1 DHCP wrapper argv的扫描、对核实PID-starttime的后代增加TERM后有限KILL，并把已知udhcpd.pid/leases加入临时状态清理。未知进程/文件仍不动，不扫描终止普通BS客户端。需再次检查无残留并更新镜像。
