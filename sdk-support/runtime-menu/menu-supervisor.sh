@@ -22,7 +22,7 @@ console_mode=
 cleanup() {
     trap - EXIT INT TERM
     if [ -n "$child" ]; then kill -TERM "$child" 2>/dev/null || true; wait "$child" 2>/dev/null || true; fi
-    if [ "$application_active" -eq 1 ]; then "$RELEASE" || echo 'Application exit hook failed' >&2; fi
+    if [ "$application_active" -eq 1 ]; then "$RELEASE" "$command" || echo 'Application exit hook failed' >&2; fi
     if [ -n "$console_mode" ]; then "$CONSOLE" "$console_mode" >/dev/null || true; fi
     rmdir "$LOCK"
 }
@@ -81,7 +81,7 @@ while :; do
     wait "$child" || app_rc=$?
     child=
     [ "$app_rc" -ne 125 ] || { echo 'application descendants not released; UI remains stopped' >&2; exit 2; }
-    "$RELEASE" >> "$SELF/application.log" 2>&1 || { echo 'application resources not released; UI remains stopped' >&2; exit 2; }
+    "$RELEASE" "$command" >> "$SELF/application.log" 2>&1 || { echo 'application resources not released; UI remains stopped' >&2; exit 2; }
     application_active=0
     if [ "$app_rc" -eq 0 ]; then error=; else error=1; fi
 done

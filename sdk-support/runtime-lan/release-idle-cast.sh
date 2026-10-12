@@ -18,7 +18,7 @@ for file in player.pid sink.pid rtsp-watch.pid; do
     pid=$(pid_from "$file") || continue
     case "$(command_of "$pid")" in
         *'/opt/f1/apps/cast/cedar_drm_player'*|*'/opt/f1/apps/cast/miracast_sink_dump.lowest'*|*"$R/rtsp-watch.sh"*)
-            echo 'DLNA refused: casting is still active' >&2
+            echo 'Application cleanup refused: independent casting is still active' >&2
             exit 1 ;;
     esac
 done
@@ -56,6 +56,7 @@ if [ -d /sys/module/aic8800_fdrv ]; then
     sleep 1
     rmmod aic8800_fdrv
 fi
+if [ -d /sys/module/aic_load_fw ]; then rmmod aic_load_fw; fi
 # Retire only the known generated session files; preserve unknown contents.
 if [ -d "$R" ]; then
     for name in dhcp.log dhcp.pid udhcpd.pid udhcpd.leases go-status.log pbc-action.log pbc-watch.pid pbc-watch.sh pbc-watch.stdout player-frame-gap.log player.pid rtsp-watch.log rtsp-watch.pid rtsp-watch.sh sink.log sink.pid watch-handoff-launch.log wpa.conf wpa.log wpa.pid; do
@@ -68,4 +69,4 @@ if [ -e /tmp/aic_h264_live.fifo ]; then
     [ ! -L /tmp/aic_h264_live.fifo ] && [ -p /tmp/aic_h264_live.fifo ] || exit 1
     rm -f /tmp/aic_h264_live.fifo
 fi
-echo 'DLNA: idle AIC cast resources released; BS Wi-Fi/SSH unchanged'
+echo 'Application cleanup: idle AIC resources released; BS Wi-Fi/SSH unchanged'
