@@ -28,6 +28,14 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_dlna_icons_match_configured_package_data_subdirectory(self):
+        layout = json.loads(Path(__file__).with_name("runtime-layout.json").read_text())
+        for size in (64, 128):
+            name = "grender-{}x{}.png".format(size, size)
+            entries = [entry for entry in layout["sources"] if entry["path"].endswith("/" + name)]
+            self.assertEqual(len(entries), 1)
+            self.assertEqual(entries[0]["targets"], ["opt/f1/apps/lan/data/gmediarender/" + name])
+
     def test_web_frontend_is_installed_beside_its_launcher(self):
         layout = json.loads(Path(__file__).with_name("runtime-layout.json").read_text())
         entries = [entry for entry in layout["sources"]
