@@ -28,6 +28,15 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_web_frontend_is_installed_beside_its_launcher(self):
+        layout = json.loads(Path(__file__).with_name("runtime-layout.json").read_text())
+        entries = [entry for entry in layout["sources"]
+                   if "opt/f1/apps/lan/index.html" in entry["targets"]]
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["origin"], "project")
+        self.assertEqual(entries[0]["path"], "SOFTWARE/lan-apps/index.html")
+        self.assertFalse(entries[0].get("executable", False))
+
     def test_dynamic_symbols_match_default_versions_and_ignore_weak_undefined(self):
         parsed = symbols_tool.parse_symbols("""
   1: 00000000 0 FUNC GLOBAL DEFAULT UND foo@GLIBC_2.4 (2)

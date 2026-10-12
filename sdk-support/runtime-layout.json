@@ -46,6 +46,7 @@
     {"origin":"project","path":"SOFTWARE/mic-recorder/recorder-app.sh","targets":["opt/f1/apps/recorder/recorder-app.sh"],"executable":true},
     {"origin":"project","path":"SOFTWARE/lan-apps/dlna-app.sh","targets":["opt/f1/apps/lan/dlna-app.sh"],"executable":true},
     {"origin":"project","path":"SOFTWARE/lan-apps/web-app.sh","targets":["opt/f1/apps/lan/web-app.sh"],"executable":true},
+    {"origin":"project","path":"SOFTWARE/lan-apps/index.html","targets":["opt/f1/apps/lan/index.html"]},
     {"origin":"project","path":"SOFTWARE/lan-apps/vendor/gmrender/data/grender-128x128.png","targets":["opt/f1/apps/lan/data/grender-128x128.png"]},
     {"origin":"project","path":"SOFTWARE/lan-apps/vendor/gmrender/data/grender-64x64.png","targets":["opt/f1/apps/lan/data/grender-64x64.png"]},
     {"origin":"project","path":"SCRCPT/network-and-audio-source/rtc_time_20261003/S18rtc-time","targets":["etc/init.d/S18rtc-time"],"executable":true},

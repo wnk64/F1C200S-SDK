@@ -1,3 +1,12 @@
+## 2026-10-12 / Planned / Board regression and missing web frontend
+Base:9a661b3 SDK recipe;board ec6a02c1 image plus verified hciconfig addition. Existing unrelated dirty files preserved.
+Hypothesis:HTTP authenticated homepage404 is caused by omitted index.html in runtime-layout,not LAN server failure.
+Files:sdk-support/runtime-layout.json,test_sdk.py and tracked records. Install locked project SOFTWARE/lan-apps/index.html next to web-app.sh;no application/kernel/radio changes.
+Protected:menu/display ownership,Wi-Fi/SSH,Bluetooth,storage and other apps. Rollback:9a661b3 layout;board target previously absent,remove added index.html only.
+Tests:reader text/gesture/LRC/reply parser passed;PNG1200x900 fits480x360;PDF/EPUB first-last render passed;MIC3.002s96072bytes,xruns0;four menu smoke modes exit0. Browser lists passed,ROM directories empty. Playback exited0 but no selftest stage markers,therefore pause/seek NOT accepted. Actual touch/sound/cast/gameplay and three cold boots pending.
+Deploy plan:SSH/SCP only,verify source and remote SHA256b527b412dd9608efe20cff67b95687529f5ca8923ec55fe6e7a33899392553cc;no existing target overwrite.
+Decision:pending;web upload/download/auth/security tests and regenerated image required. Diagnostic timeout command absent;use disposable bounded watchdog,not an application defect.
+
 ## 2026-10-07 / pending / menu Wi-Fi bounded recovery
 Sourcee717fc7; exact files and evidence in SCRCPT/network-and-audio-source/wifi_control_20261007/WORKTREE_CHANGELOG.md. Menu/helper/S17recovery candidate deploys only userspace, preserves kernel/driverbinary/BT/AIC/DTB. Fresh reject/AP/cooldown/manual safeguards, target relookup, IP confirmation, explicitUI failures. Same GCC6.4build/gatesPASS and three actual manualreconnect/staticIPv4PASS. SSH10.0.0.234/menu healthy. True driverstall and3coldboots0/full protected regressions pending, not permanent/stable claim. No temporary helper scripts/backups, serialCOM11released.
 
