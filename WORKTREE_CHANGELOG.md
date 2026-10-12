@@ -1,4 +1,5 @@
 ## 2026-10-12 / Planned / Board regression and missing web frontend
+DLNA follow-up planned:2767bff;see sdk-support/dlna-memory-20261012.md for exact board hashes,large-moov metadata,OOM and orphan-cache evidence. Temporary AIC-only resource-release comparison,BS/SSH/BT/DRM preserved;existing source/modules unchanged. Restore original cast loader after comparison. DLNA process-group cleanup candidate pending,not accepted.
 Follow-up plan:DLNA logs stat failure for data/gmediarender/grender-{64,128}x{64,128}.png;layout incorrectly installed icons directly in data/. Correct asset targets only and add layout test;existing source icons retained. Runtime correction can add expected directories without overwriting legacy icon copies. No DLNA/MPlayer code change.
 Base:9a661b3 SDK recipe;board ec6a02c1 image plus verified hciconfig addition. Existing unrelated dirty files preserved.
 Hypothesis:HTTP authenticated homepage404 is caused by omitted index.html in runtime-layout,not LAN server failure.
