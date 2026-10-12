@@ -623,11 +623,22 @@ def relocate_lan_backend(source):
         raise RuntimeError("Unrecognized DLNA backend source; refusing speculative relocation")
 
 
+def prepare_lan_runtime(backend_source):
+    support = ROOT / "sdk-support/runtime-lan"
+    runtime_source = support / "output_cedar.c"
+    known_baseline = "cc208b25d67f1e9853e8444720df838621496bfa9b3db5ef7c24b2b838cf419a"
+    if digest(backend_source) not in (known_baseline, digest(runtime_source)):
+        raise RuntimeError("Unrecognized DLNA lifecycle source; refusing replacement")
+    shutil.copyfile(str(runtime_source), str(backend_source))
+    shutil.copyfile(str(support / "dlna_process.h"), str(backend_source.with_name("dlna_process.h")))
+
+
 def build_lan(jobs):
     work, host, prefix, env = app_environment()
     directory = work / "SOFTWARE/lan-apps"
     backend_source = directory / "vendor/gmrender/src/output_cedar.c"
     relocate_lan_backend(backend_source)
+    prepare_lan_runtime(backend_source)
     library = directory / "stage"
     sysroot = Path(capture([prefix + "gcc", "--print-sysroot"]))
     env["CC"] = prefix + "gcc"

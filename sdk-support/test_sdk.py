@@ -28,6 +28,32 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_dlna_lifecycle_overlay_is_idempotent_and_refuses_unknown_source(self):
+        support = self.root / "sdk-support/runtime-lan"
+        support.mkdir(parents=True)
+        original = Path(__file__).with_name("runtime-lan")
+        for name in ("output_cedar.c", "dlna_process.h"):
+            (support / name).write_bytes((original / name).read_bytes())
+        runtime = support / "output_cedar.c"
+        source = self.root / "output_cedar.c"
+        source.write_bytes(runtime.read_bytes())
+        sdk.prepare_lan_runtime(source)
+        self.assertEqual(source.read_bytes(), runtime.read_bytes())
+        self.assertTrue(source.with_name("dlna_process.h").is_file())
+        source.write_text("unrecognized user changes")
+        with self.assertRaises(RuntimeError):
+            sdk.prepare_lan_runtime(source)
+        self.assertEqual(source.read_text(), "unrecognized user changes")
+
+    def test_dlna_process_group_cleans_cache_after_parent_is_killed(self):
+        support = Path(__file__).with_name("runtime-lan")
+        executable = self.root / "dlna-process-test"
+        subprocess.run(["cc", "-Wall", "-Wextra", "-I" + str(support),
+                        str(support / "test_process.c"), "-o", str(executable)], check=True)
+        subprocess.run([str(executable)], check=True, timeout=5)
+        for name in ("dlna-app.sh", "release-idle-cast.sh"):
+            subprocess.run(["sh", "-n", str(support / name)], check=True)
+
     def test_dlna_icons_match_configured_package_data_subdirectory(self):
         layout = json.loads(Path(__file__).with_name("runtime-layout.json").read_text())
         for size in (64, 128):
