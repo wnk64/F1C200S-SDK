@@ -671,3 +671,9 @@ Planned diagnostic:read-only dynamic-symbol resolution against existing rootfs N
 Decision:continue independent rebuild and archive verification;no board deployment,cold_boots0,full goal active.
 Diagnostic result:existing rootfs301 ELFs/22150 nonweak dynamic references,no unresolved executable symbols or shared objects requiring extra host scope. Report:.sdk-output/symbol-audit.json. Temporary diagnostic removed after execution.
 Scoped source change:retain reusable sdk-support/audit_symbols.py as management tool with rootfs/build-report hash validation;tests cover version/default exports,weak/hidden symbols,loader/transitive closure,missing strong versioned references and plugin classification. Independent dc17314 build inputs unchanged. This is not runtime relocation/dlopen/calling-ABI/hardware acceptance.
+
+## 2026-10-12 / Planned / First image runtime missing BlueZ tool
+Observed:COM10 user-flashed ec6a02c1 candidate boots5.7.1,menu/framebuffer480x800,Cedar,BS WLAN/H5 and IP5209 initialized. MemAvailable38564KiB,CMA total20480/free17692KiB. audio-backend repeatedly reports hciconfig not found;BlueALSA absent. WLAN INACTIVE with credential-free template.
+Files:sdk-support/sdk.py and change records. Enable BlueZ deprecated utilities in generated config,require usr/bin/hciconfig in rootfs;reconfigure BlueZ before incremental rootfs build. Do not edit original Buildroot source/config.
+Runtime:user requests previous WLAN/SSH state;restore BS autoconnect and prior static10.0.0.234/24 gateway/DNS10.0.0.1 via existing tools. No credentials in Git/logs;AIC cast-only. Serial control only,SSH transfers only.
+Rollback:7b5bd19 recipe;existing image retained,original sources unchanged. Runtime verification and three cold boots pending.

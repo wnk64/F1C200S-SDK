@@ -1464,6 +1464,7 @@ def build_rootfs(jobs, sources_only=False):
         "BR2_PACKAGE_FDK_AAC": "y",
         "BR2_PACKAGE_FAAD2": "y",
         "BR2_PACKAGE_LIBMAD": "y",
+        "BR2_PACKAGE_BLUEZ5_UTILS_DEPRECATED": "y",
     })
     (target / "local.mk").write_text("LIBCEDARC_OVERRIDE_SRCDIR = {}\nLIBCEDARX_OVERRIDE_SRCDIR = {}\n".format(cedarc, cedarx))
     downloads = original / "dl"
@@ -1487,7 +1488,7 @@ def build_rootfs(jobs, sources_only=False):
         with tarfile.open(str(artifact)) as archive:
             members = {posixpath.normpath(member.name): member for member in archive.getmembers()}
         for required in ("bin/busybox", "sbin/init", "etc/inittab", "etc/passwd", "etc/shadow",
-                         "usr/sbin/dropbear", "usr/sbin/udhcpd", "usr/bin/aplay", "usr/libexec/bluetooth/bluetoothd"):
+                         "usr/sbin/dropbear", "usr/sbin/udhcpd", "usr/bin/aplay", "usr/bin/hciconfig", "usr/libexec/bluetooth/bluetoothd"):
             if required not in members:
                 raise RuntimeError("Required base rootfs file missing: " + required)
         compiler = target / "output/host/bin/arm-buildroot-linux-gnueabi-gcc"
