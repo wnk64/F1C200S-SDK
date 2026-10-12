@@ -48,7 +48,7 @@ done
 for status in /proc/[0-9]*/cmdline; do
     pid=${status#/proc/}; pid=${pid%/cmdline}
     case "$(command_of "$pid")" in
-        '/bin/sh /opt/f1/apps/cast/cast-dhcp.sh wlan1 '*|'sh /opt/f1/apps/cast/cast-dhcp.sh wlan1 '*)
+        '/bin/sh /opt/f1/apps/cast/cast-dhcp.sh wlan1 '*|'sh /opt/f1/apps/cast/cast-dhcp.sh wlan1 '*|'/usr/sbin/udhcpd -f /opt/f1/apps/cast/udhcpd.conf '*)
             terminate_tree "$pid" ;;
     esac
 done

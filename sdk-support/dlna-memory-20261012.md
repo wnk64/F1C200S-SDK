@@ -35,3 +35,5 @@ SDK：`/home/wnk/Desktop/F1c200S_SOFT`，2767bff。板端5.7.1；gmediarender SH
 进一步重复测试在重播前重新SetAVTransportURI清零位置，避免沿用旧位置而误判重播成功。helper增加/proc存在检查，只消除过期PID诊断噪声，不改回收范围。最终镜像待重新生成；保留独立初始镜像与全部Git源。不把上述单次/软件层回归当稳定发布。
 
 c632782两次完整视频回归通过；第二轮重播明确从新URI0秒推进2秒，暂停8秒固定，定位后30→38秒，模拟OOM主13034/cache13037均消失。菜单恢复、BS ping/SSH正常，MemAvailable35016KiB，Slab9324KiB。初步镜像e3a813e4...已生成。最后检查发现cast DHCP旧wrapper12436/server12449仍存活（PID文件已失效），补充只匹配精确wlan1 DHCP wrapper argv的扫描、对核实PID-starttime的后代增加TERM后有限KILL，并把已知udhcpd.pid/leases加入临时状态清理。未知进程/文件仍不动，不扫描终止普通BS客户端。需再次检查无残留并更新镜像。
+
+最后清理同时覆盖完全孤立的/usr/sbin/udhcpd -f /opt/f1/apps/cast/udhcpd.conf服务器（早期实验遗留PID377），只匹配这个cast专用配置，不匹配普通网络udhcpc。避免旧服务器继续占UDP67使下一轮投屏DHCP出错。既有wrapper树已清理，恢复投屏GO并再次释放返回0；最终继续核验专用DHCP/wpa/PBC和所有MPlayer无残留。
