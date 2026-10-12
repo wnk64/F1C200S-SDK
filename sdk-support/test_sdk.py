@@ -18,6 +18,9 @@ sys.modules["package_sdk"] = package
 archive_spec = importlib.util.spec_from_file_location("archive_sdk", str(Path(__file__).with_name("archive_sdk.py")))
 archive_tool = importlib.util.module_from_spec(archive_spec)
 archive_spec.loader.exec_module(archive_tool)
+symbols_spec = importlib.util.spec_from_file_location("audit_symbols", str(Path(__file__).with_name("audit_symbols.py")))
+symbols_tool = importlib.util.module_from_spec(symbols_spec)
+symbols_spec.loader.exec_module(symbols_tool)
 
 spec = importlib.util.spec_from_file_location("f1sdk", str(Path(__file__).with_name("sdk.py")))
 sdk = importlib.util.module_from_spec(spec)
@@ -25,6 +28,53 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_dynamic_symbols_match_default_versions_and_ignore_weak_undefined(self):
+        parsed = symbols_tool.parse_symbols("""
+  1: 00000000 0 FUNC GLOBAL DEFAULT UND foo@GLIBC_2.4 (2)
+  2: 00000000 0 NOTYPE WEAK DEFAULT UND optional
+  3: 00001234 8 FUNC GLOBAL DEFAULT 12 foo@@GLIBC_2.4
+  4: 00001238 8 FUNC GLOBAL HIDDEN 12 hidden
+  5: 00001240 8 OBJECT UNIQUE DEFAULT 12 unique
+""")
+        self.assertEqual(parsed["required"], {"foo@GLIBC_2.4"})
+        self.assertEqual(parsed["defined"], {"foo", "foo@GLIBC_2.4", "foo@@GLIBC_2.4", "unique"})
+
+    def test_symbol_dependency_closure_includes_interpreter_and_transitive_libraries(self):
+        binaries = {"app": {"needed": {"lib.so": "lib.so"}, "interpreter": "/ld.so"},
+                    "lib.so": {"needed": {"support.so": "support.so"}, "interpreter": None},
+                    "support.so": {"needed": {}, "interpreter": None},
+                    "ld.so": {"needed": {}, "interpreter": None}}
+        members = {"ld.so": tarfile.TarInfo("ld.so")}
+        self.assertEqual(symbols_tool.dependency_closure("app", binaries, members, sdk), set(binaries))
+        del binaries["support.so"]
+        with self.assertRaises(RuntimeError):
+            symbols_tool.dependency_closure("app", binaries, members, sdk)
+
+    def test_symbol_audit_detects_missing_strong_versioned_reference(self):
+        archive_path = self.root / "rootfs.tar"
+        with tarfile.open(str(archive_path), "w") as archive:
+            for name in ("app", "lib.so"):
+                data = b"\x7fELF" + name.encode("ascii")
+                item = tarfile.TarInfo(name)
+                item.size = len(data)
+                archive.addfile(item, io.BytesIO(data))
+        dependencies = {"issues": [], "binaries": {
+            "app": {"needed": {"lib.so": "lib.so"}, "interpreter": None},
+            "lib.so": {"needed": {}, "interpreter": None}}}
+        def readelf(args):
+            app = Path(args[-1]).read_bytes().endswith(b"app")
+            if "-h" in args:
+                return "Type: EXEC" if app else "Type: DYN"
+            return "1: 00000000 0 FUNC GLOBAL DEFAULT UND foo@VERSION_2" if app else "1: 00000001 1 FUNC GLOBAL DEFAULT 1 foo@@VERSION_1"
+        with mock.patch.object(sdk, "capture", side_effect=readelf):
+            report = symbols_tool.audit(archive_path, dependencies, "readelf", sdk)
+        self.assertEqual(report["executable_issues"][0]["unresolved"], ["foo@VERSION_2"])
+        self.assertEqual(report["nonweak_symbols_checked"], 1)
+        with mock.patch.object(sdk, "capture", side_effect=lambda args: "Type: DYN" if "-h" in args else readelf(args)):
+            plugin_report = symbols_tool.audit(archive_path, dependencies, "readelf", sdk)
+        self.assertEqual(plugin_report["executable_issues"], [])
+        self.assertEqual(plugin_report["shared_objects_needing_host_or_other_scope"][0]["unresolved"], ["foo@VERSION_2"])
+
     def test_source_archive_roundtrip_preserves_files_modes_and_links(self):
         source = self.root / "source"
         source.mkdir()

@@ -27,6 +27,8 @@
 
 共享库检查增加GNU版本定义/需求逐项核验，按实际NEEDED解析目标匹配；它不覆盖全部符号重定位、运行时dlopen及硬件行为。fb5c20f已通过57项单测，301个ARM ELF、840项版本需求检查无问题，并重新组装候选镜像；该新检查版本尚未独立全链重编。
 
+`python3 sdk-support/audit_symbols.py` 对现有rootfs做额外只读动态符号检查，先核对rootfs及依赖报告的构建哈希，再逐项检查非弱引用在NEEDED闭包/加载器内是否可找到同名导出和版本。支持 `--rootfs`、`--readelf` 检查独立构建输出，JSON写到标准输出；插件可能需要宿主的引用单独列出，不能据此声称运行时重定位、dlopen或硬件已经验证。首次诊断301个ELF、22,150项引用未发现问题。
+
 环境：Linux、Python 3.5+、Git、make、GCC、bison、flex、bc、OpenSSL 开发头文件、pkg-config。内核/U-Boot 使用 Linaro GCC 7.2.1。默认查找 TOOLCHAIN/linaro-7.2.1/bin，兼容当前虚拟机 /opt 下的原工具链；其他位置用 KERNEL_TOOLCHAIN=/absolute/bin 指定。不自动安装工具或修改主机环境。
 
 构建从锁定 Git 提交导出源码，配置由 sdk-support/configs 提供，输出全部在 .sdk-output 下。不会在当前内核、U-Boot 原目录执行 clean 或覆盖产物。内核严格为5.7.1，显式传 LOCALVERSION=。

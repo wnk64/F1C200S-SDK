@@ -661,3 +661,13 @@ Source:dc17314 export passed,63 tests,required Git commits pinned;TOOLCHAIN copy
 Host:Ubuntu16.04.7,GCC5.4.0,Python3.5.2,Git2.7.4;newer distributions not verified.
 Archive plan:add sdk-support/archive_sdk.py/test_sdk.py and records in main SDK only. Require retained successful independent build/image reports and image hashes,then actual exported ./sdk clean,then verify and archive all source/dependencies with tar-member readback. Never claim hardware acceptance or write block devices.
 Protected:original source/build/image and live exported build unchanged. SSH read-only query10.0.0.234 timed out;no board writes or cause inference. Rollback:dc17314 management tools;full objective active,cold_boots0.
+Result:033582d archive management tool committed,65 tests passed (tar file/mode/link roundtrip and overwrite/unclean refusal);real archive execution pending independent build completion.
+
+## 2026-10-12 / pending / Resume after host shutdown
+Verified:after interruption,full original Git object checks and65 tests passed;existing1073741824byte image SHA25643006d9ac611b7f5f17d897e178e83b6610e913d92c6a4a0a72999e660e19374 intact. User paused and requested shutdown;guest shut down normally,then user reactivated goal.
+Build:old independent build confirmed stopped at rootfs-base,not complete. New attempt starts only after exported ./sdk clean and baseline hash checks. ./sdk build -j2 in dc17314 delivery snapshot,unset KERNEL_TOOLCHAIN,system-only PATH. Durable log:.sdk-output/independent-build.log outside exported clean path. Original source/images unchanged.
+Path audit:MPlayer build-nosdl.sh uses relative ROOT and explicit CEDAR_TARGET_LIBDIR;Curl build receives SDK. Old Makefile fallback alone is not evidence of external-library reuse.
+Planned diagnostic:read-only dynamic-symbol resolution against existing rootfs NEEDED closure/interpreter;non-weak symbols and version identities checked,plugins reported separately,not full runtime/hardware acceptance. Temporary script removed after report collection.
+Decision:continue independent rebuild and archive verification;no board deployment,cold_boots0,full goal active.
+Diagnostic result:existing rootfs301 ELFs/22150 nonweak dynamic references,no unresolved executable symbols or shared objects requiring extra host scope. Report:.sdk-output/symbol-audit.json. Temporary diagnostic removed after execution.
+Scoped source change:retain reusable sdk-support/audit_symbols.py as management tool with rootfs/build-report hash validation;tests cover version/default exports,weak/hidden symbols,loader/transitive closure,missing strong versioned references and plugin classification. Independent dc17314 build inputs unchanged. This is not runtime relocation/dlopen/calling-ABI/hardware acceptance.
