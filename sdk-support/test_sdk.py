@@ -28,6 +28,13 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_cast_entry_reinitializes_when_idle_radio_was_released(self):
+        layout = json.loads(Path(__file__).with_name("runtime-layout.json").read_text())
+        entry = next(item for item in layout["sources"] if "opt/f1/apps/cast/cast-app.sh" in item["targets"])
+        old = 'mode=cold; [ ! -d "$R" ] || mode=session'
+        self.assertEqual(entry["replacements"][old],
+                         'mode=cold; [ ! -d "$R" ] || [ ! -e /sys/class/net/wlan1 ] || mode=session')
+
     def test_dlna_lifecycle_overlay_is_idempotent_and_refuses_unknown_source(self):
         support = self.root / "sdk-support/runtime-lan"
         support.mkdir(parents=True)

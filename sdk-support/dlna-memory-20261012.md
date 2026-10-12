@@ -19,3 +19,7 @@ SDK：`/home/wnk/Desktop/F1c200S_SOFT`，2767bff。板端5.7.1；gmediarender SH
 仅SDK候选：runtime-lan/dlna-app.sh与release-idle-cast.sh在DLNA入口核实无活跃cast后，结束经过cmdline核验的wlan1辅助进程树并卸载原AIC驱动；普通BS/SSH/BT不动，AIC由原投屏加载器在下次投屏时恢复。runtime-lan/output_cedar.c从精确锁定原模块cc208b25...派生，只增加512KiB缓存与独立播放器session/进程组；停止、切URI、主播放器被OOM杀后清理整个缓存进程组，不让新播放与旧缓存同时占内存。sdk.py严格校验已知源hash才应用此模块，原组件源码和所有播放器/内核二进制不改。
 
 待验证：host孤儿缓存进程组回收测试、生成器与shell语法测试、板端同一手机视频持续播放/暂停/定位/断开/再次连接，以及原AIC投屏入口重新注册wlan1。三冷启动0，不标稳定发布。部署前保留板端原gmediarender/dlna-app.sh的校验备份；新增helper可删除回滚，原MPlayer哈希不变。
+
+01ac414已提交候选，72项测试通过，包含实际fork/setsid/模拟主进程SIGKILL/缓存后代回收的host测试。LAN构建退出0，gmediarender38e4019287a091581ce5e0ba6cb6eba166fbfdf250096eb2eae6550c4ab91afe；launcher bcf2acd8...；helper5b642023...。原source、播放器、kernel未改。SDK原sdk.py因Windows传输模式变化误设为可执行，后续恢复原644。
+
+恢复AIC首次失败：原cast-app.sh仅凭/tmp会话目录存在选session，但卸载后wlan1不存在，报告existing GO5745 unavailable。只在SDK生成入口的精确替换中增加接口存在条件，接口缺失选择cold；原源脚本/播放器/驱动不修改。需验证再初始化+三击退出、再次进入DLNA释放闲置AIC；不在失败状态上宣称回归通过。
