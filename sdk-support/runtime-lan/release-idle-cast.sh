@@ -3,7 +3,10 @@ set -eu
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
 R=/tmp/manual_miracast_20260920
 [ ! -L "$R" ] || { echo 'Cast runtime must not be a symlink' >&2; exit 1; }
-command_of() { tr '\000' ' ' < "/proc/$1/cmdline" 2>/dev/null || true; }
+command_of() {
+    [ -r "/proc/$1/cmdline" ] || return 0
+    tr '\000' ' ' < "/proc/$1/cmdline" 2>/dev/null || true
+}
 pid_from() {
     [ -r "$R/$1" ] || return 1
     value=$(cat "$R/$1")
