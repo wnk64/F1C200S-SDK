@@ -37,3 +37,5 @@ SDK：`/home/wnk/Desktop/F1c200S_SOFT`，2767bff。板端5.7.1；gmediarender SH
 c632782两次完整视频回归通过；第二轮重播明确从新URI0秒推进2秒，暂停8秒固定，定位后30→38秒，模拟OOM主13034/cache13037均消失。菜单恢复、BS ping/SSH正常，MemAvailable35016KiB，Slab9324KiB。初步镜像e3a813e4...已生成。最后检查发现cast DHCP旧wrapper12436/server12449仍存活（PID文件已失效），补充只匹配精确wlan1 DHCP wrapper argv的扫描、对核实PID-starttime的后代增加TERM后有限KILL，并把已知udhcpd.pid/leases加入临时状态清理。未知进程/文件仍不动，不扫描终止普通BS客户端。需再次检查无残留并更新镜像。
 
 最后清理同时覆盖完全孤立的/usr/sbin/udhcpd -f /opt/f1/apps/cast/udhcpd.conf服务器（早期实验遗留PID377），只匹配这个cast专用配置，不匹配普通网络udhcpc。避免旧服务器继续占UDP67使下一轮投屏DHCP出错。既有wrapper树已清理，恢复投屏GO并再次释放返回0；最终继续核验专用DHCP/wpa/PBC和所有MPlayer无残留。
+
+最终候选代码248b62f，73项单测通过，rootfs-integrated及sd-image成功生成。最终helper SHA25681036181db011948495e82a4ac5e966848b517b033b6856fa5cc543296c53d06，经SCP/hash核验部署。末尾ps确认无AIC后台、cast DHCP/PBC/wpa、DLNA或MPlayer遗留，仅BS/SSH/BT/菜单保留；MemAvailable35332KiB，Slab9296KiB，CmaFree16756KiB。已恢复菜单、保留三个.pre-dlna-oom回滚文件；临时测试脚本与传输副本清理。真实视听确认和三次物理冷启动仍待用户验收。
