@@ -783,3 +783,5 @@ Scope: exact .sdk-output/portable-sdk duplicate and deleted rootfs trash33060915
 Preflight: all portable Git refs exist in original repositories; baseline/download/toolchain hashes match. Parent-only Cedar metadata diff is committed in independent component HEAD. Current SDK work/sources/images/runtime output and all RK3576 trees/cache left intact. No new SDK/backup or recompilation.
 
 Result: verified duplicate export and trash removed. Original reports/image/rollback scripts moved and SHA256 verified in /home/wnk/Desktop/F1c200S_SOFT/records/portable-validation-dc17314. Free-space gain=13016489984bytes. No SDK clean/build executed; current caches and RK sources unchanged.
+
+Cleanup record commit: 0b2b7e3bdddce6da568bc7bfff8c9951b1f29059; sdk doctor and locked source/baseline verification passed; current candidate image hash checked. No compile or SDK clean.
