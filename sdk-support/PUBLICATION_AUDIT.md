@@ -25,6 +25,6 @@ SDK80项测试及源码还原工具9项测试通过；所有组件远程分支�
 
 这是规则扫描和已命中样例核查，不是安全认证、逐行人工审计或完整法律审查。压缩下载包内的所有第三方内容没有递归逐对象文本审查。
 
-旧8个F1C200S相关仓库删除需要GitHub delete_repo凭据权限；在权限未取得前保持原状，不以归档或其他操作冒充已删除。
+2026-10-13 后续结果：wnk64重新登录并取得delete_repo权限后，按用户明确要求，旧8个F1C200S相关仓库已逐个删除；账号仓库列表复核不再包含这些目标。F1C200S相关仅保留统一SDK。旧库Issues/Releases随删除移除，不保证可恢复；现有统一SDK、本地源码及编译缓存未删除，没有创建额外备份或SDK副本。此前等待授权的记录为历史过程，不是当前状态。
 
 确切范围：wnk64/f1c200s-extras、wnk64/licheepi_nano、wnk64/f1c200s-miracast-stable-aic8800d80、wnk64/f1c200s-network-tv、wnk64/f1c200s-casting、wnk64/f1c200s-linux、wnk64/f1c200s-u-boot、wnk64/f1c200s-buildroot。不含树莓派、LT6911、MCU或统一SDK仓库。

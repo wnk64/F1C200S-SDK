@@ -765,3 +765,13 @@ GitHub legacy cleanup is separately authorized by user; waiting for delete_repo 
 Verification: restoration10 tests and SDK80 tests passed; documented build/clean names checked against actual --help and stage guards. Shell examples reviewed, not executed. Decision: documentation update only; no fresh system installation or SD write validation performed. Rollback: main864170b.
 
 User-guide implementation commit: 733d409572657704a91db9827f49a527f2d66e81.
+
+## 2026-10-13 / Planned / Delete authorized obsolete GitHub repositories
+Base: maina32028e; active accountwnk64 verified with delete_repo scope. Existing unified SDK source refs and dependency Release verified before deletion.
+Exact remote-only targets: f1c200s-extras,licheepi_nano,f1c200s-miracast-stable-aic8800d80,f1c200s-network-tv,f1c200s-casting,f1c200s-linux,f1c200s-u-boot,f1c200s-buildroot (all ownerwnk64).
+Protected: F1C200S-SDK, all unrelated repositories, local source/.git/build caches, board runtime. No new backup, SDK copy, build or deployment.
+User explicitly requests deletion after consolidation; old remote Issues/Releases will be removed as well. Recovery is not guaranteed; unified SDK and existing local sources remain.
+
+Result: all8 exact remote targets deleted successfully after identity/admin verification. Authenticated owner inventory now has6 repositories: F1C200S-SDK,shumei-chumoping,lt6911uxe-tools,shumei-zawu,GPIO_Toggle1,WouoUI. No obsolete targets remain.
+Protected verification: unified repository maina32028e and11 heads retained; dependency asset size683374177,sha256ac740360e6321d88e6191a3ccc5bb89293083cbee54ab196dd64473ba71234b0 verified; Actions remains disabled. Local sources/build caches untouched.
+Decision: authorized remote cleanup completed; no hardware or SDK build acceptance claimed. Old remote Issues/Releases removed; restoration not guaranteed. No new backups or source copies.
