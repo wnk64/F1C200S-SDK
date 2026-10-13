@@ -717,3 +717,15 @@ Tests: python3 sdk-support/test_sdk.py: 80 passed. No firmware compilation, imag
 Decision: host CLI and unit tests passed; hardware state unchanged.
 
 Commit: de0cb8f04b9e1bb9e0b2cfe2794da382f1892f85. Tests: 80 passed. No board deployment.
+
+## 2026-10-13 / Planned / Consolidate GitHub SDK publication
+Base: 1d08515; preserve existing SDK and build caches, no new SDK/worktree/export.
+Scope: publish current root and locked component histories to wnk64/F1C200S-SDK; add safe source restoration and publication manifest.
+Files: README.md, sdk-support/github_sources.py, test_github_sources.py, github-sources.json.
+Protected: no kernel/driver/runtime source change, no build or board deployment.
+Delivery: one compressed dependency asset only, no duplicate source checkout.
+Old repositories: delete only after remote source/artifact verification and delete_repo authorization.
+
+Tests: source restore tests 9/9 and SDK tests 80/80 passed. Existing 10 component repositories, commits and baseline hashes verified.
+Publication: source/* branches and sdk-lock/* tags verified on consolidated private remote. Dependency asset sha256 ac740360e6321d88e6191a3ccc5bb89293083cbee54ab196dd64473ba71234b0, 683374177 bytes.
+Acceptance: source publication only; no fresh SDK checkout, compilation, image or board deployment. Three physical cold boots remain pending.
