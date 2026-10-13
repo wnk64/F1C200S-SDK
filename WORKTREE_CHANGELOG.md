@@ -785,3 +785,9 @@ Preflight: all portable Git refs exist in original repositories; baseline/downlo
 Result: verified duplicate export and trash removed. Original reports/image/rollback scripts moved and SHA256 verified in /home/wnk/Desktop/F1c200S_SOFT/records/portable-validation-dc17314. Free-space gain=13016489984bytes. No SDK clean/build executed; current caches and RK sources unchanged.
 
 Cleanup record commit: 0b2b7e3bdddce6da568bc7bfff8c9951b1f29059; sdk doctor and locked source/baseline verification passed; current candidate image hash checked. No compile or SDK clean.
+
+## 2026-10-13 / Planned / Remove obsolete pre-SDK Buildroot outputs and duplicate full snapshot
+Exact targets: ROOTFS/buildroot-2018.02.11/output (not .sdk-output/work output), SOFTWARE/existing-archives/miracast_snapshot_20261002.full.tar and its checksum sidecar.
+Preflight: no tracked output sources/mounts/active process cwd; current SDK compiler independent. Archive files match retained unpacked snapshot; all bundle refs retained in main kernel repository; actual Git ref connectivity passed with --no-reflogs. Old reflog has missing4ca2d170 entry; no Git log/ref repair or deletion performed. Protect current incremental cache, sources/configs and current image. No new backup/SDK or build.
+
+Result: old generated output and verified duplicate archive removed; free-space gain=7990013952bytes. Active SDK cache and kernel baseline retained. Deleted generated output can only be rebuilt; no deletion rollback copies created.
