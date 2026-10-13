@@ -753,3 +753,5 @@ Result: repository Actions enabled=false; Build wiliwili disabled_manually; no a
 Source restore: new clone explicitly checks out locked component HEAD after fetching; existing source trees never overwritten. Tests restoration10 + SDK80 passed; baseline verification passed. No firmware compilation or deployment.
 
 CI cleanup main implementation commit: 272d8398d3fdb32e4ed722779d200d79e97fc52b.
+
+CI-generated storage cleanup: removed18 artifacts (432502157bytes) from only accidental run38338636444 and3 caches (706294445bytes) from only refs/heads/source/wiliwili. Remote artifact/cache counts0. Failed-run logs retained for audit. Source SDK Release asset remains uploaded,size683374177. Original .sdk-output build cache untouched.
