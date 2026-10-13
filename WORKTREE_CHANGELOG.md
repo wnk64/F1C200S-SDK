@@ -705,3 +705,13 @@ Result:first build4a8652e rejected by hciconfig artifact gate;deprecated require
 Result:fb99ed6 rootfs-base/integrated/sd-image exit0,68 tests. hciconfig SHA256fcac23db68b5834c5d3261d42c0ddedd40845bc6823883e50e3442bc46b3f651 built from locked BlueZ5.48. SSH/SCP upload/tmp hash verified,target/usr/bin/hciconfig previously absent,installed mode755. Existing service automatically starts BlueALSA PID5584,hci0 UP RUNNING,headphone default. Rollback:remove only added hciconfig file;source reference7b5bd19. No driver/kernel change or reboot.
 Network:WPA save_config persistent,mode600,static10.0.0.234/24 gateway/DNS10.0.0.1 bound to home SSID;Dropbear root SSH works. Credentials stay board-local. RTC SNTP write/readback passed. SSH shell PATH lacks/sbin;manual start of already-active Dropbear under that PATH failed,not a boot-service absence (PID157 remains). No need to change boot scripts for this observation.
 Artifacts:new candidate at parent .sdk-output/images/sd-image;portable-sdk/ec6a02c1 unchanged historical export. Real Bluetooth audio/reboot/triple cold boots pending,not release accepted. Temporary helpers/transfers cleaned;reports retained.
+
+## 2026-10-13 / Planned / Explicit image packaging and incremental compilation
+Hypothesis: default build should not assemble images or rebuild unchanged stages.
+Files: sdk-support/sdk.py, sdk-support/test_sdk.py, sdk-support/BUILD_POLICY.md.
+Base: 02fc94f; complete source repository; existing portable SDK retained as rollback.
+Protected dependencies: board runtime, kernel, U-Boot and source locks unchanged.
+Build: unit tests only; no firmware build or board deployment.
+
+Tests: python3 sdk-support/test_sdk.py: 80 passed. No firmware compilation, image assembly or board deployment.
+Decision: host CLI and unit tests passed; hardware state unchanged.

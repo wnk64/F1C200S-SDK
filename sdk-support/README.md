@@ -1,5 +1,7 @@
 # F1C200S SDK 集成
 
+2026-10-13 构建入口更新：`./sdk build -j8` 默认只做增量编译，不打包镜像；需要镜像使用 `./sdk build --image -j8`。未变组件直接跳过，不自动 clean。单独执行 runtime-payload、rootfs-integrated、image-tools 或 sd-image 也必须带 `--image`。详见 [BUILD_POLICY.md](BUILD_POLICY.md)。下文旧阶段记录中的无参数打包用法不再适用。
+
 当前状态：集成中，不是已验收的完整镜像 SDK。
 
 统一目录根部入口：
@@ -15,7 +17,7 @@
 ./sdk clean
 ```
 
-`./sdk build` 为最终完整镜像入口。目前存在运行依赖未集成项，入口会明确拒绝生成不完整镜像。见 manifest.json 的 release_blockers；不能用旧二进制冒充全源码编译成功。
+`./sdk build` 为默认增量编译入口；`./sdk build --image` 才执行完整候选镜像组装。见 manifest.json 的 release_blockers；不能用旧二进制冒充全源码编译成功。
 
 当前验证状态（以此节为准，后文保留各阶段接入记录）：`./sdk build -j2` 已成功跑通19阶段，生成1GiB SD候选镜像；55项单测通过。这轮使用已有隔离缓存，尚未验证clean后独立全量重编、可携带打包或实机三次冷启动，因此不是已验收发布版。`./sdk clean` 会删除生成目录内的候选镜像，使用前应明确是否需要保留交付产物。
 

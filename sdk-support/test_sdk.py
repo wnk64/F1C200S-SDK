@@ -292,7 +292,7 @@ Version needs section '.gnu.version_r' contains 1 entry:
         self.assertEqual(sdk.audit_elf_versions(binaries)[1][0]["error"], "missing ELF version provider")
 
     def test_full_build_order_covers_all_components_and_image_last(self):
-        names = [name for name, operation in sdk.full_build_steps(2)]
+        names = [name for name, operation in sdk.full_build_steps(2, image=True)]
         self.assertEqual(len(names), len(set(names)))
         self.assertEqual(names[0], "rootfs-base")
         self.assertEqual(names[-3:], ["runtime-payload", "rootfs-integrated", "sd-image"])
@@ -302,13 +302,59 @@ Version needs section '.gnu.version_r' contains 1 entry:
                               ("retro-cores", "runtime-payload"), ("image-tools", "sd-image")):
             self.assertLess(names.index(first), names.index(second))
 
+    def test_default_build_excludes_all_packaging_steps(self):
+        names = [name for name, operation in sdk.full_build_steps(8)]
+        self.assertIn("runtime-tools", names)
+        for name in ("image-tools", "runtime-payload", "rootfs-integrated", "sd-image"):
+            self.assertNotIn(name, names)
+
+    def test_incremental_reuses_outputs_and_rebuilds_changed_input_or_output(self):
+        sdk.check_output(create=True)
+        directory = sdk.OUT / "images/runtime-tools"
+        directory.mkdir(parents=True)
+        report = directory / "build.json"
+        called = []
+        def operation():
+            called.append(True)
+            report.write_text("built")
+        with mock.patch.object(sdk, "incremental_inputs", return_value={"source": "a"}):
+            sdk.incremental_build("runtime-tools", operation)
+            sdk.incremental_build("runtime-tools", operation)
+            self.assertEqual(len(called), 1)
+            report.unlink()
+            sdk.incremental_build("runtime-tools", operation)
+            self.assertEqual(len(called), 2)
+        with mock.patch.object(sdk, "incremental_inputs", return_value={"source": "b"}):
+            sdk.incremental_build("runtime-tools", operation)
+            self.assertEqual(len(called), 3)
+
+    def test_failed_incremental_build_does_not_leave_success_stamp(self):
+        with mock.patch.object(sdk, "incremental_inputs", return_value={}):
+            with self.assertRaises(RuntimeError):
+                sdk.incremental_build("runtime-tools", lambda: (_ for _ in ()).throw(RuntimeError("failed")))
+        self.assertFalse((sdk.OUT / "stamps/incremental/runtime-tools.json").exists())
+
+    def test_packaging_requires_explicit_image_flag(self):
+        for component in ("sd-image", "rootfs-integrated", "runtime-payload", "image-tools"):
+            with mock.patch.object(sys, "argv", ["sdk", "build", component]), mock.patch.object(sdk, "locked") as lock:
+                with self.assertRaises(SystemExit) as result:
+                    sdk.main()
+                self.assertEqual(result.exception.code, 2)
+                lock.assert_not_called()
+
+    def test_build_cli_passes_image_flag_and_default_jobs(self):
+        for extra, expected in (([], False), (["--image"], True)):
+            with mock.patch.object(sys, "argv", ["sdk", "build"] + extra), mock.patch.object(sdk, "locked"), mock.patch.object(sdk, "build_all") as build:
+                self.assertEqual(sdk.main(), 0)
+                build.assert_called_once_with(8, image=expected)
+
     def test_full_build_stops_on_error_and_records_failed_stage(self):
         called = []
         def failure():
             raise RuntimeError("intentional build failure")
         steps = [("first", lambda: called.append("first")), ("failed", failure),
                  ("must-not-run", lambda: called.append("must-not-run"))]
-        with mock.patch.object(sdk, "doctor", return_value=0), mock.patch.object(sdk, "digest", return_value="hash"), mock.patch.object(sdk, "full_build_steps", return_value=steps):
+        with mock.patch.object(sdk, "doctor", return_value=0), mock.patch.object(sdk, "digest", return_value="hash"), mock.patch.object(sdk, "full_build_steps", return_value=steps), mock.patch.object(sdk, "incremental_build", side_effect=lambda name, operation: operation()):
             with self.assertRaises(RuntimeError):
                 sdk.build_all(2)
         self.assertEqual(called, ["first"])

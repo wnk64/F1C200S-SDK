@@ -1605,8 +1605,8 @@ def doctor(release=False):
     return 1 if errors else 0
 
 
-def full_build_steps(jobs):
-    return [
+def full_build_steps(jobs, image=False):
+    steps = [
         ("rootfs-base", lambda: build_rootfs(jobs)),
         ("kernel", lambda: build_boot("kernel", jobs)),
         ("uboot", lambda: build_boot("uboot", jobs)),
@@ -1622,14 +1622,71 @@ def full_build_steps(jobs):
         ("bluetooth-audio", lambda: build_bluetooth_audio(jobs)),
         ("wfd-protocol", lambda: build_wfd_protocol(jobs)),
         ("runtime-tools", lambda: build_runtime_tools(jobs)),
-        ("image-tools", lambda: build_image_tools(jobs)),
-        ("runtime-payload", build_runtime_payload),
-        ("rootfs-integrated", build_integrated_rootfs),
-        ("sd-image", build_sd_image),
     ]
+    if image:
+        steps += [("image-tools", lambda: build_image_tools(jobs)),
+                  ("runtime-payload", build_runtime_payload),
+                  ("rootfs-integrated", build_integrated_rootfs),
+                  ("sd-image", build_sd_image)]
+    return steps
 
 
-def build_all(jobs):
+def incremental_inputs(name):
+    # Locked source/config identities, recipes and helper sources determine reuse.
+    inputs = {"manifest": MANIFEST, "component": name, "support": {},
+              "toolchain": os.environ.get("KERNEL_TOOLCHAIN", "default")}
+    # Dirty locked sources must invalidate reuse and reach the existing guards.
+    inputs["project_diff"] = capture(["git", "diff", MANIFEST["project_sources"]["commit"], "--"] +
+                                     MANIFEST["project_sources"]["paths"], ROOT)
+    for relative in capture(["git", "ls-files", "sdk-support"], ROOT).splitlines():
+        path = ROOT / relative
+        if path.is_file() and path.suffix not in (".md",) and path.name != "test_sdk.py":
+            inputs["support"][relative] = digest(path)
+    inputs["dependencies"] = {}
+    for report in sorted((OUT / "images").glob("*/build.json")):
+        group = report.parent.name
+        # Only earlier steps may invalidate this stage; never depend on itself.
+        order = [key for key, unused in full_build_steps(1, image=True)]
+        if name in order and group in order and order.index(group) < order.index(name):
+            inputs["dependencies"][group] = digest(report)
+    return inputs
+
+
+def incremental_outputs(name):
+    directory = OUT / "images" / name
+    if not (directory / "build.json").is_file():
+        return None
+    result = {}
+    for path in sorted(directory.rglob("*")):
+        if path.is_symlink():
+            return None
+        if path.is_file():
+            stat = path.stat()
+            result[str(path.relative_to(OUT))] = [stat.st_size, stat.st_mtime_ns]
+    return result
+
+
+def incremental_build(name, operation):
+    check_output(create=True)
+    stamps = OUT / "stamps/incremental"
+    stamps.mkdir(parents=True, exist_ok=True)
+    stamp = stamps / (name + ".json")
+    inputs = incremental_inputs(name)
+    outputs = incremental_outputs(name)
+    if stamp.is_file():
+        previous = json.loads(stamp.read_text())
+        if outputs and previous == {"inputs": inputs, "outputs": outputs}:
+            print("UP TO DATE: " + name, flush=True)
+            return
+        stamp.unlink()
+    print("INCREMENTAL BUILD: " + name, flush=True)
+    operation()
+    outputs = incremental_outputs(name)
+    if outputs:
+        stamp.write_text(json.dumps({"inputs": inputs, "outputs": outputs}, sort_keys=True) + "\n")
+
+
+def build_all(jobs, image=False):
     if doctor(release=False):
         raise RuntimeError("Full build source/environment preflight failed")
     check_output(create=True)
@@ -1640,17 +1697,22 @@ def build_all(jobs):
               "manifest_sha256": digest(ROOT / "sdk-support/manifest.json"),
               "recipe_sha256": digest(ROOT / "sdk-support/sdk.py"), "jobs": jobs,
               "board_deployed": False}
-    for name, operation in full_build_steps(jobs):
+    for name, operation in full_build_steps(jobs, image=image):
         report["current_step"] = name
         path.write_text(json.dumps(report, indent=2) + "\n")
-        print("FULL BUILD STEP: " + name, flush=True)
+        print("BUILD STEP: " + name, flush=True)
         try:
-            operation()
+            incremental_build(name, operation)
         except BaseException as error:
             report["error"] = str(error)
             path.write_text(json.dumps(report, indent=2) + "\n")
             raise
         report["completed_steps"].append(name)
+    if not image:
+        report.update({"build_complete": True, "image_requested": False, "current_step": "complete"})
+        path.write_text(json.dumps(report, indent=2) + "\n")
+        print("Incremental compilation complete; image packaging not requested", flush=True)
+        return
     image_report_path = OUT / "images/sd-image/build.json"
     image_report = json.loads(image_report_path.read_text())
     image_path = image_report_path.parent / image_report["image"]
@@ -1672,11 +1734,17 @@ def main():
     build = sub.add_parser("build")
     build.add_argument("component", choices=["all", "kernel", "uboot", "rootfs-sources", "rootfs-base", "board", "apps-ui", "ons", "retro-cores", "lan", "media-backends", "miracast-sink", "bluetooth-audio", "wireless-modules", "wfd-protocol", "runtime-tools", "runtime-payload", "kernel-runtime", "rootfs-integrated", "image-tools", "sd-image"], default="all", nargs="?")
     build.add_argument("-j", "--jobs", type=int, default=8)
+    build.add_argument("--image", action="store_true", help="Explicitly assemble rootfs and SD image after compilation")
     clean = sub.add_parser("clean")
     clean.add_argument("--component", choices=sorted(MANIFEST["components"]))
     args = parser.parse_args()
     if not args.command:
         parser.error("a command is required")
+    if args.command == "build":
+        if args.image and args.component not in ("all", "runtime-payload", "rootfs-integrated", "sd-image", "image-tools"):
+            parser.error("--image is supported with all or a packaging component")
+        if args.component in ("runtime-payload", "rootfs-integrated", "sd-image", "image-tools") and not args.image:
+            parser.error("packaging requires explicit --image")
     with locked():
         if args.command == "package":
             from package_sdk import build_package
@@ -1697,7 +1765,11 @@ def main():
         if args.jobs < 1 or args.jobs > 64:
             raise RuntimeError("jobs must be between 1 and 64")
         if args.component == "all":
-            build_all(args.jobs)
+            build_all(args.jobs, image=args.image)
+            return 0
+        operations = dict(full_build_steps(args.jobs, image=True))
+        if args.component in operations:
+            incremental_build(args.component, operations[args.component])
             return 0
         if args.component in ("rootfs-sources", "rootfs-base"):
             build_rootfs(args.jobs, sources_only=args.component == "rootfs-sources")
