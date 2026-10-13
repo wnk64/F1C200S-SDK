@@ -763,3 +763,5 @@ Protected: docs only; no apt install, compilation, image assembly, card write, b
 GitHub legacy cleanup is separately authorized by user; waiting for delete_repo login with renamed accountwnk64.
 
 Verification: restoration10 tests and SDK80 tests passed; documented build/clean names checked against actual --help and stage guards. Shell examples reviewed, not executed. Decision: documentation update only; no fresh system installation or SD write validation performed. Rollback: main864170b.
+
+User-guide implementation commit: 733d409572657704a91db9827f49a527f2d66e81.
