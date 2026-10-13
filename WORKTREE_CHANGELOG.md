@@ -791,3 +791,5 @@ Exact targets: ROOTFS/buildroot-2018.02.11/output (not .sdk-output/work output),
 Preflight: no tracked output sources/mounts/active process cwd; current SDK compiler independent. Archive files match retained unpacked snapshot; all bundle refs retained in main kernel repository; actual Git ref connectivity passed with --no-reflogs. Old reflog has missing4ca2d170 entry; no Git log/ref repair or deletion performed. Protect current incremental cache, sources/configs and current image. No new backup/SDK or build.
 
 Result: old generated output and verified duplicate archive removed; free-space gain=7990013952bytes. Active SDK cache and kernel baseline retained. Deleted generated output can only be rebuilt; no deletion rollback copies created.
+
+Old output cleanup commit: 2f429ca7bd1f167daf7f0b4297f417f9bc6367a6; doctor/source-baseline verification passed; current image SHA256 unchanged. Current staged compiler/cache retained. No compile.
