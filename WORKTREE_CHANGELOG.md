@@ -738,3 +738,5 @@ Audit: 323142 text objects,1528 binary/large not text-scanned; matches confirmed
 Tests: SDK80 + restoration9 passed. Fresh full checkout/rebuild intentionally not performed; existing SDK unchanged apart from committed publication tools/docs.
 Legacy8 repositories remain untouched: current OAuth token lacks delete_repo; device authorization pending. No unrelated repositories modified.
 Cleanup: Windows upload copy removed after remote digest verification; VM upload archive removed below. No duplicate SDK/worktree created.
+
+Publication documentation commit: cf088c0dfbc8770c338b0079ed8b0f735b2b2ad7.
