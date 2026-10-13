@@ -777,3 +777,9 @@ Protected verification: unified repository maina32028e and11 heads retained; dep
 Decision: authorized remote cleanup completed; no hardware or SDK build acceptance claimed. Old remote Issues/Releases removed; restoration not guaranteed. No new backups or source copies.
 
 Legacy cleanup record commit: 553c5d710a222dff62fbff8c43c4c1f89e4dea44.
+
+## 2026-10-13 / Planned / Remove verified obsolete portable export
+Scope: exact .sdk-output/portable-sdk duplicate and deleted rootfs trash3306091537. Preserve original validation image,JSON reports and existing rollback scripts by moving to records/portable-validation-dc17314, not copying.
+Preflight: all portable Git refs exist in original repositories; baseline/download/toolchain hashes match. Parent-only Cedar metadata diff is committed in independent component HEAD. Current SDK work/sources/images/runtime output and all RK3576 trees/cache left intact. No new SDK/backup or recompilation.
+
+Result: verified duplicate export and trash removed. Original reports/image/rollback scripts moved and SHA256 verified in /home/wnk/Desktop/F1c200S_SOFT/records/portable-validation-dc17314. Free-space gain=13016489984bytes. No SDK clean/build executed; current caches and RK sources unchanged.
