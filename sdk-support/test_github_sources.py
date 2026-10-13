@@ -84,6 +84,13 @@ class SourceRestoreTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 sources.verify_repository(self.root, 'KERNEL', {'head': 'expected', 'commits': []})
 
+    def test_new_clone_checks_out_lock_not_publication_branch_tip(self):
+        item = {'branch': 'source/wiliwili', 'head': 'locked', 'commits': ['locked']}
+        with mock.patch.object(sources, 'verify_repository') as verify, mock.patch.object(sources, 'run') as run, mock.patch.object(sources.subprocess, 'call', return_value=0):
+            sources.restore_sources(self.root, {'repositories': {'LVGL/wiliwili': item}}, 'remote')
+            self.assertEqual(run.call_args_list[-1], mock.call(['git', 'checkout', '--detach', 'locked'], self.root / 'LVGL/wiliwili'))
+            verify.assert_called_once_with(self.root, 'LVGL/wiliwili', item)
+
     def test_baseline_checksums_verified(self):
         path = self.root / 'baseline'
         path.write_bytes(b'baseline')

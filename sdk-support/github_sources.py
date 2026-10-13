@@ -61,6 +61,8 @@ def restore_sources(root, publication, remote):
                 missing.append('refs/tags/sdk-lock/' + commit + ':refs/sdk-lock/' + commit)
         if missing:
             run(['git', 'fetch', '--no-tags', 'origin'] + missing, path)
+        # Publication-only cleanup commits must not change the build baseline.
+        run(['git', 'checkout', '--detach', item['head']], path)
         verify_repository(root, relative, item)
 
 

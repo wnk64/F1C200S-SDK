@@ -740,3 +740,14 @@ Legacy8 repositories remain untouched: current OAuth token lacks delete_repo; de
 Cleanup: Windows upload copy removed after remote digest verification; VM upload archive removed below. No duplicate SDK/worktree created.
 
 Publication documentation commit: cf088c0dfbc8770c338b0079ed8b0f735b2b2ad7.
+
+## 2026-10-13 / Planned / Remove unrelated upstream cloud workflows
+Base: 6664f7e; existing worktree and build caches preserved.
+Scope: delete4 .github/workflows files from published source/wiliwili branch; preserve all sdk-lock refs and locked component trees. Disable repository Actions to protect historical refs.
+Files: sdk-support/github_sources.py, test_github_sources.py; publish-only CI deletion commit; WORKTREE_CHANGELOG.md, Chinese record.
+Hypothesis: no upstream multi-platform jobs on pushes, source restoration explicitly checks out original locked component commit.
+Protected: no kernel, app runtime, board configuration or build-system compilation; no new SDK or worktree.
+Rollback: published branch parent0c773e14c095c57aeb911f8d97bbd79b0536801b; main6664f7e.
+
+Result: repository Actions enabled=false; Build wiliwili disabled_manually; no active runs. Published cleanup commit97a3bd74d5ae36c25f57e7cf6884f91813eadc88 removes only4 upstream workflows from source/wiliwili. Parent and sdk-lock refs unchanged.
+Source restore: new clone explicitly checks out locked component HEAD after fetching; existing source trees never overwritten. Tests restoration10 + SDK80 passed; baseline verification passed. No firmware compilation or deployment.
