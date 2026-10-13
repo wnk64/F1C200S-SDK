@@ -729,3 +729,12 @@ Old repositories: delete only after remote source/artifact verification and dele
 Tests: source restore tests 9/9 and SDK tests 80/80 passed. Existing 10 component repositories, commits and baseline hashes verified.
 Publication: source/* branches and sdk-lock/* tags verified on consolidated private remote. Dependency asset sha256 ac740360e6321d88e6191a3ccc5bb89293083cbee54ab196dd64473ba71234b0, 683374177 bytes.
 Acceptance: source publication only; no fresh SDK checkout, compilation, image or board deployment. Three physical cold boots remain pending.
+
+## 2026-10-13 / pending legacy deletion / Source publication verified
+Implementation commit: fb42a001c9beb8970d340abdfa7904c92ef7a344.
+Remote: https://github.com/wnk64/F1C200S-SDK ; default main; public after user-requested audit.
+Release: sdk-source-20261013 (source candidate/prerelease, not hardware acceptance). Asset server sha256 matches ac740360e6321d88e6191a3ccc5bb89293083cbee54ab196dd64473ba71234b0 and size683374177.
+Audit: 323142 text objects,1528 binary/large not text-scanned; matches confirmed upstream public test fixtures; asset7683members,8baseline/protocol hashes verified,22license files preserved.
+Tests: SDK80 + restoration9 passed. Fresh full checkout/rebuild intentionally not performed; existing SDK unchanged apart from committed publication tools/docs.
+Legacy8 repositories remain untouched: current OAuth token lacks delete_repo; device authorization pending. No unrelated repositories modified.
+Cleanup: Windows upload copy removed after remote digest verification; VM upload archive removed below. No duplicate SDK/worktree created.

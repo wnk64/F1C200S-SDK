@@ -7,14 +7,14 @@
 整个项目只使用这一个 GitHub 仓库。`main` 保存 SDK 入口、配置、应用和脚本；`source/*` 分支保存独立组件的完整源码和 Git 历史，版本锁保存在 `sdk-support/manifest.json` 和 `sdk-support/github-sources.json`。不是指向已删除旧仓库的 submodule。
 
 ```sh
-git clone --single-branch --branch main git@github.com:wnk64/F1C200S-SDK.git
+git clone --single-branch --branch main https://github.com/wnk64/F1C200S-SDK.git
 cd F1C200S-SDK
-gh release download sdk-source-20261013 -R wnk64/F1C200S-SDK -p dependencies-20261013.tar.gz
-python3 sdk-support/github_sources.py --dependencies dependencies-20261013.tar.gz
+wget https://github.com/wnk64/F1C200S-SDK/releases/download/sdk-source-20261013/dependencies-20261013.tar.gz
+python3 sdk-support/github_sources.py --dependencies dependencies-20261013.tar.gz --repository https://github.com/wnk64/F1C200S-SDK.git
 ./sdk doctor
 ```
 
-私有仓库需要授权 Git SSH 和 GitHub CLI。依赖包包含 Linaro 7.2.1 工具链、Buildroot 下载缓存、锁定基线检查文件和协议源码归档，不含 `.sdk-output` 编译缓存、用户 ROM 或媒体。还原程序核验 SHA256，不覆盖不同内容的已有文件，不创建额外 SDK 副本。配置完成后可删除下载的压缩包。
+仓库已经过公开前凭据检查并设置为公开，上述 HTTPS 下载不需要 GitHub 登录。依赖包包含 Linaro 7.2.1 工具链、Buildroot 下载缓存、锁定基线检查文件和协议源码归档，不含 `.sdk-output` 编译缓存、用户 ROM 或个人媒体。还原程序核验 SHA256，不覆盖不同内容的已有文件，不创建额外 SDK 副本。配置完成后可删除下载的压缩包。原有开发环境不用重新下载或执行还原，直接继续使用原目录。
 
 已验证主机环境为 Ubuntu 16.04.7 x86_64，Python 3.5.2、Git 2.7.4、GCC 5.4.0。主机还需 make、gcc/g++、bison、flex、bc、autoconf、automake、libtool、pkg-config、OpenSSL/ncurses 开发包、cpio、unzip、rsync、wget、mtools、dosfstools。其他发行版兼容性尚未完整验证。
 
@@ -34,3 +34,5 @@ python3 sdk-support/github_sources.py --dependencies dependencies-20261013.tar.g
 包括 DLNA 内存/退出回收修复、所有菜单应用统一退出资源回收，以及显式镜像打包和增量缓存策略。主机构建入口已通过 80 项自动测试；应用生命周期完成 11 轮板端测试。最新候选仍缺完整音视频回归及三次物理冷启动验收，不能视为已验收稳定发布。此前完整独立构建记录仅证明其对应旧提交，不冒充最新提交的全量构建验收。
 
 第三方源码保留各组件原有许可证及版权声明；本仓库汇总不改变其许可证。历史开发记录可能包含本地路径、设备地址和实验说明，公开前需继续审查。
+
+公开前检查记录见 [PUBLICATION_AUDIT.md](sdk-support/PUBLICATION_AUDIT.md)。默认账户和实验网络配置仅用于开发；部署前应更改默认密码，不要直接暴露 SSH 或文件传输服务到公网。
