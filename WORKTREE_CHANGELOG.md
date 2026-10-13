@@ -775,3 +775,5 @@ User explicitly requests deletion after consolidation; old remote Issues/Release
 Result: all8 exact remote targets deleted successfully after identity/admin verification. Authenticated owner inventory now has6 repositories: F1C200S-SDK,shumei-chumoping,lt6911uxe-tools,shumei-zawu,GPIO_Toggle1,WouoUI. No obsolete targets remain.
 Protected verification: unified repository maina32028e and11 heads retained; dependency asset size683374177,sha256ac740360e6321d88e6191a3ccc5bb89293083cbee54ab196dd64473ba71234b0 verified; Actions remains disabled. Local sources/build caches untouched.
 Decision: authorized remote cleanup completed; no hardware or SDK build acceptance claimed. Old remote Issues/Releases removed; restoration not guaranteed. No new backups or source copies.
+
+Legacy cleanup record commit: 553c5d710a222dff62fbff8c43c4c1f89e4dea44.
