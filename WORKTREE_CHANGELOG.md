@@ -751,3 +751,5 @@ Rollback: published branch parent0c773e14c095c57aeb911f8d97bbd79b0536801b; main6
 
 Result: repository Actions enabled=false; Build wiliwili disabled_manually; no active runs. Published cleanup commit97a3bd74d5ae36c25f57e7cf6884f91813eadc88 removes only4 upstream workflows from source/wiliwili. Parent and sdk-lock refs unchanged.
 Source restore: new clone explicitly checks out locked component HEAD after fetching; existing source trees never overwritten. Tests restoration10 + SDK80 passed; baseline verification passed. No firmware compilation or deployment.
+
+CI cleanup main implementation commit: 272d8398d3fdb32e4ed722779d200d79e97fc52b.
