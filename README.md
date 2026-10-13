@@ -2,6 +2,8 @@
 
 统一管理 F1C200S 当前使用的 Linux 5.7.1、U-Boot、Buildroot、AIC8800/RTL8723BS 支持、LVGL、投屏、wiliwili、本地媒体、阅读器、ONS、模拟器及板端脚本。
 
+完整中文步骤见 [使用说明](sdk-support/USER_GUIDE.md)：主机依赖安装、首次下载还原、增量编译、显式打包、备用SD卡烧录校验、源码及版本锁维护、清理和排错。已有开发目录原地继续使用，不需要再复制SDK。
+
 ## 下载与配置
 
 整个项目只使用这一个 GitHub 仓库。`main` 保存 SDK 入口、配置、应用和脚本；`source/*` 分支保存独立组件的完整源码和 Git 历史，版本锁保存在 `sdk-support/manifest.json` 和 `sdk-support/github-sources.json`。不是指向已删除旧仓库的 submodule。
@@ -28,6 +30,8 @@ python3 sdk-support/github_sources.py --dependencies dependencies-20261013.tar.g
 ```
 
 输出位于 `.sdk-output`。固件为 `.sdk-output/images/sd-image/f1c200s-sdk-candidate.img`。不自动烧卡或部署。详细构建策略见 [BUILD_POLICY.md](sdk-support/BUILD_POLICY.md)。
+
+注意：同一版本锁下复用构建缓存，不等于任意源码跨版本都已支持无清理增量迁移。当前独立组件代码换版、共享源码修改/删除仍存在迁移保护限制，详见[源码及版本锁维护](sdk-support/USER_GUIDE.md#6-修改源码与版本锁)。不要为了绕过检查直接删缓存或改stamps。
 
 ## 当前状态
 

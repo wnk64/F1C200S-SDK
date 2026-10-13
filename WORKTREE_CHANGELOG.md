@@ -755,3 +755,11 @@ Source restore: new clone explicitly checks out locked component HEAD after fetc
 CI cleanup main implementation commit: 272d8398d3fdb32e4ed722779d200d79e97fc52b.
 
 CI-generated storage cleanup: removed18 artifacts (432502157bytes) from only accidental run38338636444 and3 caches (706294445bytes) from only refs/heads/source/wiliwili. Remote artifact/cache counts0. Failed-run logs retained for audit. Source SDK Release asset remains uploaded,size683374177. Original .sdk-output build cache untouched.
+
+## 2026-10-13 / Planned / Complete SDK user guide
+Base: 864170b; existing sources/build caches preserved. Files: README.md, sdk-support/USER_GUIDE.md.
+Scope: host apt prerequisites, download/hash/source restoration, incremental/image commands, disposable SD write/verify examples, exact source-lock migration limitations, clean/error handling.
+Protected: docs only; no apt install, compilation, image assembly, card write, board deployment or new SDK/worktree.
+GitHub legacy cleanup is separately authorized by user; waiting for delete_repo login with renamed accountwnk64.
+
+Verification: restoration10 tests and SDK80 tests passed; documented build/clean names checked against actual --help and stage guards. Shell examples reviewed, not executed. Decision: documentation update only; no fresh system installation or SD write validation performed. Rollback: main864170b.
