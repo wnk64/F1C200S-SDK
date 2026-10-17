@@ -1,3 +1,12 @@
+## 2026-10-17 / Results / DLNA state and frame reserve candidates
+Commits:fef4697 transport STOPPED on URI replacement;b203c76 real SOAP probe;ed1c9ef MPlayer reserves;24caa9d test fixture correction. Host87 tests PASS. Incremental builds compiled only upnp_transport.o/vd_cedar.o and relinked, no image/configure.
+Renderer:e5fac92f83d5fbabb3d2f234d27e41c5ebf56aab2eca6c30bf4d8a27d3fdc871;MPlayer9b78dbe4fb65feb2e4c19f45cc17b4075b2d14a1b5250e0b60d96259d8b5d7ab;SSH verified and deployed to existing paths. Old renderer38e40192/old player18ee6853. Existing baseline retained, no new backups. Published SDK artifacts/build reports updated.
+Before:old renderer real SOAP URI replacement remained PLAYING. Old MPlayer same network URI both with/without sound timed out25s, result4 valid0 with buffered PTS warnings. After:new MPlayer same URI120frames audio off/on exits0, result1 valid1, pool peak7778304/cap12582912,fallback0,live0.
+New renderer+player:three live URI replacement/Play cycles each advance3s;Pause frozen position/resume/Stop PASS. Same video used for protocol regression, not three codec cases. Phone ADB connected and actual Bilibili casting works; user confirmed switching videos works. No visible frame capture or subjective audio acceptance claimed.
+Phone real casting later SOAP timeout observed with active player/cache and multiple futex waits; not yet root-caused. User later disconnected/exited:all app descendants released but direct diagnostic runner had no parent menu supervisor, leaving last scanout image. Restored S90f1-menu,PID9149; this was test launch-path error, not persistent service/code change. Formal menu-return regression pending below.
+Menu-return regression:F1_LAN_TEST_MS=3000 menu-supervisor.sh --test-app-once dlna returned to f1-menu9526;no renderer/player left. Test supervisor stopped;normal S90 service restored9544. Temporary launch-path issue resolved;physical touch not simulated.
+Decision:candidates only; cold acceptance0/3. Further real phone timeout/seek/local-media regression pending. Do not claim all DLNA problems resolved.
+
 ## 2026-10-17 / Planned / MPlayer scanout and rotation frame reserves
 Base:fef4697/b203c76 DLNA state candidate. Same URI fails progress under both old38e40192 and new3a316836 renderer; isolated MPlayer without audio/cache also hangs. Not attributed to transport patch.
 Debug:decoder #35 onward result4/NO_FRAME_BUFFER valid0 while packets continue through#600. Original vd_cedar.c6583f9ce has display/rotation reserves0; VO retains displayed_picture until next commit/vblank.

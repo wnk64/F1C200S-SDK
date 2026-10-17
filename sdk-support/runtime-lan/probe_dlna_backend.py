@@ -8,10 +8,11 @@ import subprocess
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--uri-file", type=Path, required=True)
 parser.add_argument("--audio", action="store_true")
+parser.add_argument("--player", default="/opt/f1/apps/media/mplayer-native")
 args = parser.parse_args()
 ssh = [r"D:\AI工具\putty\plink.exe", "-batch", "-hostkey",
        "SHA256:uKw6EdGW7mdHRgfPwSwASOAjkAGwemfB9iX8Jo/gBxo", "-pw", "1", "root@10.0.0.234"]
-player = ["/opt/f1/apps/media/mplayer-native", "-noconfig", "all", "-nocache",
+player = [args.player, "-noconfig", "all", "-nocache",
           "-frames", "120", "-vc", "cedarh264", "-vo", "cedar_drm:native"]
 player += ["-afm", "faad", "-ao", "alsa"] if args.audio else ["-nosound"]
 player += [args.uri_file.read_text().strip()]
@@ -30,7 +31,7 @@ try:
 except subprocess.TimeoutExpired:
     print("decoder-only audio=%s timed out" % args.audio)
 finally:
-    cleanup = 'if test "$(cat /proc/%d/comm 2>/dev/null)" = mplayer-native; then kill -TERM %d; fi' % (pid, pid)
+    cleanup = 'if test "$(readlink /proc/%d/exe)" = %s; then kill -TERM %d; fi' % (pid, shlex.quote(args.player), pid)
     subprocess.run(ssh + [cleanup], check=True, timeout=10)
     try:
         process.communicate(timeout=5)
