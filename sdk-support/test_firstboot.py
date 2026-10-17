@@ -98,6 +98,8 @@ class FirstBootTests(unittest.TestCase):
         self.assertIn('"$saved_cid" = "$cid"', source)
         helper = (self.support / "f1_data_partition.c").read_text()
         self.assertIn('root.st_dev != system.st_rdev', helper)
+        mount_source = (self.support.parent / "runtime-cast/S19data").read_text()
+        self.assertLess(mount_source.index("/etc/f1-data-firstboot.state"), mount_source.index('mount -t vfat'))
 
     def run_initializer(self, state="new\n", fresh_ok=True, format_ok=True):
         area = self.root / "sandbox"
