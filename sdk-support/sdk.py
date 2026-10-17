@@ -464,9 +464,20 @@ def relocate_cast_touch(source):
         raise RuntimeError("Unrecognized cast touch sink identity")
 
 
+def prepare_media_touch(source):
+    support = ROOT / "sdk-support/runtime-media"
+    candidate = support / "media_display.c"
+    baseline = "bb154371198f10a50bfcc460b7c9c59cb7cccd087ff73cf57fe6c79851d0d6c1"
+    if digest(source) not in (baseline, digest(candidate)):
+        raise RuntimeError("Unrecognized media display source; refusing replacement")
+    for name in ("media_display.c", "media_touch.h"):
+        shutil.copyfile(str(support / name), str(source.with_name(name)))
+
+
 def build_app_ui(jobs):
     work = stage_project_sources()
     relocate_cast_touch(work / "LVGL/menu/cast-wait-touch.c")
+    prepare_media_touch(work / "LVGL/media_player/media_display.c")
     host = work / "ROOTFS/buildroot-2018.02.11/output/host"
     prefix = host / "bin/arm-buildroot-linux-gnueabi-"
     if not Path(str(prefix) + "gcc").is_file():

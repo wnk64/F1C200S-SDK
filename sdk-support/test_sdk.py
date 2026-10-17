@@ -28,6 +28,30 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_media_touch_targets_touchscreen_not_last_registered_keyboard(self):
+        support = Path(__file__).with_name("runtime-media")
+        executable = self.root / "media-touch-test"
+        subprocess.run(["cc", "-std=c99", "-Wall", "-Wextra", "-Werror",
+                        "-I" + str(support), str(support / "test_media_touch.c"),
+                        "-o", str(executable)], check=True)
+        subprocess.run([str(executable)], check=True, timeout=3)
+
+    def test_media_touch_overlay_is_idempotent_and_rejects_unknown_source(self):
+        support = self.root / "sdk-support/runtime-media"
+        support.mkdir(parents=True)
+        original = Path(__file__).with_name("runtime-media")
+        for name in ("media_display.c", "media_touch.h"):
+            (support / name).write_bytes((original / name).read_bytes())
+        source = self.root / "media_display.c"
+        source.write_bytes((original / "media_display.c").read_bytes())
+        sdk.prepare_media_touch(source)
+        sdk.prepare_media_touch(source)
+        self.assertEqual(source.read_bytes(), (original / "media_display.c").read_bytes())
+        source.write_text("unrecognized user source")
+        with self.assertRaises(RuntimeError):
+            sdk.prepare_media_touch(source)
+        self.assertEqual(source.read_text(), "unrecognized user source")
+
     def test_uniform_app_runner_reaps_escaped_children_and_private_runtime(self):
         support = Path(__file__).with_name("runtime-menu")
         runner, fixture = self.root / "runner", self.root / "fixture"

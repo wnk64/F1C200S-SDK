@@ -1,3 +1,11 @@
+## 2026-10-17 / Planned / Media landscape touch input identity
+Base: d17aaab; existing unrelated changes preserved. SDK media display source bb154371 matches locked staged source.
+Bug: LVGL registers devices at list head. Media replaced first (keyboard) read_cb, leaving touch portrait coordinates in landscape UI.
+Scope: hash-gated runtime-media overlay and apps-ui hook; select unique pointer_read callback and preserve keyboard/mouse.
+Build: reuse SDK staged toolchain and incremental apps-ui -j8; no image/kernel/network changes.
+Tests: host list-order/type/duplicate/missing/double-wrap and overlay guards; board real touch/exit required, cold boots pending.
+Rollback: existing source snapshot and SDK cache; no new board backup files. Do not claim exact old binary provenance without matching hash.
+
 ## 2026-10-12 / Planned / Board regression and missing web frontend
 DLNA follow-up planned:2767bff;see sdk-support/dlna-memory-20261012.md for exact board hashes,large-moov metadata,OOM and orphan-cache evidence. Temporary AIC-only resource-release comparison,BS/SSH/BT/DRM preserved;existing source/modules unchanged. Restore original cast loader after comparison. DLNA process-group cleanup candidate pending,not accepted.
 Result:1eb868b plan committed;idle-AIC removal frees4396KiB ordinary memory and3408KiB Slab;BS ping/SSH passed. Same input/default MPlayer/cache512/faad displays180frames,AV6.0s near0 delta,exit0,CMApeak5484544/fallback0/live0. Planned SDK-only lifecycle overlay and DLNA idle-resource launcher;locked source hash cc208b25...;MPlayer/kernel/cast source unchanged. Host orphan-group regression and board original-AIC restart required before deployment acceptance.
