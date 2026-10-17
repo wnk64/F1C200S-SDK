@@ -39,6 +39,13 @@ int main(int argc, char **argv) {
     if (fstat(fd, &st) || (image ? !S_ISREG(st.st_mode) : !S_ISBLK(st.st_mode))) {
         fail("unexpected target type"); goto out;
     }
+    if (!image) {
+        struct stat root, system;
+        if (stat("/", &root) || lstat("/dev/mmcblk0p2", &system) ||
+            !S_ISBLK(system.st_mode) || root.st_dev != system.st_rdev) {
+            fail("running root is not mmcblk0p2"); goto out;
+        }
+    }
     if (image) bytes = (uint64_t)st.st_size;
     else if (ioctl(fd, BLKGETSIZE64, &bytes)) { fail("cannot read disk size"); goto out; }
     uint64_t sectors = bytes / 512;

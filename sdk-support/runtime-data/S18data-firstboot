@@ -12,9 +12,6 @@ die() { echo "F1DATA first boot: $*; no reboot, initialization retained" >&2; ex
 [ -x "$TOOL" ] && [ -x /sbin/mkfs.fat ] && [ -x /sbin/fsck.fat ] || die 'missing tools'
 rootdev=$(awk '$2 == "/" {print $1}' /proc/mounts)
 case "$rootdev" in /dev/mmcblk0p2|/dev/root) ;; *) die 'unexpected root device' ;; esac
-rootid=$(stat -c %d /)
-partid=$(stat -c %r /dev/mmcblk0p2)
-[ "$rootid" = "$partid" ] || die 'root is not mmcblk0p2'
 awk '$1 == "/dev/mmcblk0p3" || $2 == "/root/roms" {bad=1} END {exit bad}' /proc/mounts || die 'data already mounted'
 cid=$(cat /sys/class/block/mmcblk0/device/cid)
 size=$(cat /sys/class/block/mmcblk0/size)
