@@ -701,10 +701,28 @@ def build_lan(jobs):
     report_path.write_text(json.dumps(report, indent=2) + "\n")
 
 
+def prepare_wiliwili_runtime(directory):
+    support = ROOT / "sdk-support/runtime-wiliwili"
+    files = (
+        ("loop_mediaplayer.c", "board_linux/loop_mediaplayer.c",
+         "db0f9d62418ead15e064fa7a9133904ee8d17a984b5f2ee939bf7053467e5971"),
+        ("main.cpp", "windows_lvgl/src/main.cpp",
+         "4737b2895d2a6da87d9c738aeb31c8960c3f917c6f175fc2535525e76e99df42"),
+    )
+    for name, relative, baseline in files:
+        if digest(directory / relative) not in (baseline, digest(support / name)):
+            raise RuntimeError("Unrecognized wiliwili recovery source: " + relative)
+    for name, relative, _ in files:
+        shutil.copyfile(str(support / name), str(directory / relative))
+    shutil.copyfile(str(support / "startup_audio_gate.h"),
+                    str(directory / "board_linux/startup_audio_gate.h"))
+
+
 def build_media_backends(jobs):
     work, host, prefix, env = app_environment()
     _, player, _ = stage("cedar-player")
     _, wili, _ = stage("wiliwili")
+    prepare_wiliwili_runtime(wili)
     sysroot = Path(capture([prefix + "gcc", "--print-sysroot"]))
     target = work / "ROOTFS/buildroot-2018.02.11/output/target"
     for name in ("libcdx_parser.so", "libcdx_stream.so", "libcdx_base.so", "libcdx_common.so", "libfdk-aac.so"):

@@ -1,0 +1,294 @@
+#include <CdxParser.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/socket.h>
+#include <stdatomic.h>
+#include <alsa/asoundlib.h>
+#include <string.h>
+#include <errno.h>
+#include <vdecoder.h>
+#include <fdk-aac/aacdecoder_lib.h>
+#include "render/mediaplayer.h"
+#include <unistd.h>
+#include <time.h>
+#include "startup_audio_gate.h"
+
+extern mediaplayer_t g_mediaplayer;
+atomic_int wiliwili_first_frame_visible = ATOMIC_VAR_INIT(0);
+atomic_llong wiliwili_first_video_pts = ATOMIC_VAR_INIT(-1);
+static int64_t audio_packet_pts = -1;
+static atomic_llong audio_played_pts = ATOMIC_VAR_INIT(-1);
+static atomic_llong audio_clock_wall = ATOMIC_VAR_INIT(0);
+static atomic_int audio_clock_active = ATOMIC_VAR_INIT(0);
+static atomic_int loop_pending = ATOMIC_VAR_INIT(0);
+atomic_llong wiliwili_latest_video_pts = ATOMIC_VAR_INIT(-1);
+int wiliwili_debug_enabled(void)
+{
+    const char *value = getenv("F1_PLAYER_DEBUG");
+    return value && strcmp(value, "1") == 0;
+}
+static _Thread_local int video_thread;
+static _Thread_local int64_t video_current_pts = -1;
+static int64_t monotonic_us(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (int64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+}
+static int64_t audio_now(void)
+{
+    int64_t elapsed = monotonic_us() - atomic_load(&audio_clock_wall);
+    if (elapsed < 0) elapsed = 0;
+    if (elapsed > 250000) elapsed = 250000;
+    return atomic_load(&audio_played_pts) + elapsed;
+}
+#include "audio_output.h"
+static AAC_DECODER_ERROR wiliwili_aac_fill(HANDLE_AACDECODER decoder, UCHAR *buffers[],
+                                          const UINT sizes[], UINT *valid, int64_t pts)
+{
+    static int logged;
+    audio_packet_pts = pts;
+    if (!logged) { fprintf(stderr, "PLAYER first audio packet pts_us=%lld\n", (long long)pts); logged = 1; }
+    return aacDecoder_Fill(decoder, buffers, sizes, valid);
+}
+
+atomic_int wiliwili_crop_ready = ATOMIC_VAR_INIT(0);
+int wiliwili_crop_left, wiliwili_crop_width, wiliwili_crop_height;
+static unsigned picture_requests, picture_returns;
+static int diagnostic_return(VideoDecoder *decoder, VideoPicture *picture)
+{
+    int rc = ReturnPicture(decoder, picture);
+    ++picture_returns;
+    if (rc && wiliwili_debug_enabled()) fprintf(stderr, "DEBUG ReturnPicture failed=%d\n", rc);
+    return rc;
+}
+#define ReturnPicture diagnostic_return
+
+static VideoPicture *wiliwili_request_picture(VideoDecoder *decoder, int stream)
+{
+    if (player_pause_wait()) return NULL;
+    video_thread = 1;
+    VideoPicture *picture = RequestPicture(decoder, stream);
+    if (picture) ++picture_requests;
+    static int logged;
+    static int preroll_done;
+    static unsigned preroll_frames;
+    if (picture && atomic_load(&loop_pending)) {
+        if (picture->nPts > 5000000) {
+            if (wiliwili_debug_enabled()) fprintf(stderr, "DEBUG discard previous-loop video pts=%lld\n", (long long)picture->nPts);
+            ReturnPicture(decoder, picture);
+            return NULL;
+        }
+        if (atomic_load(&audio_clock_active) && audio_now() < 5000000) atomic_store(&loop_pending, 0);
+    }
+    if (picture && !preroll_done) {
+        const char *start = getenv("F1_PLAYER_START_MS");
+        int64_t target = start ? (int64_t)strtol(start, NULL, 10) * 1000 : 0;
+        if (target > 0 && picture->nPts >= 0 && picture->nPts < target) {
+            if (!preroll_frames) fprintf(stderr, "PLAYER seek preroll first_pts_us=%lld target_us=%lld\n",
+                                        (long long)picture->nPts, (long long)target);
+            ++preroll_frames;
+            ReturnPicture(decoder, picture);
+            return NULL;
+        }
+        preroll_done = 1;
+        atomic_store(&wiliwili_first_video_pts, picture->nPts);
+        fprintf(stderr, "PLAYER first display pts_us=%lld preroll_frames=%u\n",
+                (long long)picture->nPts, preroll_frames);
+    }
+    if (picture && picture->nPts >= 0 && g_mediaplayer.has_audio && atomic_load(&audio_clock_active)) {
+        static unsigned late_frames;
+        static int64_t last_report;
+        int64_t clock = audio_now();
+        if (picture->nPts + 100000 < clock) {
+            ++late_frames;
+            if (late_frames == 1 || late_frames % 50 == 0)
+                fprintf(stderr, "PLAYER AV late frame: video_us=%lld audio_us=%lld dropped=%u\n",
+                        (long long)picture->nPts, (long long)clock, late_frames);
+            ReturnPicture(decoder, picture);
+            return NULL;
+        }
+        while (picture->nPts > clock + 20000) {
+            if (!atomic_load(&audio_clock_active) ||
+                monotonic_us() - atomic_load(&audio_clock_wall) > 750000) {
+                atomic_store(&audio_clock_active, 0);
+                break;
+            }
+            if (player_pause_wait()) { ReturnPicture(decoder, picture); return NULL; }
+            if (atomic_load(&loop_pending) && picture->nPts > 5000000) {
+                ReturnPicture(decoder, picture);
+                return NULL;
+            }
+            pthread_rwlock_rdlock(&g_mediaplayer.thread.rwlock);
+            int stopped = g_mediaplayer.thread.requested_stop;
+            pthread_rwlock_unlock(&g_mediaplayer.thread.rwlock);
+            if (stopped) { ReturnPicture(decoder, picture); return NULL; }
+            usleep(2000);
+            clock = audio_now();
+        }
+        if (wiliwili_debug_enabled() && monotonic_us() - last_report > 5000000) {
+            fprintf(stderr, "PLAYER AV clock: video_us=%lld audio_us=%lld delta_us=%lld dropped=%u\n",
+                    (long long)picture->nPts, (long long)clock, (long long)(picture->nPts - clock), late_frames);
+            last_report = monotonic_us();
+        }
+    }
+    if (picture) {
+        video_current_pts = picture->nPts;
+        atomic_store(&wiliwili_latest_video_pts, picture->nPts);
+    }
+    if (picture && !logged) {
+        logged = 1;
+        fprintf(stderr, "PLAYER frame bounds: buffer=%dx%d stride=%d visible=L%d T%d R%d B%d\n",
+                picture->nWidth, picture->nHeight, picture->nLineStride,
+                picture->nLeftOffset, picture->nTopOffset, picture->nRightOffset, picture->nBottomOffset);
+        if (picture->nTopOffset == 0 && picture->nLeftOffset >= 0 && picture->nLeftOffset < 32 &&
+            picture->nRightOffset > picture->nLeftOffset && picture->nRightOffset <= picture->nWidth &&
+            picture->nBottomOffset > 0 && picture->nBottomOffset <= picture->nHeight) {
+            wiliwili_crop_left = picture->nLeftOffset;
+            wiliwili_crop_width = picture->nRightOffset - picture->nLeftOffset;
+            wiliwili_crop_height = picture->nBottomOffset;
+            atomic_store(&wiliwili_crop_ready, 1);
+        }
+    }
+    return picture;
+}
+
+static int wiliwili_usleep(useconds_t duration)
+{
+    if (video_thread && video_current_pts >= 0 && duration > 2000 &&
+        g_mediaplayer.has_audio && atomic_load(&audio_clock_active)) return 0;
+    return usleep(duration);
+}
+
+atomic_int wiliwili_volume = ATOMIC_VAR_INIT(100);
+static int initial_seek_applied;
+static cdx_int32 wiliwili_prefetch(CdxParserT *parser, CdxPacketT *packet)
+{
+    if (player_pause_wait()) return -1;
+    if (!initial_seek_applied) {
+        initial_seek_applied = 1;
+        const char *value = getenv("F1_PLAYER_START_MS");
+        if (value && *value) {
+            char *end;
+            long ms = strtol(value, &end, 10);
+            if (*end || ms < 0 || ms > 86400000) return -1;
+            if (ms > 0) {
+                int result = CdxParserSeekTo(parser, (int64_t)ms * 1000, AW_SEEK_CLOSEST);
+                fprintf(stderr, "PLAYER initial_seek_ms=%ld rc=%d\n", ms, result);
+                if (result < 0) return result;
+            }
+        }
+    }
+    return CdxParserPrefetch(parser, packet);
+}
+
+static snd_pcm_sframes_t wiliwili_pcm_write(snd_pcm_t *pcm, const void *samples, snd_pcm_uframes_t frames)
+{
+    if (atomic_load(&loop_pending) && audio_packet_pts > 5000000) return frames;
+    const char *start = getenv("F1_PLAYER_START_MS");
+    int64_t target = start ? (int64_t)strtol(start, NULL, 10) * 1000 : 0;
+    /* Drain pre-keyframe audio before waiting for video. Otherwise the bounded
+     * audio queue blocks the shared parser before it can reach the target. */
+    int64_t first_video = atomic_load(&wiliwili_first_video_pts);
+    if (!atomic_load(&wiliwili_first_frame_visible) &&
+        wiliwili_startup_audio_discard(audio_packet_pts, target, first_video)) {
+        if (audio_rate) audio_packet_pts += (int64_t)frames * 1000000 / audio_rate;
+        return frames;
+    }
+    while (!atomic_load(&wiliwili_first_frame_visible)) {
+        pthread_rwlock_rdlock(&g_mediaplayer.thread.rwlock);
+        int stopped = g_mediaplayer.thread.requested_stop;
+        pthread_rwlock_unlock(&g_mediaplayer.thread.rwlock);
+        if (stopped) return -EINTR;
+        usleep(2000);
+    }
+    first_video = atomic_load(&wiliwili_first_video_pts);
+    static int startup_audio_aligned;
+    if (!startup_audio_aligned && audio_packet_pts >= 0 && first_video >= 0 && audio_packet_pts < first_video) {
+        static int logged;
+        if (!logged) { fprintf(stderr, "PLAYER discard early audio PCM pts_us=%lld video_us=%lld\n",
+                              (long long)audio_packet_pts, (long long)first_video); logged = 1; }
+        return frames;
+    }
+    startup_audio_aligned = 1;
+    int volume = atomic_load(&wiliwili_volume);
+    (void)pcm;
+    unsigned channels = audio_channels, rate = audio_rate;
+    if (!rate) return -EINVAL;
+    static int16_t scaled[8192];
+    if (!channels || frames > 8192 / channels) return -EINVAL;
+    const int16_t *input = samples;
+    const void *output = samples;
+    if (volume < 100) {
+        for (unsigned i = 0; i < frames * channels; ++i) scaled[i] = (int32_t)input[i] * volume / 100;
+        output = scaled;
+    }
+    snd_pcm_sframes_t written = audio_write(output, frames);
+    if (written > 0 && audio_packet_pts >= 0 && audio_pcm) {
+        audio_packet_pts += (int64_t)written * 1000000 / rate;
+        snd_pcm_sframes_t delay = 0;
+        if (snd_pcm_delay(audio_pcm, &delay) < 0 || delay < 0) delay = 0;
+        atomic_store(&audio_played_pts, audio_packet_pts - (int64_t)delay * 1000000 / rate);
+        atomic_store(&audio_clock_wall, monotonic_us());
+        atomic_store(&audio_clock_active, 1);
+    }
+    return written;
+}
+
+static cdx_int32 wiliwili_seek_to(CdxParserT *parser, cdx_int64 time_us, SeekModeType mode)
+{
+    cdx_int32 result = CdxParserSeekTo(parser, time_us, mode);
+    if (result == 0 && time_us == 0 && getenv("F1_OSD_EVENT_FD")) {
+        atomic_store(&loop_pending, 1);
+        atomic_store(&audio_clock_active, 0);
+        const uint64_t notification = 4;
+        ssize_t sent = send(3, &notification, sizeof(notification), MSG_DONTWAIT | MSG_NOSIGNAL);
+        fprintf(stderr, "PLAYER loop-to-zero: seek_rc=%d UI_event_bytes=%ld\n", result, (long)sent);
+    }
+    return result;
+}
+
+static int wiliwili_decode(VideoDecoder *decoder, int eos, int keyframe, int drop, int64_t now)
+{
+    int rc = DecodeVideoStream(decoder, eos, keyframe, drop, now);
+    static int64_t report;
+    if (wiliwili_debug_enabled() && monotonic_us() - report > 5000000) {
+        layer_t *layer = &g_mediaplayer.drm_warpper->layer[DRM_WARPPER_LAYER_VIDEO];
+        pthread_mutex_lock(&layer->display_queue.mtx);
+        size_t queued = layer->display_queue.count;
+        pthread_mutex_unlock(&layer->display_queue.mtx);
+        pthread_mutex_lock(&layer->free_queue.mtx);
+        size_t returned = layer->free_queue.count;
+        pthread_mutex_unlock(&layer->free_queue.mtx);
+        fprintf(stderr, "DEBUG frame pipeline decode=%d valid=%d display_queue=%zu free_queue=%zu audio_pts=%lld video_pts=%lld requests=%u returns=%u\n",
+            rc, ValidPictureNum(decoder, 0), queued, returned,
+            (long long)audio_now(), (long long)atomic_load(&wiliwili_latest_video_pts), picture_requests, picture_returns);
+        report = monotonic_us();
+    }
+    return rc;
+}
+static int wiliwili_initialize_decoder(VideoDecoder *decoder, VideoStreamInfo *info, VConfig *config)
+{
+    /* A zero reserve can deadlock a full reference DPB while scanout owns a frame. */
+    config->nDisplayHoldingFrameBufferNum = 1;
+    if (config->bRotationEn) config->nRotateHoldingFrameBufferNum = 1;
+    fprintf(stderr, "PLAYER frame reserve display=1 rotate=%d\n", config->bRotationEn ? 1 : 0);
+    return InitializeVideoDecoder(decoder, info, config);
+}
+
+/* Compile the original player without editing its protected source tree. */
+#define CdxParserSeekTo wiliwili_seek_to
+#define CdxParserPrefetch wiliwili_prefetch
+#define snd_pcm_writei wiliwili_pcm_write
+#define snd_pcm_open wiliwili_pcm_open
+#define snd_pcm_set_params wiliwili_pcm_params
+#define snd_pcm_drain wiliwili_pcm_drop
+#define snd_pcm_close wiliwili_pcm_drop
+#define snd_pcm_recover wiliwili_pcm_recover
+#define RequestPicture wiliwili_request_picture
+#define DecodeVideoStream wiliwili_decode
+#define InitializeVideoDecoder wiliwili_initialize_decoder
+#define usleep wiliwili_usleep
+#define aacDecoder_Fill(dec, buffers, sizes, valid) wiliwili_aac_fill(dec, buffers, sizes, valid, pkt->pts)
+#include "render/mediaplayer.c"

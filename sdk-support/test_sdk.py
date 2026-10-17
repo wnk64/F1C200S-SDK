@@ -28,6 +28,37 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_wiliwili_seek_preroll_audio_does_not_wait_for_first_frame(self):
+        support = Path(__file__).with_name("runtime-wiliwili")
+        executable = self.root / "startup-audio-test"
+        subprocess.run(["cc", "-std=c99", "-Wall", "-Wextra", "-Werror",
+                        "-I" + str(support), str(support / "test_startup_audio_gate.c"),
+                        "-o", str(executable)], check=True)
+        subprocess.run([str(executable)], check=True, timeout=3)
+        source = (support / "loop_mediaplayer.c").read_text()
+        pcm = source[source.index("static snd_pcm_sframes_t wiliwili_pcm_write"):]
+        self.assertLess(pcm.index("wiliwili_startup_audio_discard"),
+                        pcm.index("while (!atomic_load(&wiliwili_first_frame_visible))"))
+
+    def test_wiliwili_overlay_is_guarded_idempotent_and_transactional(self):
+        original = Path(__file__).with_name("runtime-wiliwili")
+        support = self.root / "sdk-support/runtime-wiliwili"
+        support.mkdir(parents=True)
+        directory = self.root / "wiliwili"
+        for name, relative in (("loop_mediaplayer.c", "board_linux/loop_mediaplayer.c"),
+                               ("main.cpp", "windows_lvgl/src/main.cpp")):
+            (support / name).write_bytes((original / name).read_bytes())
+            target = directory / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes((original / name).read_bytes())
+        (support / "startup_audio_gate.h").write_bytes((original / "startup_audio_gate.h").read_bytes())
+        sdk.prepare_wiliwili_runtime(directory)
+        sdk.prepare_wiliwili_runtime(directory)
+        target = directory / "windows_lvgl/src/main.cpp"
+        target.write_text("user changes")
+        with self.assertRaises(RuntimeError): sdk.prepare_wiliwili_runtime(directory)
+        self.assertEqual(target.read_text(), "user changes")
+
     def test_media_touch_targets_touchscreen_not_last_registered_keyboard(self):
         support = Path(__file__).with_name("runtime-media")
         executable = self.root / "media-touch-test"

@@ -1,3 +1,10 @@
+## 2026-10-17 / Planned / wiliwili seek preroll and feed cover restoration
+Base:a3f2fe7; nested wiliwili0c773e1 clean; original Cedar sources unchanged.
+Observed:seek55000 starts video50133312us/audio49969433us; no bitstream grows while audio thread waits for first committed frame and parser waits on bounded audio queue.
+Fix:drain audio older than seek/first-video cutoff before first-frame wait; retain queue bounds and no fabricated playback clock.
+Cover:cache matching covers even off-page, and retry missing snapshot covers after returning with a fresh navigation epoch; preserve stale-ID/URL guards.
+SDK hash-gated runtime-wiliwili overlays preserve locked sources/incremental cache. No image/kernel/radio changes. Host tests and board live seek/start/exit/reentry required; three cold boots pending.
+
 ## 2026-10-17 / Planned / Media landscape touch input identity
 Base: d17aaab; existing unrelated changes preserved. SDK media display source bb154371 matches locked staged source.
 Bug: LVGL registers devices at list head. Media replaced first (keyboard) read_cb, leaving touch portrait coordinates in landscape UI.
