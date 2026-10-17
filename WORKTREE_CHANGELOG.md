@@ -5,6 +5,9 @@ Scope: hash-gated runtime-media overlay and apps-ui hook; select unique pointer_
 Build: reuse SDK staged toolchain and incremental apps-ui -j8; no image/kernel/network changes.
 Tests: host list-order/type/duplicate/missing/double-wrap and overlay guards; board real touch/exit required, cold boots pending.
 Rollback: existing source snapshot and SDK cache; no new board backup files. Do not claim exact old binary provenance without matching hash.
+Implementation:92fafb4; executable mode preserved by a2fa893. SDK82 host tests PASS, including touch selection and guarded overlay; apps-ui incremental -j8 PASS in8s, only media_display compiled (some linked targets refreshed), no image.
+Deploy:old board frontend0dfcd882...; new aaa00de0c9f2991d4d219cb769ecd9d024d729e61f09d1a2a5009f68fcb5d167 verified before atomic rename to /opt/f1/apps/media/mplayer-ui. Backend unchanged. Board parser/LRC selftests PASS.
+Runner7754 terminated normally; menu8515 restored, old frontend/backend gone. No kernel/DTB/Wi-Fi/BT/ROM changes, no ad hoc backups. Physical touch/audio-video and3cold boots pending; candidate not stable promotion.
 
 ## 2026-10-12 / Planned / Board regression and missing web frontend
 DLNA follow-up planned:2767bff;see sdk-support/dlna-memory-20261012.md for exact board hashes,large-moov metadata,OOM and orphan-cache evidence. Temporary AIC-only resource-release comparison,BS/SSH/BT/DRM preserved;existing source/modules unchanged. Restore original cast loader after comparison. DLNA process-group cleanup candidate pending,not accepted.
