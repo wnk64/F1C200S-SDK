@@ -20,6 +20,7 @@ import tarfile
 import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
+SDK_VERSION = (ROOT / "VERSION").read_text().strip()
 OUT = ROOT / ".sdk-output"
 MARKER = ".f1c200s-sdk-output"
 TOKEN = "F1C200S generated SDK output v1\n"
@@ -1491,7 +1492,7 @@ def build_sd_image():
             if pending.exists():
                 pending.unlink()
     report = {"image": output.name, "sha256": digest(output), "bytes": output.stat().st_size,
-              "sdk_version": (ROOT / "VERSION").read_text().strip(),
+              "sdk_version": SDK_VERSION,
               "first_boot_data": "FAT32 p3 uses remaining card space; initializer self-removes and reboots",
               "partitions": partitions, "partition_sha256": partition_hashes,
               "rootfs_tar_sha256": digest(rootfs), "boot_input_sha256": {name: digest(path) for name, path in inputs.items()},
@@ -1801,7 +1802,7 @@ def build_all(jobs, image=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", action="version", version=(ROOT / "VERSION").read_text().strip())
+    parser.add_argument("--version", action="version", version=SDK_VERSION)
     sub = parser.add_subparsers(dest="command")
     inspect = sub.add_parser("doctor")
     sub.add_parser("package", help="Export complete source, toolchain and dependencies to .sdk-output/portable-sdk")
