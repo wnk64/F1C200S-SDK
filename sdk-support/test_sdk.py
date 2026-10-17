@@ -28,6 +28,23 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_mplayer_frame_reserve_overlay_is_guarded_and_incremental(self):
+        original = Path(__file__).with_name("runtime-media/vd_cedar.c")
+        support = self.root / "sdk-support/runtime-media"
+        support.mkdir(parents=True)
+        content = original.read_text()
+        self.assertIn("config.nDisplayHoldingFrameBufferNum = 1;", content)
+        self.assertIn("config.nRotateHoldingFrameBufferNum = ctx->rotate_90 ? 1 : 0;", content)
+        (support / "vd_cedar.c").write_text(content)
+        source = self.root / "vd_cedar.c"
+        source.write_text(content)
+        os.utime(str(source), (1000000000, 1000000000))
+        sdk.prepare_mplayer_frames(source)
+        self.assertEqual(source.stat().st_mtime, 1000000000)
+        source.write_text("user source")
+        with self.assertRaises(RuntimeError): sdk.prepare_mplayer_frames(source)
+        self.assertEqual(source.read_text(), "user source")
+
     def test_dlna_uri_switch_stops_transport_and_next_play_restarts(self):
         support = Path(__file__).with_name("runtime-lan")
         source = (support / "upnp_transport.c").read_text()

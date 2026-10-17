@@ -1,3 +1,9 @@
+## 2026-10-17 / Planned / MPlayer scanout and rotation frame reserves
+Base:fef4697/b203c76 DLNA state candidate. Same URI fails progress under both old38e40192 and new3a316836 renderer; isolated MPlayer without audio/cache also hangs. Not attributed to transport patch.
+Debug:decoder #35 onward result4/NO_FRAME_BUFFER valid0 while packets continue through#600. Original vd_cedar.c6583f9ce has display/rotation reserves0; VO retains displayed_picture until next commit/vblank.
+Scope:runtime-media/vd_cedar.c sets display reserve1 and rotation reserve1 only if enabled, matching working wiliwili strategy. SDK guarded overlay and mtime test; original MPlayer source untouched. MPlayer is shared by DLNA/local media, both require regression.
+Build:existing SDK toolchain, only vd_cedar.o plus link, no configure/full image. Compare same no-audio probe, then DLNA real switch/pause/progress and local frontend playback; ordinary/CMA memory and cleanup must be checked.
+
 ## 2026-10-17 / Planned / DLNA URI replacement state synchronization
 Base:c922ce8; runtime renderer38e40192; full source in SOFTWARE/lan-apps with staged transport24636bfdd0f3d1d593ab085eb6bcbcd255e140945683ca43ad2fd742e7b494cb.
 Observed:renderer4958 listening49494, no player, waiting UI; SOAP GetTransportInfo returns PLAYING/OK. Log Pause failed704 after old child SIGTERM. Not an SSDP discovery failure.

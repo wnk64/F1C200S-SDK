@@ -732,6 +732,16 @@ def prepare_wiliwili_runtime(directory):
         shutil.copyfile(str(support / header.name), str(header))
 
 
+def prepare_mplayer_frames(source):
+    candidate = ROOT / "sdk-support/runtime-media/vd_cedar.c"
+    baseline = "6583f9ce5ed462d0e9e17492c3e795a84f76bf7e49a1518870d1d6f00777f4ae"
+    current = digest(source)
+    if current not in (baseline, digest(candidate)):
+        raise RuntimeError("Unrecognized MPlayer Cedar source; refusing replacement")
+    if current != digest(candidate):
+        shutil.copyfile(str(candidate), str(source))
+
+
 def build_media_backends(jobs):
     work, host, prefix, env = app_environment()
     _, player, _ = stage("cedar-player")
@@ -749,6 +759,7 @@ def build_media_backends(jobs):
          "TARGET_DIR=" + str(target), "CFLAGS=" + cflags, "cedar_drm_player"], source, env)
     env["JOBS"] = str(jobs)
     mplayer = work / "SOFTWARE/mplayer-cedar"
+    prepare_mplayer_frames(mplayer / "libmpcodecs/vd_cedar.c")
     makefile = mplayer / "Makefile"
     old_include = "CFLAGS += -I/home/wnk/LicheePi_Nano/buildroot-2018.02.11/output/host/arm-buildroot-linux-gnueabi/sysroot/usr/include/drm"
     new_include = "CFLAGS += -I" + str(sysroot / "usr/include/drm")
