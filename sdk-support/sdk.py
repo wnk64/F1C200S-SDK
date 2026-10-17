@@ -20,7 +20,7 @@ import tarfile
 import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
-SDK_VERSION = (ROOT / "VERSION").read_text().strip()
+SDK_VERSION = (ROOT / "sdk-support/VERSION").read_text().strip()
 OUT = ROOT / ".sdk-output"
 MARKER = ".f1c200s-sdk-output"
 TOKEN = "F1C200S generated SDK output v1\n"

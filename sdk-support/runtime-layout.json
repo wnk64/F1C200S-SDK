@@ -4,7 +4,7 @@
   "sources": [
     {"origin":"sdk","path":"runtime-data/S18data-firstboot","targets":["etc/init.d/S18data-firstboot"],"executable":true},
     {"origin":"sdk","path":"runtime-data/f1-data-firstboot.state","targets":["etc/f1-data-firstboot.state"]},
-    {"origin":"project-git","path":"VERSION","targets":["etc/f1-sdk-version"]},
+    {"origin":"sdk","path":"VERSION","targets":["etc/f1-sdk-version"]},
     {"origin":"sdk","path":"runtime-data/COPYING.dosfstools","targets":["usr/share/licenses/dosfstools/COPYING"]},
     {"origin":"sdk","path":"runtime-cast/S12board-hardware","targets":["etc/init.d/S12board-hardware"],"executable":true},
     {"origin":"sdk","path":"runtime-cast/S19data","targets":["etc/init.d/S19data"],"executable":true},
