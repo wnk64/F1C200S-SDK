@@ -1211,6 +1211,23 @@ def build_integrated_rootfs():
     print(json.dumps(report, indent=2), flush=True)
 
 
+def build_fat_tools(jobs, prefix, env):
+    archive = ROOT / "ROOTFS/buildroot-2018.02.11/dl/dosfstools-4.1.tar.xz"
+    if digest(archive) != "e6b2aca70ccc3fe3687365009dd94a2e18e82b688ed4e260e04b7412471cc173":
+        raise RuntimeError("dosfstools source checksum mismatch")
+    parent = OUT / "runtime-tools-build"
+    source = parent / "dosfstools-4.1"
+    if not source.exists():
+        with archive.open("rb") as stream:
+            extract_archive(stream, parent)
+    if not (source / "Makefile").is_file():
+        configure_env = dict(env, CC=prefix + "gcc", CFLAGS="-Os")
+        run([source / "configure", "--host=arm-buildroot-linux-gnueabi", "--without-udev",
+             "--disable-compat-symlinks"], source, configure_env)
+    run(["make", "-j{}".format(jobs), "-C", "src", "mkfs.fat", "fsck.fat"], source, env)
+    return {name: source / "src" / name for name in ("mkfs.fat", "fsck.fat")}
+
+
 def build_runtime_tools(jobs):
     work, _, prefix, env = app_environment()
     network = work / "SCRCPT/network-and-audio-source"
@@ -1218,6 +1235,7 @@ def build_runtime_tools(jobs):
         "f1-rtc-time-ui": network / "rtc_time_20261003/f1-rtc-time.c",
         "f1-ip-config": network / "static_ip_20261004/f1-ip-config.c",
         "f1-app-runner": ROOT / "sdk-support/runtime-menu/f1_app_runner.c",
+        "f1-data-partition": ROOT / "sdk-support/runtime-data/f1_data_partition.c",
     }
     generated = OUT / "runtime-tools-build"
     generated.mkdir(parents=True, exist_ok=True)
@@ -1226,10 +1244,13 @@ def build_runtime_tools(jobs):
         if not source.is_file():
             raise RuntimeError("Missing runtime tool source: " + str(source))
         output = generated / name
-        run([prefix + "gcc", "-Os", "-march=armv5te", "-std=gnu99", "-Wall", "-Wextra", "-Werror",
-             source, "-o", output], env=env)
-        run(["gcc", "-Os", "-std=gnu99", "-Wall", "-Wextra", "-Werror", source,
-             "-o", generated / (name + ".host")], env=env)
+        host_output = generated / (name + ".host")
+        if not output.is_file() or source.stat().st_mtime > output.stat().st_mtime:
+            run([prefix + "gcc", "-Os", "-march=armv5te", "-std=gnu99", "-Wall", "-Wextra", "-Werror",
+                 source, "-o", output], env=env)
+        if not host_output.is_file() or source.stat().st_mtime > host_output.stat().st_mtime:
+            run(["gcc", "-Os", "-std=gnu99", "-Wall", "-Wextra", "-Werror", source,
+                 "-o", host_output], env=env)
         outputs[name] = output
     run([generated / "f1-rtc-time-ui.host", "--selftest"], env=env)
     run([generated / "f1-ip-config.host", "validate", "static", "10.0.0.234/24", "10.0.0.1", "10.0.0.1"], env=env)
@@ -1242,6 +1263,7 @@ def build_runtime_tools(jobs):
         result = subprocess.run([str(generated / "f1-ip-config.host"), "validate"] + arguments, env=env)
         if result.returncode != 3:
             raise RuntimeError("IP validation failed to reject invalid configuration")
+    outputs.update(build_fat_tools(jobs, prefix, env))
     publish_apps("runtime-tools", outputs, prefix)
 
 
@@ -1341,12 +1363,11 @@ def sd_partition_table():
     return [
         {"name": "boot", "start": 2048, "sectors": 32768, "type": 0x0e},
         {"name": "rootfs", "start": 34816, "sectors": 1013760, "type": 0x83},
-        {"name": "data", "start": 1048576, "sectors": 1048576, "type": 0x0c},
     ]
 
 
 def sd_mbr(partitions, total_sectors, bootloader_bytes):
-    if len(partitions) != 3 or total_sectors < 1 or bootloader_bytes < 1:
+    if len(partitions) != 2 or total_sectors < 1 or bootloader_bytes < 1:
         raise RuntimeError("Invalid SD image layout")
     previous = 0
     result = bytearray(512)
@@ -1438,10 +1459,7 @@ def build_sd_image():
         console = capture([host / "sbin/debugfs", "-R", "stat /dev/console", filesystems["rootfs"]])
         if "character special" not in console or not re.search(r"User:\s+0\s+Group:\s+0", console):
             raise RuntimeError("Rootfs console node/ownership incorrect")
-        run(["mkfs.vfat", "-F", "32", "-n", "F1DATA", "-h", str(partitions[2]["start"]), filesystems["data"]])
-        for name in ("gba", "ps1", "md", "sfc", "ons", "video", "music", "documents", "pictures", "recordings", "uploads"):
-            run(["mmd", "-i", filesystems["data"], "::" + name])
-        for name in ("boot", "data"):
+        for name in ("boot",):
             run(["fsck.vfat", "-n", filesystems[name]])
         output = images / "f1c200s-sdk-candidate.img"
         pending = images / "f1c200s-sdk-candidate.img.pending"
@@ -1473,6 +1491,8 @@ def build_sd_image():
             if pending.exists():
                 pending.unlink()
     report = {"image": output.name, "sha256": digest(output), "bytes": output.stat().st_size,
+              "sdk_version": (ROOT / "VERSION").read_text().strip(),
+              "first_boot_data": "FAT32 p3 uses remaining card space; initializer self-removes and reboots",
               "partitions": partitions, "partition_sha256": partition_hashes,
               "rootfs_tar_sha256": digest(rootfs), "boot_input_sha256": {name: digest(path) for name, path in inputs.items()},
               "offline_filesystem_checks": "passed", "board_deployed": False, "cold_boots": 0,
@@ -1781,6 +1801,7 @@ def build_all(jobs, image=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--version", action="version", version=(ROOT / "VERSION").read_text().strip())
     sub = parser.add_subparsers(dest="command")
     inspect = sub.add_parser("doctor")
     sub.add_parser("package", help="Export complete source, toolchain and dependencies to .sdk-output/portable-sdk")

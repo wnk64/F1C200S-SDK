@@ -1,0 +1,71 @@
+#!/bin/sh
+set -eu
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+case "${1:-start}" in start) ;; stop) exit 0 ;; *) exit 1 ;; esac
+STATE=/etc/f1-data-firstboot.state
+SELF=/etc/init.d/S18data-firstboot
+TOOL=/usr/sbin/f1-data-partition
+PART=/dev/mmcblk0p3
+DATA=/root/roms
+die() { echo "F1DATA first boot: $*; no reboot, initialization retained" >&2; exit 1; }
+[ -f "$STATE" ] && [ ! -L "$STATE" ] || exit 0
+[ -x "$TOOL" ] && [ -x /sbin/mkfs.fat ] && [ -x /sbin/fsck.fat ] || die 'missing tools'
+rootdev=$(awk '$2 == "/" {print $1}' /proc/mounts)
+case "$rootdev" in /dev/mmcblk0p2|/dev/root) ;; *) die 'unexpected root device' ;; esac
+rootid=$(stat -c %d /)
+partid=$(stat -c %r /dev/mmcblk0p2)
+[ "$rootid" = "$partid" ] || die 'root is not mmcblk0p2'
+awk '$1 == "/dev/mmcblk0p3" || $2 == "/root/roms" {bad=1} END {exit bad}' /proc/mounts || die 'data already mounted'
+cid=$(cat /sys/class/block/mmcblk0/device/cid)
+size=$(cat /sys/class/block/mmcblk0/size)
+case "$cid" in ''|*[!0-9a-fA-F]*) die 'invalid card identity' ;; esac
+case "$size" in ''|*[!0-9]*) die 'invalid card size' ;; esac
+read -r phase saved_cid saved_size extra < "$STATE" || die 'invalid state'
+save_state() {
+    umask 077
+    printf '%s %s %s\n' "$1" "$cid" "$size" > "$STATE.pending"
+    sync
+    mv "$STATE.pending" "$STATE"
+    sync
+}
+if [ "$phase" = new ]; then
+    [ -z "$saved_cid$saved_size$extra" ] || die 'invalid new state'
+    "$TOOL" --fresh >/dev/null || die 'layout is not fresh; existing data protected'
+    save_state format
+    phase=format
+else
+    [ "$saved_cid" = "$cid" ] && [ "$saved_size" = "$size" ] && [ -z "$extra" ] || die 'card identity changed'
+fi
+case "$phase" in
+format)
+    geometry=$("$TOOL" --create) || die 'cannot create partition'
+    set -- $geometry
+    [ "$#" = 2 ] || die 'invalid planned geometry'
+    n=0
+    while [ ! -b "$PART" ]; do
+        n=$((n + 1)); [ "$n" -lt 10 ] || die 'partition node did not appear'
+        mdev -s
+        sleep 1
+    done
+    [ "$(cat /sys/class/block/mmcblk0p3/start)" = "$1" ] &&
+        [ "$(cat /sys/class/block/mmcblk0p3/size)" = "$2" ] || die 'kernel geometry differs'
+    /sbin/mkfs.fat -F 32 -n F1DATA "$PART" || die 'FAT32 format failed'
+    /sbin/fsck.fat -n "$PART" || die 'FAT32 check failed'
+    mkdir -p "$DATA"
+    mount -t vfat -o rw,noatime,utf8=1 "$PART" "$DATA" || die 'mount failed'
+    for directory in gba ps1 md sfc ons video music documents pictures recordings uploads; do
+        mkdir -p "$DATA/$directory" || die 'directory creation failed'
+    done
+    sync
+    umount "$DATA" || die 'unmount failed'
+    save_state done
+    ;;
+done) "$TOOL" --resume >/dev/null || die 'completed layout changed' ;;
+*) die 'unknown state' ;;
+esac
+echo 'F1DATA FAT32 ready; removing one-time initializer and rebooting'
+rm -f "$STATE" "$STATE.pending" "$SELF" "$TOOL"
+sync
+/sbin/reboot
+sleep 10
+die 'reboot did not complete'

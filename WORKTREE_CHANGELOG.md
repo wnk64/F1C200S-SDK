@@ -1,3 +1,9 @@
+## 2026-10-17 / Planned / First-boot FAT32 data partition and SDK release
+Base:4bbf29d;canonical existing SDK only. Preserve unrelated dirty files. New SD images have only unchanged boot/root partitions; first boot creates p3 from512MiB through aligned card end, FAT32 at/root/roms.
+Safety:explicit new-image state, exact SDK MBR/system geometry, root identity, card CID/size binding, reject existing p3/p4 or mounted data. Persist format intent before MBR update; resume only exact own geometry. No system partition resizing, no live card repartitioning.
+Completion:mkfs/fsck/mount/create folders/unmount, durable done state, self-remove initializer/state/helper, sync/reboot. Failures retain state and do not reboot-loop. FAT32 individual files limited to4GiB-1.
+Tests:host C MBR image tests/fault cases, shell lifecycle mocks, filesystem/loop integration on temporary disposable files; SDK regression and board read-only smoke. No current SD writes. Version0.2.0-rc1;publish tracked audited changes and tag after validation;not hardware-stable without3cold boots.
+
 ## 2026-10-17 / Results / DLNA state and frame reserve candidates
 Commits:fef4697 transport STOPPED on URI replacement;b203c76 real SOAP probe;ed1c9ef MPlayer reserves;24caa9d test fixture correction. Host87 tests PASS. Incremental builds compiled only upnp_transport.o/vd_cedar.o and relinked, no image/configure.
 Renderer:e5fac92f83d5fbabb3d2f234d27e41c5ebf56aab2eca6c30bf4d8a27d3fdc871;MPlayer9b78dbe4fb65feb2e4c19f45cc17b4075b2d14a1b5250e0b60d96259d8b5d7ab;SSH verified and deployed to existing paths. Old renderer38e40192/old player18ee6853. Existing baseline retained, no new backups. Published SDK artifacts/build reports updated.

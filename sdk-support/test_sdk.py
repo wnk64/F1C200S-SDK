@@ -470,8 +470,9 @@ Version needs section '.gnu.version_r' contains 1 entry:
         partitions = sdk.sd_partition_table()
         result = sdk.sd_mbr(partitions, 2097152, 548864)
         self.assertEqual(result[510:512], b"\x55\xaa")
-        for index, start in enumerate((2048, 34816, 1048576)):
+        for index, start in enumerate((2048, 34816)):
             self.assertEqual(sdk.struct.unpack_from("<I", result, 446 + index * 16 + 8)[0], start)
+        self.assertEqual(result[478:510], bytes(32))
         with self.assertRaises(RuntimeError):
             sdk.sd_mbr(partitions, 2097152, 2 * 1024 * 1024)
         partitions[1]["start"] = 2048

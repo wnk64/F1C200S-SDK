@@ -2,6 +2,10 @@
   "schema": 1,
   "kernel_modules": true,
   "sources": [
+    {"origin":"sdk","path":"runtime-data/S18data-firstboot","targets":["etc/init.d/S18data-firstboot"],"executable":true},
+    {"origin":"sdk","path":"runtime-data/f1-data-firstboot.state","targets":["etc/f1-data-firstboot.state"]},
+    {"origin":"project-git","path":"VERSION","targets":["etc/f1-sdk-version"]},
+    {"origin":"sdk","path":"runtime-data/COPYING.dosfstools","targets":["usr/share/licenses/dosfstools/COPYING"]},
     {"origin":"sdk","path":"runtime-cast/S12board-hardware","targets":["etc/init.d/S12board-hardware"],"executable":true},
     {"origin":"sdk","path":"runtime-cast/S19data","targets":["etc/init.d/S19data"],"executable":true},
     {"origin":"project","path":"DRIVER/board-power-20261004/S14board-power","targets":["etc/init.d/S14board-power"],"executable":true,"replacements":{"/root/aic_miracast/candidates/board_power_20261004/f1_board_power.ko":"/lib/modules/5.7.1/extra/f1_board_power.ko"}},
@@ -119,7 +123,10 @@
     "runtime-tools": {
       "f1-rtc-time-ui": "opt/f1-time/f1-rtc-time-ui",
       "f1-ip-config": "opt/f1-network/f1-ip-config",
-      "f1-app-runner": "opt/f1/apps/menu/f1-app-runner"
+      "f1-app-runner": "opt/f1/apps/menu/f1-app-runner",
+      "f1-data-partition": "usr/sbin/f1-data-partition",
+      "mkfs.fat": "sbin/mkfs.fat",
+      "fsck.fat": "sbin/fsck.fat"
     },
     "wireless-modules": {
       "aic_load_fw.ko": "lib/modules/5.7.1/extra/aic_load_fw.ko",
