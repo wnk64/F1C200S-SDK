@@ -1,3 +1,9 @@
+## 2026-10-17 / Planned / wiliwili progress probe
+Hypothesis: committed YUV PTS must advance at startup and after a 55s seek; audio/process liveness alone is insufficient.
+Files: sdk-support/runtime-wiliwili/playback_progress_probe.c; standalone opt-in diagnostic, not installed in normal runtime.
+Build: existing SDK ARM compiler; exclusive display; URI supplied on stdin and never printed.
+Tests: pending board baseline/candidate comparisons; no kernel/radio changes or cold power control.
+
 ## 2026-10-17 / Planned / wiliwili seek preroll and feed cover restoration
 Base:a3f2fe7; nested wiliwili0c773e1 clean; original Cedar sources unchanged.
 Observed:seek55000 starts video50133312us/audio49969433us; no bitstream grows while audio thread waits for first committed frame and parser waits on bounded audio queue.
