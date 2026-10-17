@@ -644,12 +644,23 @@ def prepare_lan_runtime(backend_source):
     shutil.copyfile(str(support / "dlna_process.h"), str(backend_source.with_name("dlna_process.h")))
 
 
+def prepare_lan_transport(source):
+    candidate = ROOT / "sdk-support/runtime-lan/upnp_transport.c"
+    baseline = "24636bfdd0f3d1d593ab085eb6bcbcd255e140945683ca43ad2fd742e7b494cb"
+    current = digest(source)
+    if current not in (baseline, digest(candidate)):
+        raise RuntimeError("Unrecognized DLNA transport source; refusing replacement")
+    if current != digest(candidate):
+        shutil.copyfile(str(candidate), str(source))
+
+
 def build_lan(jobs):
     work, host, prefix, env = app_environment()
     directory = work / "SOFTWARE/lan-apps"
     backend_source = directory / "vendor/gmrender/src/output_cedar.c"
     relocate_lan_backend(backend_source)
     prepare_lan_runtime(backend_source)
+    prepare_lan_transport(backend_source.with_name("upnp_transport.c"))
     library = directory / "stage"
     sysroot = Path(capture([prefix + "gcc", "--print-sysroot"]))
     env["CC"] = prefix + "gcc"

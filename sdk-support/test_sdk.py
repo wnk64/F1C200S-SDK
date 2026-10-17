@@ -28,6 +28,30 @@ spec.loader.exec_module(sdk)
 
 
 class OutputSafetyTests(unittest.TestCase):
+    def test_dlna_uri_switch_stops_transport_and_next_play_restarts(self):
+        support = Path(__file__).with_name("runtime-lan")
+        source = (support / "upnp_transport.c").read_text()
+        actions = source[source.index("static int set_avtransport_uri("):source.index("static int set_next_avtransport_uri(")]
+        actions += source[source.index("static int play(struct action_event"):source.index("static int pause_stream(")]
+        (self.root / "transport_actions.inc").write_text(actions)
+        executable = self.root / "transport-state-test"
+        subprocess.run(["cc", "-std=c99", "-Wall", "-Wextra", "-Werror", "-I" + str(self.root),
+                        str(support / "test_transport_state.c"), "-o", str(executable)], check=True)
+        subprocess.run([str(executable)], check=True, timeout=3)
+
+    def test_dlna_transport_overlay_rejects_unknown_and_preserves_mtime(self):
+        support = self.root / "sdk-support/runtime-lan"
+        support.mkdir(parents=True)
+        (support / "upnp_transport.c").write_text("known candidate")
+        source = self.root / "upnp_transport.c"
+        source.write_text("known candidate")
+        os.utime(str(source), (1000000000, 1000000000))
+        sdk.prepare_lan_transport(source)
+        self.assertEqual(source.stat().st_mtime, 1000000000)
+        source.write_text("user modifications")
+        with self.assertRaises(RuntimeError): sdk.prepare_lan_transport(source)
+        self.assertEqual(source.read_text(), "user modifications")
+
     def test_wiliwili_seek_preroll_audio_does_not_wait_for_first_frame(self):
         support = Path(__file__).with_name("runtime-wiliwili")
         executable = self.root / "startup-audio-test"

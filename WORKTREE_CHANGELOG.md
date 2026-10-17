@@ -1,3 +1,10 @@
+## 2026-10-17 / Planned / DLNA URI replacement state synchronization
+Base:c922ce8; runtime renderer38e40192; full source in SOFTWARE/lan-apps with staged transport24636bfdd0f3d1d593ab085eb6bcbcd255e140945683ca43ad2fd742e7b494cb.
+Observed:renderer4958 listening49494, no player, waiting UI; SOAP GetTransportInfo returns PLAYING/OK. Log Pause failed704 after old child SIGTERM. Not an SSDP discovery failure.
+Cause:Cedar set_uri terminates child; transport set_avtransport_uri leaves PLAYING; subsequent Play is ignored in PLAYING case.
+Scope:hash-gated runtime-lan/upnp_transport.c resets STOPPED/time0 after output_set_uri; SDK hook and C regression harness extracted from actual action functions. Original vendor source, backend,MPlayer,kernel,wireless unchanged.
+Validation:host state sequence tests and real SOAP URI1/Play/URI2/Play, active player/progress, pause/resume/stop/reconnect, menu/resource release. Incremental renderer build only; no image/new SDK/unsolicited backups. Cold acceptance pending.
+
 ## 2026-10-17 / Results / wiliwili runtime recovery candidate
 Source:ff4950a audio-preroll/feed-cover fix;757ee52 progress probe;69aa9f8 UI cover probe;c35f94d unchanged overlay mtimes. README documents opt-in diagnostics. Locked nested sources remain unchanged; unrelated dirty files preserved.
 Build:./sdk build media-backends -j8;84 SDK tests PASS. Repeated build reports UI/Cedar/MPlayer up-to-date, no main.o/mediaplayer.o compilation; no image built.
