@@ -1214,7 +1214,21 @@ def build_integrated_rootfs():
 
 def build_fat_tools(jobs, prefix, env):
     archive = ROOT / "ROOTFS/buildroot-2018.02.11/dl/dosfstools-4.1.tar.xz"
-    if digest(archive) != "e6b2aca70ccc3fe3687365009dd94a2e18e82b688ed4e260e04b7412471cc173":
+    expected = "e6b2aca70ccc3fe3687365009dd94a2e18e82b688ed4e260e04b7412471cc173"
+    if not archive.is_file():
+        archive.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(prefix="dosfstools-download-", dir=str(archive.parent), delete=False) as temporary:
+            pending = Path(temporary.name)
+        try:
+            run(["wget", "--https-only", "--timeout=30", "--tries=2", "-O", pending,
+                 "https://github.com/dosfstools/dosfstools/releases/download/v4.1/dosfstools-4.1.tar.xz"], env=env)
+            if digest(pending) != expected:
+                raise RuntimeError("Downloaded dosfstools checksum mismatch")
+            os.replace(str(pending), str(archive))
+        finally:
+            if pending.exists():
+                pending.unlink()
+    if digest(archive) != expected:
         raise RuntimeError("dosfstools source checksum mismatch")
     parent = OUT / "runtime-tools-build"
     source = parent / "dosfstools-4.1"
