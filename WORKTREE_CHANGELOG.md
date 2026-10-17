@@ -2,7 +2,8 @@
 Hypothesis: committed YUV PTS must advance at startup and after a 55s seek; audio/process liveness alone is insufficient.
 Files: sdk-support/runtime-wiliwili/playback_progress_probe.c; standalone opt-in diagnostic, not installed in normal runtime.
 Build: existing SDK ARM compiler; exclusive display; URI supplied on stdin and never printed.
-Tests: pending board baseline/candidate comparisons; no kernel/radio changes or cold power control.
+Tests: old seek55s failed20s with0 advancing PTS; candidate seek55s passed twice (229/230frames), startup passed twice (231/232frames), each advances8s. Startup1.9/2.9s; seek3.5/6.8s; max gap0.8-1.45s. Further long playback and cover test pending.
+Probe extension: optional playback duration; F1_WILI_COVER_SELFTEST=1 explicitly enables UI detail/return test requiring all feed covers restored within120s. Default disabled. No kernel/radio changes or cold power control.
 
 ## 2026-10-17 / Planned / wiliwili seek preroll and feed cover restoration
 Base:a3f2fe7; nested wiliwili0c773e1 clean; original Cedar sources unchanged.

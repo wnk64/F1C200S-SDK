@@ -6880,6 +6880,13 @@ int main(int argc, char** argv) {
     bool running = true;
     bool displayed = false;
     uint32_t last_tick = platform_ticks();
+#ifdef WILIWILI_BOARD
+    const char* cover_test_setting = std::getenv("F1_WILI_COVER_SELFTEST");
+    const bool cover_selftest = cover_test_setting && std::strcmp(cover_test_setting, "1") == 0;
+    const uint32_t cover_test_started = last_tick;
+    uint32_t cover_test_step_tick = last_tick;
+    int cover_test_step = 0, cover_test_exit = 0;
+#endif
     while (running && !quit_requested.load()) {
         PlatformEvent event;
         while (platform_poll_event(event)) {
@@ -7379,6 +7386,34 @@ int main(int argc, char** argv) {
 #endif
         }
         refresh_danmaku_overlay();
+#ifdef WILIWILI_BOARD
+        if (cover_selftest) {
+            size_t expected = 0, loaded = 0;
+            for (size_t index = 0; index < displayed_videos.size(); ++index) {
+                if (displayed_videos[index].pic.empty()) continue;
+                ++expected;
+                if (index < thumbnail_descriptors.size() && thumbnail_descriptors[index].data) ++loaded;
+            }
+            if (cover_test_step == 0 && expected > 4 && loaded >= 1 && !detail_visible) {
+                std::fprintf(stderr, "COVER SELFTEST enter detail loaded=%zu expected=%zu\n", loaded, expected);
+                show_video_detail(0);
+                cover_test_step = 1;
+                cover_test_step_tick = platform_ticks();
+            } else if (cover_test_step == 1 && platform_ticks() - cover_test_step_tick >= 1000) {
+                return_to_recommend(nullptr);
+                cover_test_step = 2;
+                std::fprintf(stderr, "COVER SELFTEST returned loaded=%zu expected=%zu\n", loaded, expected);
+            } else if (cover_test_step == 2 && expected > 4 && loaded == expected && !detail_visible) {
+                std::fprintf(stderr, "COVER SELFTEST PASS restored=%zu\n", loaded);
+                running = false;
+            }
+            if (platform_ticks() - cover_test_started > 120000) {
+                std::fprintf(stderr, "COVER SELFTEST FAIL step=%d loaded=%zu expected=%zu\n", cover_test_step, loaded, expected);
+                cover_test_exit = 1;
+                running = false;
+            }
+        }
+#endif
         const uint32_t next_timer = lv_timer_handler();
         handle_player_end();
         const uint32_t fps_now = platform_ticks();
@@ -7406,7 +7441,7 @@ int main(int argc, char** argv) {
 #ifdef WILIWILI_BOARD
     // Detached requests must not race destruction of shared C++ globals.
     // Board display/player resources are closed before terminating workers.
-    std::_Exit(0);
+    std::_Exit(cover_test_exit);
 #endif
     return 0;
 }

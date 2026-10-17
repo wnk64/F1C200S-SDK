@@ -21,7 +21,7 @@ static long milliseconds(void) {
 /* Input URI stays on stdin, never in probe output. Run with an exclusive display. */
 int main(int argc, char **argv) {
     char uri[16384];
-    if (argc != 4 || !fgets(uri, sizeof(uri), stdin)) return 2;
+    if ((argc != 4 && argc != 5) || !fgets(uri, sizeof(uri), stdin)) return 2;
     uri[strcspn(uri, "\r\n")] = 0;
     int sockets[2];
     if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sockets)) return 2;
@@ -58,7 +58,8 @@ int main(int argc, char **argv) {
                     if (!frames) { first = position; printf("first_ms=%u startup_ms=%ld\n", first, now - started); }
                     else if (gap > max_gap) max_gap = gap;
                     last = now; latest = position; ++frames;
-                    if (latest >= first + 8000 && frames >= 60) { passed = 1; break; }
+                    uint32_t required = argc == 5 ? (uint32_t)atoi(argv[4]) * 1000U : 8000U;
+                    if (latest >= first + required && frames >= 60) { passed = 1; break; }
                 }
             }
         }

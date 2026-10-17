@@ -710,7 +710,8 @@ def prepare_wiliwili_runtime(directory):
          "4737b2895d2a6da87d9c738aeb31c8960c3f917c6f175fc2535525e76e99df42"),
     )
     for name, relative, baseline in files:
-        if digest(directory / relative) not in (baseline, digest(support / name)):
+        previous = ("7c4a5ee1a5d72f48140f7de2f668a55ba7e68102023709d428173dfbc5b3b02e",) if name == "main.cpp" else ()
+        if digest(directory / relative) not in (baseline, digest(support / name)) + previous:
             raise RuntimeError("Unrecognized wiliwili recovery source: " + relative)
     for name, relative, _ in files:
         shutil.copyfile(str(support / name), str(directory / relative))
