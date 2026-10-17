@@ -29,7 +29,7 @@ spec.loader.exec_module(sdk)
 
 class OutputSafetyTests(unittest.TestCase):
     def test_mplayer_frame_reserve_overlay_is_guarded_and_incremental(self):
-        original = Path(__file__).with_name("runtime-media/vd_cedar.c")
+        original = Path(__file__).with_name("runtime-media") / "vd_cedar.c"
         support = self.root / "sdk-support/runtime-media"
         support.mkdir(parents=True)
         content = original.read_text()
