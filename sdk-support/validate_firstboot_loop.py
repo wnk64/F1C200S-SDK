@@ -20,7 +20,11 @@ def install(root, binary, destination):
     target = root / destination.lstrip("/")
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(str(binary), str(target))
-    deps = subprocess.check_output(["ldd", str(binary)], universal_newlines=True)
+    dependency_result = subprocess.run(["ldd", str(binary)], stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE, universal_newlines=True)
+    deps = dependency_result.stdout
+    if dependency_result.returncode and "not a dynamic executable" not in deps + dependency_result.stderr:
+        raise RuntimeError("cannot inspect binary dependencies: " + str(binary))
     for dependency in re.findall(r"(/[^\s()]+)", deps):
         source = Path(dependency)
         if source.is_file():
