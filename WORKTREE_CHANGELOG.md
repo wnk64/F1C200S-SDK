@@ -1,3 +1,7 @@
+## 2026-10-17 / Planned / Preserve incremental overlay mtimes
+Files: sdk-support/sdk.py,test_sdk.py. Skip overlay copies when content already matches; test unchanged sources/header preserve deterministic mtime. No runtime behavior change.
+Board:69aa9f8 cover selftest passed8/8 after detail/return, new UI2859a7c4; backend835d8fd8. User restarted previous long probe; interrupted test not counted. Repeating live playback after restart.
+
 ## 2026-10-17 / Planned / wiliwili progress probe
 Hypothesis: committed YUV PTS must advance at startup and after a 55s seek; audio/process liveness alone is insufficient.
 Files: sdk-support/runtime-wiliwili/playback_progress_probe.c; standalone opt-in diagnostic, not installed in normal runtime.

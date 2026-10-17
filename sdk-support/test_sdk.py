@@ -53,7 +53,13 @@ class OutputSafetyTests(unittest.TestCase):
             target.write_bytes((original / name).read_bytes())
         (support / "startup_audio_gate.h").write_bytes((original / "startup_audio_gate.h").read_bytes())
         sdk.prepare_wiliwili_runtime(directory)
+        targets = [directory / relative for relative in (
+            "board_linux/loop_mediaplayer.c", "windows_lvgl/src/main.cpp",
+            "board_linux/startup_audio_gate.h")]
+        for target in targets:
+            os.utime(str(target), (1000000000, 1000000000))
         sdk.prepare_wiliwili_runtime(directory)
+        self.assertTrue(all(target.stat().st_mtime == 1000000000 for target in targets))
         target = directory / "windows_lvgl/src/main.cpp"
         target.write_text("user changes")
         with self.assertRaises(RuntimeError): sdk.prepare_wiliwili_runtime(directory)

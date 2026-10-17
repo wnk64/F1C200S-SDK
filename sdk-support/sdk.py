@@ -714,9 +714,11 @@ def prepare_wiliwili_runtime(directory):
         if digest(directory / relative) not in (baseline, digest(support / name)) + previous:
             raise RuntimeError("Unrecognized wiliwili recovery source: " + relative)
     for name, relative, _ in files:
-        shutil.copyfile(str(support / name), str(directory / relative))
-    shutil.copyfile(str(support / "startup_audio_gate.h"),
-                    str(directory / "board_linux/startup_audio_gate.h"))
+        if digest(directory / relative) != digest(support / name):
+            shutil.copyfile(str(support / name), str(directory / relative))
+    header = directory / "board_linux/startup_audio_gate.h"
+    if not header.is_file() or digest(header) != digest(support / header.name):
+        shutil.copyfile(str(support / header.name), str(header))
 
 
 def build_media_backends(jobs):
