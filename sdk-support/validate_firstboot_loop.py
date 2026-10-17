@@ -105,7 +105,8 @@ def main():
             if Path("/sys/class/block/" + Path(loop).name + "p3/size").read_text().strip() != "3145728":
                 raise RuntimeError("BLKPG registration mismatch")
             run(["fsck.vfat", "-n", loop + "p3"])
-            listing = subprocess.check_output(["mdir", "-i", loop + "p3", "::"], universal_newlines=True)
+            listing = subprocess.check_output(["mdir", "-i", loop + "p3", "::"],
+                                              env=dict(os.environ, MTOOLS_SKIP_CHECK="1"), universal_newlines=True)
             if "uploads" not in listing or "music" not in listing:
                 raise RuntimeError("data directories missing")
             after = image.open("rb").read(16384)
