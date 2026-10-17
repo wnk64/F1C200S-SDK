@@ -1,3 +1,13 @@
+## 2026-10-17 / Results / wiliwili runtime recovery candidate
+Source:ff4950a audio-preroll/feed-cover fix;757ee52 progress probe;69aa9f8 UI cover probe;c35f94d unchanged overlay mtimes. README documents opt-in diagnostics. Locked nested sources remain unchanged; unrelated dirty files preserved.
+Build:./sdk build media-backends -j8;84 SDK tests PASS. Repeated build reports UI/Cedar/MPlayer up-to-date, no main.o/mediaplayer.o compilation; no image built.
+Artifacts:UI2859a7c4618337b541b830b5fcf829d33bf9725c1753e60af9cb3b36fdb7a038;backend835d8fd805169e2a95bb3c7660e233faf930ea4f1ca183e40ea1855c35d8ebec.
+Old board:UIad6daf37c16b80e3eaeda64627bbc2a8a2b4852543c7dc9faa3c9ce5aa3a09c7;backend513556b1bbfc2fb0d3a71025cc58c097ef40f47b3985eaa8934a1cb2c11b3fd3. No new backup copies; existing locked source baseline retained, exact old-binary reproduction not claimed.
+Tests:old seek55s with required CA failed20s without advancing frames;new same-stream seek55s passed twice229/230frames;startup twice231/232frames,8s advancement each. After user reboot, actual UI --player-bv BV1GJ411x7h7 advances48s;Bluetooth route switch retained advancing frames, reported AV delta17-20ms.
+Independent post-reboot probe:start0 PASS1117frames,160->45160ms,first1911ms,maxgap1195ms. Seek55s PASS194frames,55040->63040ms,first7085ms,maxgap2184ms. These gaps remain; audible smoothness not certified. Earlier interrupted long probe not counted.
+Cover:selftest starts with1/8,returns2/8,retries to8/8 PASS. Opt-in only; default disabled. Startup audio-only freeze not reproduced in this run; do not claim every intermittent cause resolved.
+Decision:candidate deployment scoped to two wiliwili binaries with SSH/hash verification and same-directory replacement; restore menu and remove temporary probes/URI/logs. Cold-boot acceptance0/3;shared display/audio/user touch still needs broader physical regression. No kernel,DTB,network,Bluetooth config,account or media changes.
+
 ## 2026-10-17 / Planned / Preserve incremental overlay mtimes
 Files: sdk-support/sdk.py,test_sdk.py. Skip overlay copies when content already matches; test unchanged sources/header preserve deterministic mtime. No runtime behavior change.
 Board:69aa9f8 cover selftest passed8/8 after detail/return, new UI2859a7c4; backend835d8fd8. User restarted previous long probe; interrupted test not counted. Repeating live playback after restart.
